@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -58,7 +59,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -89,7 +89,6 @@ import kotlinx.coroutines.delay
 
 private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
-private const val GRID_COLUMNS = 3
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
@@ -118,13 +117,17 @@ private fun HomeContent(
     var dubMode by rememberSaveable { mutableStateOf(false) }
     var heroIndex by remember { mutableIntStateOf(0) }
 
-    val screenHeight = LocalConfiguration.current.screenHeightDp
-    val heroHeight = (screenHeight * 0.70f).dp.coerceIn(480.dp, 720.dp)
-
     val currentHero = state.hero.getOrNull(heroIndex)
-    val backdrop = currentHero?.let { state.art[it.id]?.backdrop ?: it.backdropUrl }
+    val backdrop = currentHero?.let { state.art[it.id]?.backdrop ?: it.posterUrl ?: it.backdropUrl }
 
-    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx)) {
+        // Everything below adapts to the real screen size.
+        val heroHeight = (maxHeight * 0.68f).coerceIn(420.dp, 760.dp)
+        val columns = when {
+            maxWidth >= 900.dp -> 6
+            maxWidth >= 600.dp -> 4
+            else -> 3
+        }
         // Fixed, faint copy of the hero art that stays behind the whole page (as on Miruro).
         if (backdrop != null) {
             AsyncImage(
@@ -167,7 +170,7 @@ private fun HomeContent(
                 }
                 val pageCount = pages.size.coerceAtLeast(1)
                 val page = latestPage.coerceIn(0, pageCount - 1)
-                val rows = pages.getOrNull(page).orEmpty().chunked(GRID_COLUMNS)
+                val rows = pages.getOrNull(page).orEmpty().chunked(columns)
 
                 LazyColumn(
                     state = listState,
@@ -222,7 +225,7 @@ private fun HomeContent(
                         }
                     } else {
                         items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], onClick = comingSoon)
+                            EpisodeRow(rows[index], columns, onClick = comingSoon)
                             Spacer(Modifier.height(16.dp))
                         }
                     }
@@ -264,7 +267,7 @@ private fun HomeContent(
 @Composable
 private fun AniTopBar(scrolled: Boolean, onSearch: () -> Unit, onMenu: () -> Unit) {
     val background by animateColorAsState(
-        targetValue = if (scrolled) Ani.Onyx.copy(alpha = 0.88f) else Color.Transparent,
+        targetValue = if (scrolled) Ani.Onyx.copy(alpha = 0.97f) else Color.Transparent,
         label = "topBarBackground",
     )
     Column(Modifier.fillMaxWidth().background(background)) {
@@ -280,7 +283,7 @@ private fun AniTopBar(scrolled: Boolean, onSearch: () -> Unit, onMenu: () -> Uni
                 contentDescription = "AniBiar TV",
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                modifier = Modifier.height(34.dp).width(88.dp),
+                modifier = Modifier.height(30.dp).width(78.dp),
             )
             Spacer(Modifier.weight(1f))
             Icon(
@@ -346,7 +349,7 @@ private fun HeroSlide(
 ) {
     Box(Modifier.fillMaxSize()) {
         AsyncImage(
-            model = art?.backdrop ?: media.backdropUrl,
+            model = art?.backdrop ?: media.posterUrl ?: media.backdropUrl,
             contentDescription = media.displayTitle,
             contentScale = ContentScale.Crop,
             alignment = Alignment.Center,
@@ -382,7 +385,7 @@ private fun HeroSlide(
             } else {
                 Text(
                     text = media.displayTitle,
-                    style = inter(30f, FontWeight.Bold, lineHeight = 36f),
+                    style = inter(27f, FontWeight.Bold, lineHeight = 32f),
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -406,7 +409,7 @@ private fun HeroSlide(
 
             Text(
                 text = media.cleanDescription,
-                style = inter(16f, lineHeight = 25f),
+                style = inter(15f, lineHeight = 23f),
                 color = Color(0xFFC3BFC7),
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
@@ -421,12 +424,12 @@ private fun HeroSlide(
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color.White)
                         .clickable(onClick = onWatch)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(AniIcons.Play, contentDescription = null, tint = Color.Black, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Watch Now", style = inter(15f, FontWeight.Medium), color = Color.Black)
+                    Icon(AniIcons.Play, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Watch Now", style = inter(13.5f, FontWeight.Medium), color = Color.Black, maxLines = 1, softWrap = false)
                 }
                 Row(
                     modifier = Modifier
@@ -434,12 +437,12 @@ private fun HeroSlide(
                         .clip(RoundedCornerShape(10.dp))
                         .background(Ani.ButtonDark)
                         .clickable(onClick = onDetails)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(AniIcons.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Details", style = inter(15f, FontWeight.Medium))
+                    Icon(AniIcons.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Details", style = inter(13.5f, FontWeight.Medium), maxLines = 1, softWrap = false)
                 }
                 Box(
                     modifier = Modifier
@@ -463,9 +466,9 @@ private fun HeroChip(label: String) {
             .clip(RoundedCornerShape(50))
             .background(Color.Black.copy(alpha = 0.35f))
             .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(50))
-            .padding(horizontal = 13.dp, vertical = 5.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
-        Text(label, style = inter(14f, FontWeight.Medium), color = Color(0xFFD9D5DC))
+        Text(label, style = inter(11.5f, FontWeight.Medium), color = Color(0xFFD9D5DC), maxLines = 1, softWrap = false)
     }
 }
 
@@ -484,7 +487,7 @@ private fun ContinueWatching(
         ) {
             Text(
                 "Continue Watching",
-                style = inter(22f, FontWeight.SemiBold),
+                style = inter(20f, FontWeight.SemiBold),
                 modifier = Modifier.weight(1f),
             )
             Text("View all", style = inter(15f), color = Ani.Muted)
@@ -561,7 +564,7 @@ private fun LatestHeader(
     ) {
         Text(
             text = "Latest Episodes",
-            style = inter(22f, FontWeight.SemiBold),
+            style = inter(20f, FontWeight.SemiBold),
             color = Ani.Soft,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -579,7 +582,7 @@ private fun SubDubToggle(dubMode: Boolean, onChange: (Boolean) -> Unit) {
     val shape = RoundedCornerShape(50)
     Row(
         modifier = Modifier
-            .height(32.dp)
+            .height(30.dp)
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
             .padding(2.dp),
@@ -598,12 +601,12 @@ private fun ToggleSegment(label: String, selected: Boolean, onClick: () -> Unit)
             .clip(RoundedCornerShape(50))
             .background(if (selected) Ani.Lavender else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 13.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            style = inter(15f, if (selected) FontWeight.SemiBold else FontWeight.Medium),
+            style = inter(12.5f, if (selected) FontWeight.SemiBold else FontWeight.Medium),
             color = if (selected) Color.White else Color.White.copy(alpha = 0.85f),
         )
     }
@@ -614,35 +617,35 @@ private fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () 
     val shape = RoundedCornerShape(50)
     Row(
         modifier = Modifier
-            .height(32.dp)
+            .height(30.dp)
             .clip(shape)
             .border(1.dp, Color.White.copy(alpha = 0.28f), shape)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = AniIcons.ChevronLeft,
             contentDescription = "Previous page",
             tint = Color.White.copy(alpha = if (page > 0) 0.9f else 0.35f),
-            modifier = Modifier.size(22.dp).clip(CircleShape).clickable(enabled = page > 0, onClick = onPrev),
+            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page > 0, onClick = onPrev),
         )
         Text(
             text = "${page + 1}/$pageCount",
-            style = inter(14f, FontWeight.Medium),
+            style = inter(12.5f, FontWeight.Medium),
             color = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.padding(horizontal = 6.dp),
+            modifier = Modifier.padding(horizontal = 4.dp),
         )
         Icon(
             imageVector = AniIcons.ChevronRight,
             contentDescription = "Next page",
             tint = Color.White.copy(alpha = if (page < pageCount - 1) 0.9f else 0.35f),
-            modifier = Modifier.size(22.dp).clip(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext),
+            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext),
         )
     }
 }
 
 @Composable
-private fun EpisodeRow(rowItems: List<LatestEpisode>, onClick: () -> Unit) {
+private fun EpisodeRow(rowItems: List<LatestEpisode>, columns: Int, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
@@ -650,7 +653,7 @@ private fun EpisodeRow(rowItems: List<LatestEpisode>, onClick: () -> Unit) {
         rowItems.forEach { episode ->
             EpisodeCard(episode, onClick, Modifier.weight(1f))
         }
-        repeat(GRID_COLUMNS - rowItems.size) {
+        repeat((columns - rowItems.size).coerceAtLeast(0)) {
             Spacer(Modifier.weight(1f))
         }
     }
@@ -659,62 +662,86 @@ private fun EpisodeRow(rowItems: List<LatestEpisode>, onClick: () -> Unit) {
 @Composable
 private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val media = item.media
-    Column(modifier.clickable(onClick = onClick)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Ani.Item),
-        ) {
-            AsyncImage(
-                model = media.posterUrl,
-                contentDescription = media.displayTitle,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
+    BoxWithConstraints(modifier.clickable(onClick = onClick)) {
+        // Badge size follows the card width so CC + format + year always fit on one line.
+        val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
+        val badgeText = 9.5f * fit
+        val badgeIcon = (10f * fit).dp
+        val badgePad = (5f * fit).dp
+
+        Column {
             Box(
                 Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(72.dp)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))),
-            )
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Ani.Item),
             ) {
-                Text("EP ${item.episode}", style = inter(15f, FontWeight.SemiBold), color = Color.White)
-                Text(
-                    timeAgo(item.airingAt),
-                    style = inter(15f, FontWeight.Medium),
-                    color = Color.White.copy(alpha = 0.92f),
+                AsyncImage(
+                    model = media.posterUrl,
+                    contentDescription = media.displayTitle,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
                 )
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))),
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 9.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "EP ${item.episode}",
+                        style = inter(12.5f, FontWeight.SemiBold),
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        timeAgo(item.airingAt),
+                        style = inter(11.5f, FontWeight.Medium),
+                        color = Color.White.copy(alpha = 0.92f),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
+
+            Spacer(Modifier.height(7.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                InfoBadge(
+                    text = item.episode.toString(),
+                    icon = AniIcons.ClosedCaption,
+                    textSize = badgeText,
+                    iconSize = badgeIcon,
+                    hPad = badgePad,
+                    vPad = 4.dp,
+                )
+                InfoBadge(text = media.formatLabel, textSize = badgeText, hPad = badgePad, vPad = 4.dp)
+                media.year?.let {
+                    InfoBadge(text = it.toString(), textSize = badgeText, hPad = badgePad, vPad = 4.dp)
+                }
+            }
+
+            Spacer(Modifier.height(7.dp))
+
+            Text(
+                text = media.displayTitle,
+                style = inter(13.5f, FontWeight.Medium, lineHeight = 18f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            InfoBadge(text = item.episode.toString(), icon = AniIcons.ClosedCaption)
-            InfoBadge(text = media.formatLabel)
-            media.year?.let { InfoBadge(text = it.toString()) }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = media.displayTitle,
-            style = inter(15f, FontWeight.Medium, lineHeight = 20f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
@@ -724,19 +751,29 @@ private fun InfoBadge(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     background: Color = Ani.Chip,
+    textSize: Float = 12f,
+    iconSize: Dp = 13.dp,
+    hPad: Dp = 8.dp,
+    vPad: Dp = 5.dp,
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(7.dp))
             .background(background)
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = hPad, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
+            Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(iconSize))
+            Spacer(Modifier.width(3.dp))
         }
-        Text(text, style = inter(13f, FontWeight.Medium), color = Ani.Muted)
+        Text(
+            text = text,
+            style = inter(textSize, FontWeight.Medium),
+            color = Ani.Muted,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
@@ -761,9 +798,9 @@ private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: ()
             modifier = Modifier.padding(start = 2.dp, top = 4.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(AniIcons.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(AniIcons.ChevronRight, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(6.dp))
-            Text(title, style = inter(20f, FontWeight.SemiBold, letterSpacing = 0.4f))
+            Text(title, style = inter(15f, FontWeight.SemiBold, letterSpacing = 0.6f))
         }
 
         visible.forEach { media ->
@@ -836,27 +873,29 @@ private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).clip(CircleShape).background(dot))
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(dot))
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = media.displayTitle,
-                        style = inter(17f, FontWeight.SemiBold, lineHeight = 21f),
+                        style = inter(14.5f, FontWeight.SemiBold, lineHeight = 19f),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.padding(start = 18.dp).clip(RoundedCornerShape(8.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(start = 17.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    InfoBadge(media.formatLabel, background = Ani.ChipOnItem)
-                    media.year?.let { InfoBadge(it.toString(), icon = AniIcons.Calendar, background = Ani.ChipOnItem) }
+                    InfoBadge(media.formatLabel, background = Ani.ChipOnItem, textSize = 10.5f, hPad = 7.dp, vPad = 4.dp)
+                    media.year?.let {
+                        InfoBadge(it.toString(), icon = AniIcons.Calendar, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
+                    }
                     media.airedEpisodes?.takeIf { it > 0 }?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, background = Ani.ChipOnItem)
+                        InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                     media.averageScore?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.Star, background = Ani.ChipOnItem)
+                        InfoBadge(it.toString(), icon = AniIcons.Star, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                 }
             }
