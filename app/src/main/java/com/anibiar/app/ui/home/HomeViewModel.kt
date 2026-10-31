@@ -8,6 +8,7 @@ import com.anibiar.app.data.HistoryItem
 import com.anibiar.app.data.LatestEpisode
 import com.anibiar.app.data.Media
 import com.anibiar.app.data.TmdbArt
+import com.anibiar.app.data.posterUrl
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
