@@ -3,7 +3,9 @@
 package com.anibiar.app.ui.home
 
 import android.widget.Toast
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -59,7 +62,9 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.anibiar.app.BuildConfig
 import com.anibiar.app.R
 import com.anibiar.app.data.HistoryItem
 import com.anibiar.app.data.LatestEpisode
@@ -118,37 +124,27 @@ private fun HomeContent(
     var heroIndex by remember { mutableIntStateOf(0) }
 
     val currentHero = state.hero.getOrNull(heroIndex)
-    val backdrop = currentHero?.let { state.art[it.id]?.backdrop ?: it.posterUrl ?: it.backdropUrl }
+    val backdrop = currentHero?.let { state.art[it.id]?.backdrop ?: it.bannerImage ?: it.posterUrl }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx)) {
         // Everything below adapts to the real screen size.
-        val heroHeight = (maxHeight * 0.68f).coerceIn(420.dp, 760.dp)
+        val heroHeight = (maxHeight * 0.80f).coerceIn(440.dp, 780.dp)
+        val heroPx = with(LocalDensity.current) { heroHeight.toPx() }
         val columns = when {
             maxWidth >= 900.dp -> 6
             maxWidth >= 600.dp -> 4
             else -> 3
         }
-        // Fixed, faint copy of the hero art that stays behind the whole page (as on Miruro).
-        if (backdrop != null) {
-            AsyncImage(
-                model = backdrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alpha = 0.22f,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.45f to Ani.Onyx.copy(alpha = 0.80f),
-                            1f to Ani.Onyx,
-                        ),
-                    ),
-            )
+
+        // Read only while drawing, so scrolling never recomposes the backdrop.
+        val scrollProgress: () -> Float = {
+            if (listState.firstVisibleItemIndex == 0) {
+                listState.firstVisibleItemScrollOffset / heroPx
+            } else {
+                1f + ((listState.firstVisibleItemIndex - 1) * 700f + listState.firstVisibleItemScrollOffset) / heroPx
+            }
         }
+        HeroBackdrop(url = backdrop, scrollProgress = scrollProgress, modifier = Modifier.fillMaxSize())
 
         when {
             state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
@@ -267,7 +263,7 @@ private fun HomeContent(
 @Composable
 private fun AniTopBar(scrolled: Boolean, onSearch: () -> Unit, onMenu: () -> Unit) {
     val background by animateColorAsState(
-        targetValue = if (scrolled) Ani.Onyx.copy(alpha = 0.97f) else Color.Transparent,
+        targetValue = if (scrolled) Ani.Onyx.copy(alpha = 0.92f) else Color.Transparent,
         label = "topBarBackground",
     )
     Column(Modifier.fillMaxWidth().background(background)) {
@@ -339,6 +335,56 @@ private fun HeroPager(
     }
 }
 
+/**
+ * The hero art lives behind the whole page (like Miruro): sharp at the top, then it dims as the page
+ * scrolls, stays faintly visible just below the hero, and fades out completely further down.
+ */
+@Composable
+private fun HeroBackdrop(url: String?, scrollProgress: () -> Float, modifier: Modifier = Modifier) {
+    Box(modifier) {
+        Crossfade(
+            targetState = url,
+            modifier = Modifier.fillMaxSize(),
+            animationSpec = tween(600),
+            label = "heroBackdrop",
+        ) { target ->
+            if (target != null) {
+                AsyncImage(
+                    model = target,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        // Static shading: darker under the top bar, fading to onyx behind the buttons.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Ani.Onyx.copy(alpha = 0.65f),
+                        0.18f to Color.Transparent,
+                        0.52f to Ani.Onyx.copy(alpha = 0.25f),
+                        0.84f to Ani.Onyx.copy(alpha = 0.93f),
+                        1f to Ani.Onyx,
+                    ),
+                ),
+        )
+        // Scroll scrim.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    val p = scrollProgress().coerceIn(0f, 2.2f)
+                    val alpha = if (p <= 1f) 0.10f + 0.62f * p else 0.72f + (p - 1f) / 1.2f * 0.27f
+                    drawRect(Ani.Onyx.copy(alpha = alpha.coerceIn(0f, 0.99f)))
+                },
+        )
+    }
+}
+
 @Composable
 private fun HeroSlide(
     media: Media,
@@ -347,43 +393,27 @@ private fun HeroSlide(
     onDetails: () -> Unit,
     onAdd: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
-        AsyncImage(
-            model = art?.backdrop ?: media.posterUrl ?: media.backdropUrl,
-            contentDescription = media.displayTitle,
-            contentScale = ContentScale.Crop,
-            alignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize(),
-        )
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Ani.Onyx.copy(alpha = 0.60f),
-                        0.28f to Color.Transparent,
-                        0.55f to Ani.Onyx.copy(alpha = 0.35f),
-                        1f to Ani.Onyx,
-                    ),
-                ),
-        )
+    val logoWidth = (LocalConfiguration.current.screenWidthDp * 0.68f).coerceAtMost(340f).dp
 
+    // The slide itself is transparent: the shared backdrop shows through.
+    Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 20.dp, end = 20.dp, bottom = 22.dp),
         ) {
             val logo = art?.logo
-            if (logo != null) {
-                AsyncImage(
+            val waitingForLogo = art == null && BuildConfig.TMDB_API_KEY.isNotBlank()
+            when {
+                logo != null -> AsyncImage(
                     model = logo,
                     contentDescription = media.displayTitle,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(250.dp).height(96.dp),
+                    modifier = Modifier.width(logoWidth).height(92.dp),
                 )
-            } else {
-                Text(
+                waitingForLogo -> Spacer(Modifier.height(92.dp))
+                else -> Text(
                     text = media.displayTitle,
                     style = inter(27f, FontWeight.Bold, lineHeight = 32f),
                     maxLines = 3,
@@ -391,7 +421,7 @@ private fun HeroSlide(
                 )
             }
 
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
 
             val chips = buildList {
                 media.airedEpisodes?.takeIf { it > 0 }?.let { add(if (it == 1) "1 Episode" else "$it Episodes") }
@@ -435,7 +465,8 @@ private fun HeroSlide(
                     modifier = Modifier
                         .height(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Ani.ButtonDark)
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
                         .clickable(onClick = onDetails)
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -448,7 +479,8 @@ private fun HeroSlide(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Ani.ButtonDark)
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
                         .clickable(onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -464,11 +496,11 @@ private fun HeroChip(label: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.35f))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.10f))
+            .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
-        Text(label, style = inter(11.5f, FontWeight.Medium), color = Color(0xFFD9D5DC), maxLines = 1, softWrap = false)
+        Text(label, style = inter(12f, FontWeight.Medium), color = Color(0xFFE3E0E6), maxLines = 1, softWrap = false)
     }
 }
 
@@ -750,7 +782,7 @@ private fun InfoBadge(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    background: Color = Ani.Chip,
+    background: Color = Color.White.copy(alpha = 0.08f),
     textSize: Float = 12f,
     iconSize: Dp = 13.dp,
     hPad: Dp = 8.dp,
@@ -760,6 +792,7 @@ private fun InfoBadge(
         modifier = modifier
             .clip(RoundedCornerShape(7.dp))
             .background(background)
+            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(7.dp))
             .padding(horizontal = hPad, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {

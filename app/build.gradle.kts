@@ -22,9 +22,20 @@ android {
         applicationId = "com.anibiar.app"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        val run = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
+        versionCode = run
+        versionName = "0.3.$run"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
+    }
+
+    signingConfigs {
+        // A fixed debug-grade key (committed) so every build installs over the previous one.
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildFeatures {
@@ -69,6 +80,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // HTTP/3 (QUIC) through Cronet; falls back to OkHttp when unavailable.
+    implementation("com.google.android.gms:play-services-cronet:18.0.1")
+    implementation("com.google.net.cronet:cronet-okhttp:0.1.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")

@@ -1,5 +1,7 @@
 package com.anibiar.app.data
 
+import android.content.Context
+import com.google.net.cronet.okhttptransport.CronetInterceptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
@@ -10,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.chromium.net.CronetEngine
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -33,13 +36,60 @@ class RateLimitInterceptor : Interceptor {
     }
 }
 
+/**
+ * Sends the request through Cronet (HTTP/3 over QUIC). If Cronet fails for any reason the same request
+ * is retried over plain OkHttp (HTTP/2), so a QUIC problem never turns into an error screen.
+ */
+class CronetWithFallback(
+    private val cronet: Interceptor,
+    private val fallback: OkHttpClient,
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response =
+        try {
+            cronet.intercept(chain)
+        } catch (e: IOException) {
+            fallback.newCall(chain.request()).execute()
+        } catch (e: RuntimeException) {
+            fallback.newCall(chain.request()).execute()
+        }
+}
+
 object Http {
-    val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+    private var appContext: Context? = null
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    val client: OkHttpClient by lazy { create() }
+
+    private fun create(): OkHttpClient {
+        val plain = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
-            .addInterceptor(RateLimitInterceptor())
             .build()
+
+        val builder = plain.newBuilder().addInterceptor(RateLimitInterceptor())
+        cronetInterceptor()?.let { builder.addInterceptor(CronetWithFallback(it, plain)) }
+        return builder.build()
+    }
+
+    private fun cronetInterceptor(): Interceptor? {
+        val context = appContext ?: return null
+        return try {
+            val engine = CronetEngine.Builder(context)
+                .enableHttp2(true)
+                .enableQuic(true)
+                .enableBrotli(true)
+                .addQuicHint("graphql.anilist.co", 443, 443)
+                .addQuicHint("s4.anilist.co", 443, 443)
+                .addQuicHint("api.themoviedb.org", 443, 443)
+                .addQuicHint("image.tmdb.org", 443, 443)
+                .build()
+            CronetInterceptor.newBuilder(engine).build()
+        } catch (e: Throwable) {
+            null // no Cronet provider on this device: stay on OkHttp
+        }
     }
 }
 

@@ -2,6 +2,9 @@ package com.anibiar.app.data
 
 import android.content.Context
 import com.anibiar.app.BuildConfig
+import coil.imageLoader
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -54,7 +57,8 @@ class AnimeRepository(context: Context) {
 
     suspend fun fetchDiscover(): DiscoverData {
         val body = api.execute(Queries.DISCOVER)
-        val data = decodeDiscover(body) ?: throw IOException("Unexpected AniList response")
+        val data = withContext(Dispatchers.Default) { decodeDiscover(body) }
+            ?: throw IOException("Unexpected AniList response")
         cache.write(KEY_DISCOVER, body)
         return data
     }
@@ -86,7 +90,7 @@ class AnimeRepository(context: Context) {
 
         cache.write(KEY_LATEST_1, firstBody)
         if (secondBody != null) cache.write(KEY_LATEST_2, secondBody)
-        buildLatest(listOfNotNull(firstBody, secondBody))
+        withContext(Dispatchers.Default) { buildLatest(listOfNotNull(firstBody, secondBody)) }
     }
 
     private fun buildLatest(bodies: List<String>): List<LatestEpisode> {
@@ -108,6 +112,32 @@ class AnimeRepository(context: Context) {
             result += LatestEpisode(media, schedule.episode, schedule.airingAt)
         }
         return result
+    }
+
+    // ---- Image warm-up ----
+
+    /** Fills the disk cache with the first screen of artwork before the UI asks for it. */
+    suspend fun prewarm() {
+        val discover = cachedDiscover()
+        val latest = cachedLatest()
+        preloadImages(
+            discover?.top?.media.orEmpty().take(4).flatMap { listOf(it.bannerImage, it.posterUrl) } +
+                latest.take(12).map { it.media.posterUrl },
+        )
+    }
+
+    /** Network-only preload (no memory cache) so it costs nothing while scrolling. */
+    fun preloadImages(urls: List<String?>) {
+        val loader = appContext.imageLoader
+        urls.filterNotNull().distinct().forEach { url ->
+            loader.enqueue(
+                ImageRequest.Builder(appContext)
+                    .data(url)
+                    .size(240, 360)
+                    .memoryCachePolicy(CachePolicy.DISABLED)
+                    .build(),
+            )
+        }
     }
 
     // ---- TMDB artwork ----

@@ -31,6 +31,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = app.repository
     private val history = app.history
 
+    private val requestedArt = HashSet<Int>()
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
@@ -62,7 +63,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val latest = latestJob.await()
 
             discover.getOrNull()?.let { applyDiscover(it.top.media, it.upcoming.media) }
-            latest.getOrNull()?.let { list -> _state.update { it.copy(latest = list) } }
+            latest.getOrNull()?.let { list ->
+                _state.update { it.copy(latest = list) }
+                repository.preloadImages(list.take(12).map { it.media.posterUrl })
+            }
 
             _state.update { current ->
                 val nothingToShow = current.hero.isEmpty() && current.latest.isEmpty()
@@ -80,11 +84,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         // TMDB artwork (logo + backdrop) for the hero slides, fetched in parallel.
         hero.forEach { media ->
-            if (_state.value.art.containsKey(media.id)) return@forEach
+            if (!requestedArt.add(media.id)) return@forEach
             viewModelScope.launch {
-                repository.art(media)?.let { art ->
-                    _state.update { it.copy(art = it.art + (media.id to art)) }
-                }
+                // An empty TmdbArt marks "resolved, nothing found" so the UI can fall back to text.
+                val art = repository.art(media) ?: TmdbArt(null, null)
+                _state.update { it.copy(art = it.art + (media.id to art)) }
             }
         }
     }

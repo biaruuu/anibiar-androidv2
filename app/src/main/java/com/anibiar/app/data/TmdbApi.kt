@@ -63,7 +63,7 @@ class TmdbApi(
         for (name in names) {
             val results = get("/search/$type", mapOf("query" to name))?.optJSONArray("results") ?: continue
             val tmdbId = pickResult(results, media.year) ?: continue
-            val images = get("/$type/$tmdbId/images", mapOf("include_image_language" to "en,null")) ?: continue
+            val images = get("/$type/$tmdbId/images", mapOf("include_image_language" to "en,ja,null")) ?: continue
             val logo = bestLogo(images.optJSONArray("logos"))
             val backdrop = bestBackdrop(images.optJSONArray("backdrops"))
             if (logo != null || backdrop != null) {
@@ -82,6 +82,14 @@ class TmdbApi(
         for (i in 0 until minOf(results.length(), 10)) {
             val item = results.optJSONObject(i) ?: continue
             if (item.optString("original_language") == "ja") candidates += item
+        }
+        if (candidates.isEmpty()) {
+            // Fall back to anything tagged Animation (genre 16).
+            for (i in 0 until minOf(results.length(), 10)) {
+                val item = results.optJSONObject(i) ?: continue
+                val genres = item.optJSONArray("genre_ids") ?: continue
+                if ((0 until genres.length()).any { genres.optInt(it) == 16 }) candidates += item
+            }
         }
         if (candidates.isEmpty()) return null
         if (year != null) {
@@ -103,8 +111,13 @@ class TmdbApi(
             val logo = logos.optJSONObject(i) ?: continue
             val path = logo.optString("file_path")
             if (path.isEmpty() || path.endsWith(".svg", ignoreCase = true)) continue
-            val english = logo.optString("iso_639_1") == "en"
-            val score = (if (english) 100.0 else 0.0) + logo.optDouble("vote_average", 0.0)
+            val lang = logo.optString("iso_639_1")
+            val languageScore = when (lang) {
+                "en" -> 100.0
+                "ja" -> 50.0
+                else -> 0.0
+            }
+            val score = languageScore + logo.optDouble("vote_average", 0.0)
             if (score > bestScore) {
                 bestScore = score
                 best = path
@@ -174,7 +187,7 @@ class TmdbApi(
         )
     }
 
-    private fun prefKey(id: Int) = "art_$id"
+    private fun prefKey(id: Int) = "art2_$id"
 
     private companion object {
         const val BASE = "https://api.themoviedb.org/3"

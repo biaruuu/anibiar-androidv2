@@ -21,14 +21,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Create debug keystore (signs the APK so it installs directly)
+      - name: Check TMDB key
+        id: tmdb
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
-          mkdir -p ~/.android
-          if [ ! -f ~/.android/debug.keystore ]; then
-            keytool -genkeypair -keystore ~/.android/debug.keystore \
-              -storepass android -keypass android -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
+          if [ -z "$TMDB_API_KEY" ]; then
+            echo "status=MISSING (secret TMDB_API_KEY not found, logos disabled)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ ${#TMDB_API_KEY} -gt 40 ]; then
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TMDB_API_KEY" https://api.themoviedb.org/3/configuration)
+            logos=$(curl -s -H "Authorization: Bearer $TMDB_API_KEY" "https://api.themoviedb.org/3/tv/37854/images?include_image_language=en,null" | grep -o '"file_path"' | wc -l)
+          else
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://api.themoviedb.org/3/configuration?api_key=$TMDB_API_KEY")
+            logos=$(curl -s "https://api.themoviedb.org/3/tv/37854/images?include_image_language=en,null&api_key=$TMDB_API_KEY" | grep -o '"file_path"' | wc -l)
+          fi
+          if [ "$code" = "200" ]; then
+            echo "status=OK (HTTP 200, One Piece images found: $logos)" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=REJECTED (HTTP $code, logos disabled)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build release APK
@@ -49,8 +61,9 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TMDB_STATUS: ${{ steps.tmdb.outputs.status }}
         run: |
           gh release create "build-${{ github.run_number }}" AniBiar.apk \
             --title "AniBiar build ${{ github.run_number }}" \
-            --notes "Home screen build. Install AniBiar.apk on Android 7.0+." \
+            --notes "Home screen build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS" \
             --latest
