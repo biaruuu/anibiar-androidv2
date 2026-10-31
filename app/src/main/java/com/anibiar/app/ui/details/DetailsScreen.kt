@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -123,6 +124,7 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    var topBarPx by remember { mutableStateOf(0) }
     var artFilter by rememberSaveable { mutableStateOf("All") }
     var artExpanded by rememberSaveable { mutableStateOf(false) }
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
@@ -154,7 +156,10 @@ fun DetailsScreen(
                 ),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                item(key = "top") { Spacer(Modifier.statusBarsPadding().height(56.dp + 14.dp)) }
+                item(key = "top") {
+                    val minTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp
+                    Spacer(Modifier.height(maxOf(with(androidx.compose.ui.platform.LocalDensity.current) { topBarPx.toDp() }, minTop) + 14.dp))
+                }
                 item(key = "header") {
                     Header(
                         media = media,
@@ -248,7 +253,9 @@ fun DetailsScreen(
             )
         }
 
-        AniTopBar(scrolled = scrolled, onSearch = comingSoon, onMenu = comingSoon, onLogo = onHome)
+        Box(Modifier.onSizeChanged { topBarPx = it.height }) {
+            AniTopBar(scrolled = scrolled, onSearch = comingSoon, onMenu = comingSoon, onLogo = onHome)
+        }
     }
 }
 
@@ -261,21 +268,26 @@ private fun DetailsBackdrop(media: Media, listState: LazyListState) {
     val request = remember(url) {
         ImageRequest.Builder(context).data(url).size(720, 720).crossfade(true).build()
     }
-    val scrollPx by remember {
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    // Eased (smoothstep) target, quantised so we only recompose a few dozen times per fade.
+    val target by remember {
         derivedStateOf {
-            if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 100_000
+            val px = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 100_000
+            val t = (1f - px / density / 1100f).coerceIn(0f, 1f)
+            Math.round(t * t * (3f - 2f * t) * 60f) / 60f
         }
     }
+    val fade by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = target,
+        animationSpec = androidx.compose.animation.core.tween(280, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
+        label = "backdropFade",
+    )
     // Fixed behind the page like Miruro: strong at the top, dimming as you scroll, gone further down.
     Box(
         Modifier
             .fillMaxWidth()
             .height(720.dp)
-            .graphicsLayer {
-                val scrolledDp = scrollPx / this.density
-                // Linear and slow: still visible behind "About this anime", gone a few screens down.
-                alpha = (1f - scrolledDp / 1100f).coerceIn(0f, 1f)
-            },
+            .graphicsLayer { alpha = fade },
     ) {
         AsyncImage(
             model = request,
@@ -289,8 +301,10 @@ private fun DetailsBackdrop(media: Media, listState: LazyListState) {
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
                     0f to Ani.Onyx.copy(alpha = 0.30f),
-                    0.50f to Ani.Onyx.copy(alpha = 0.62f),
-                    1f to Ani.Onyx.copy(alpha = 0.92f),
+                    0.35f to Ani.Onyx.copy(alpha = 0.50f),
+                    0.60f to Ani.Onyx.copy(alpha = 0.78f),
+                    0.82f to Ani.Onyx.copy(alpha = 0.94f),
+                    1f to Ani.Onyx,
                 ),
             ),
         )
@@ -647,9 +661,15 @@ private fun openUrl(context: Context, url: String?) {
 
 // ------------------------------------------------------------------ trailer
 
+private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 /**
- * Trailer card. Tapping it plays the video inside the app in its own full-screen player window (a separate
- * window keeps the WebView video surface away from the page's blur / clip / animation layers, which blanked it).
+ * Trailer card that plays inside the page. The embed is loaded as the WebView's top-level page (a nested
+ * iframe rendered black on some phones), with the player's own controls and a real fullscreen mode.
  */
 @Composable
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
@@ -658,14 +678,68 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
     val kind = site?.lowercase()
     if (kind != "youtube" && kind != "dailymotion") return
     val shape = RoundedCornerShape(14.dp)
-    var showPlayer by rememberSaveable(videoId) { mutableStateOf(false) }
+    var playing by remember(videoId) { mutableStateOf(false) }
+    var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
+    val activity = remember(context) { context.findActivity() }
 
     val embedUrl = if (kind == "youtube") {
-        "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&origin=https://anibiartv.vercel.app"
+        "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=https://anibiartv.vercel.app"
     } else {
         "https://www.dailymotion.com/embed/video/$videoId?autoplay=1"
     }
-    val watchUrl = if (kind == "youtube") "https://www.youtube.com/watch?v=$videoId" else "https://www.dailymotion.com/video/$videoId"
+
+    fun systemBars(hidden: Boolean) {
+        val window = activity?.window ?: return
+        val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        if (hidden) {
+            controller.systemBarsBehavior =
+                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    fun exitFullscreen() {
+        fullscreenView?.let { view -> (view.parent as? android.view.ViewGroup)?.removeView(view) }
+        fullscreenCallback?.onCustomViewHidden()
+        val wasFullscreen = fullscreenView != null
+        fullscreenView = null
+        fullscreenCallback = null
+        if (wasFullscreen) {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            systemBars(false)
+        }
+    }
+
+    BackHandler(enabled = fullscreenView != null) { exitFullscreen() }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { exitFullscreen() } }
+
+    val chrome = remember {
+        object : android.webkit.WebChromeClient() {
+            override fun onShowCustomView(view: android.view.View, callback: android.webkit.WebChromeClient.CustomViewCallback) {
+                if (fullscreenView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                view.setBackgroundColor(android.graphics.Color.BLACK)
+                (activity?.window?.decorView as? android.widget.FrameLayout)?.addView(
+                    view,
+                    android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+                fullscreenView = view
+                fullscreenCallback = callback
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                systemBars(true)
+            }
+
+            override fun onHideCustomView() = exitFullscreen()
+        }
+    }
 
     Column(modifier.fillMaxWidth().padding(top = 32.dp)) {
         Text("Trailer", style = inter(18f, FontWeight.SemiBold))
@@ -674,87 +748,53 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(shape)
+                .then(if (playing) Modifier else Modifier.clip(shape))
                 .border(1.dp, Ani.Border, shape)
-                .background(Ani.Item)
-                .clickable { showPlayer = true },
+                .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
-            val full = if (kind == "youtube") "https://img.youtube.com/vi/$videoId/maxresdefault.jpg" else thumbnail
-            var art by remember(videoId) { mutableStateOf(full ?: thumbnail) }
-            val request = remember(art) {
-                ImageRequest.Builder(context).data(art).size(Size.ORIGINAL).crossfade(true).build()
-            }
-            AsyncImage(
-                model = request,
-                contentDescription = "${media.displayTitle} trailer",
-                contentScale = ContentScale.Crop,
-                filterQuality = FilterQuality.High,
-                onError = { if (art != thumbnail && thumbnail != null) art = thumbnail },
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.20f)))
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.55f))
-                    .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(AniIcons.Play, contentDescription = "Play trailer", tint = Color.White, modifier = Modifier.size(28.dp))
-            }
-        }
-    }
-
-    if (showPlayer) {
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { showPlayer = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+            if (playing) {
                 androidx.compose.ui.viewinterop.AndroidView(
-                    modifier = Modifier.aspectRatio(16f / 9f),
+                    modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         android.webkit.WebView(ctx).apply {
                             setBackgroundColor(android.graphics.Color.BLACK)
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
                             settings.mediaPlaybackRequiresUserGesture = false
-                            settings.loadWithOverviewMode = true
-                            settings.useWideViewPort = true
-                            webChromeClient = android.webkit.WebChromeClient()
+                            webChromeClient = chrome
                             webViewClient = android.webkit.WebViewClient()
                             loadUrl(embedUrl, mapOf("Referer" to "https://anibiartv.vercel.app"))
                         }
                     },
                     onRelease = { it.destroy() },
                 )
+            } else {
+                val full = if (kind == "youtube") "https://img.youtube.com/vi/$videoId/maxresdefault.jpg" else thumbnail
+                var art by remember(videoId) { mutableStateOf(full ?: thumbnail) }
+                val request = remember(art) {
+                    ImageRequest.Builder(context).data(art).size(Size.ORIGINAL).crossfade(true).build()
+                }
+                AsyncImage(
+                    model = request,
+                    contentDescription = "${media.displayTitle} trailer",
+                    contentScale = ContentScale.Crop,
+                    filterQuality = FilterQuality.High,
+                    onError = { if (art != thumbnail && thumbnail != null) art = thumbnail },
+                    modifier = Modifier.fillMaxSize().clickable { playing = true },
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.20f)))
                 Box(
                     Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(14.dp)
-                        .size(40.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .clickable { showPlayer = false },
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                        .clickable { playing = true },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AniIcons.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(AniIcons.Play, contentDescription = "Play trailer", tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-                Text(
-                    "Open in browser",
-                    style = inter(13.5f, FontWeight.Medium),
-                    color = Ani.Soft,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-                        .clickable { openUrl(context, watchUrl) }
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
-                )
             }
         }
     }
@@ -966,18 +1006,20 @@ private fun MediaCard(
             }
         }
         Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            val eps = media.airedEpisodes ?: media.episodes
-            eps?.takeIf { it > 0 }?.let {
-                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = 11f, iconSize = 12.dp, hPad = 7.dp, vPad = 4.dp)
+        // CC count + format + year always sit on ONE row: the text size shrinks with the card width and label length.
+        val eps = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }
+        val formatText = media.formatLabel
+        val yearText = media.year?.toString()
+        val chipCount = listOfNotNull(eps, formatText, yearText).size
+        val chars = (eps?.toString()?.length ?: 0) + formatText.length + (yearText?.length ?: 0)
+        val available = width.value - chipCount * 12f - (chipCount - 1) * 3f - (if (eps != null) 15f else 0f)
+        val badgeText = (available / (chars.coerceAtLeast(1) * 0.70f)).coerceIn(8.5f, 11.5f)
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            eps?.let {
+                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = badgeText, iconSize = (badgeText + 1f).dp, hPad = 6.dp, vPad = 4.dp)
             }
-            InfoBadge(media.formatLabel, textSize = 11f, hPad = 7.dp, vPad = 4.dp)
-            media.year?.let {
-                InfoBadge(it.toString(), textSize = 11f, hPad = 7.dp, vPad = 4.dp)
-            }
+            InfoBadge(formatText, textSize = badgeText, hPad = 6.dp, vPad = 4.dp)
+            yearText?.let { InfoBadge(it, textSize = badgeText, hPad = 6.dp, vPad = 4.dp) }
         }
         Spacer(Modifier.height(6.dp))
         if (label != null) {
