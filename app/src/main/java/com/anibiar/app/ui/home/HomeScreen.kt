@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -72,11 +73,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.size.Size
 import com.anibiar.app.BuildConfig
 import com.anibiar.app.R
 import com.anibiar.app.data.HistoryItem
@@ -149,14 +154,15 @@ private fun HomeContent(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx).nestedScroll(scrollConnection)) {
         // Everything below adapts to the real screen size.
-        val heroHeight = (maxHeight * 0.80f).coerceIn(440.dp, 780.dp)
+        // Miruro's hero is ~1.48x as tall as it is wide; that proportion gives the same crop of the art.
+        val heroHeight = (maxWidth * 1.48f).coerceAtMost(maxHeight * 0.88f).coerceAtLeast(300.dp)
         val columns = when {
             maxWidth >= 900.dp -> 6
             maxWidth >= 600.dp -> 4
             else -> 3
         }
 
-        HeroBackdrop(url = backdrop, scrollPx = { scrollPx }, modifier = Modifier.fillMaxSize())
+        HeroBackdrop(url = backdrop, heroHeight = heroHeight, scrollPx = { scrollPx }, modifier = Modifier.fillMaxSize())
 
         when {
             state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
@@ -352,51 +358,62 @@ private fun HeroPager(
  * scrolls, stays faintly visible just below the hero, and fades out completely further down.
  */
 @Composable
-private fun HeroBackdrop(url: String?, scrollPx: () -> Float, modifier: Modifier = Modifier) {
+private fun HeroBackdrop(
+    url: String?,
+    heroHeight: Dp,
+    scrollPx: () -> Float,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier) {
-        Crossfade(
-            targetState = url,
-            modifier = Modifier.fillMaxSize(),
-            animationSpec = tween(600),
-            label = "heroBackdrop",
-        ) { target ->
-            if (target != null) {
-                AsyncImage(
-                    model = target,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    alignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        // The art is exactly hero-sized and stays fixed while the page scrolls over it.
+        Box(Modifier.fillMaxWidth().height(heroHeight)) {
+            Crossfade(
+                targetState = url,
+                modifier = Modifier.fillMaxSize(),
+                animationSpec = tween(600),
+                label = "heroBackdrop",
+            ) { target ->
+                if (target != null) {
+                    AsyncImage(
+                        model = target,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        alignment = Alignment.Center,
+                        filterQuality = FilterQuality.High,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
-        }
-        // Static shading: darker under the top bar, fading to onyx behind the buttons.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Ani.Onyx.copy(alpha = 0.65f),
-                        0.18f to Color.Transparent,
-                        0.52f to Ani.Onyx.copy(alpha = 0.25f),
-                        0.84f to Ani.Onyx.copy(alpha = 0.93f),
-                        1f to Ani.Onyx,
+            // Darker under the top bar, fading into onyx behind the buttons.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Ani.Onyx.copy(alpha = 0.60f),
+                            0.16f to Color.Transparent,
+                            0.55f to Ani.Onyx.copy(alpha = 0.30f),
+                            0.80f to Ani.Onyx.copy(alpha = 0.62f),
+                            0.93f to Ani.Onyx.copy(alpha = 0.92f),
+                            1f to Ani.Onyx,
+                        ),
                     ),
-                ),
-        )
-        // Scroll scrim.
+            )
+        }
+        // Scroll scrim, tuned to Miruro: dim but visible just below the hero, almost gone after ~1.2 hero heights.
         Box(
             Modifier
                 .fillMaxSize()
                 .drawBehind {
-                    // Distance scrolled in screens: 0.8 = hero just left, 1.8 = a few rows of cards later.
-                    val s = scrollPx() / size.height
+                    val s = scrollPx() / heroHeight.toPx()
                     val alpha = when {
-                        s <= 0.8f -> 0.10f + 0.50f * (s / 0.8f)
-                        s <= 1.8f -> 0.60f + 0.28f * (s - 0.8f)
-                        else -> (0.88f + 0.105f * ((s - 1.8f) / 1.4f)).coerceAtMost(0.985f)
+                        s <= 0.35f -> 0.08f + 0.37f * (s / 0.35f)
+                        s <= 0.71f -> 0.45f + 0.25f * ((s - 0.35f) / 0.36f)
+                        s <= 1.16f -> 0.70f + 0.20f * ((s - 0.71f) / 0.45f)
+                        s <= 1.6f -> 0.90f + 0.09f * ((s - 1.16f) / 0.44f)
+                        else -> 1f
                     }
-                    drawRect(Ani.Onyx.copy(alpha = alpha))
+                    drawRect(Ani.Onyx.copy(alpha = alpha.coerceIn(0f, 1f)))
                 },
         )
     }
@@ -446,7 +463,7 @@ private fun HeroSlide(
                 addAll(media.genres.orEmpty().take(3))
             }
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 chips.forEach { label -> HeroChip(label) }
@@ -513,9 +530,9 @@ private fun HeroChip(label: String) {
             .clip(RoundedCornerShape(50))
             .background(Color.White.copy(alpha = 0.10f))
             .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(50))
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
-        Text(label, style = inter(12f, FontWeight.Medium), color = Color(0xFFE3E0E6), maxLines = 1, softWrap = false)
+        Text(label, style = inter(11.5f, FontWeight.Medium), color = Color(0xFFE3E0E6), maxLines = 1, softWrap = false)
     }
 }
 
@@ -724,10 +741,9 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
                     .clip(RoundedCornerShape(16.dp))
                     .background(Ani.Item),
             ) {
-                AsyncImage(
-                    model = media.posterUrl,
+                PosterImage(
+                    url = media.posterUrl,
                     contentDescription = media.displayTitle,
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
                 Box(
@@ -747,7 +763,7 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
                 ) {
                     Text(
                         "EP ${item.episode}",
-                        style = inter(12.5f, FontWeight.SemiBold),
+                        style = inter(11f, FontWeight.SemiBold),
                         color = Color.White,
                         maxLines = 1,
                         softWrap = false,
@@ -755,7 +771,7 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
                     Spacer(Modifier.width(4.dp))
                     Text(
                         timeAgo(item.airingAt),
-                        style = inter(11.5f, FontWeight.Medium),
+                        style = inter(10.5f, FontWeight.Medium),
                         color = Color.White.copy(alpha = 0.92f),
                         maxLines = 1,
                         softWrap = false,
@@ -906,10 +922,9 @@ private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
         )
 
         Row(Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = media.posterUrl,
+            PosterImage(
+                url = media.posterUrl,
                 contentDescription = media.displayTitle,
-                contentScale = ContentScale.Crop,
                 modifier = Modifier.width(68.dp).fillMaxHeight(),
             )
             Column(
@@ -948,6 +963,26 @@ private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
             }
         }
     }
+}
+
+/** Poster art decoded at full resolution and scaled with high-quality filtering, so cards stay crisp. */
+@Composable
+private fun PosterImage(url: String?, contentDescription: String?, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val request = remember(url) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .size(Size.ORIGINAL)
+            .crossfade(true)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Crop,
+        filterQuality = FilterQuality.High,
+        modifier = modifier,
+    )
 }
 
 // ---------------------------------------------------------------- error
