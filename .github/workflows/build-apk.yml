@@ -48,7 +48,18 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon --console=plain 2>&1 | tee build.log
+
+      - name: Show build errors
+        if: failure()
+        run: |
+          grep -E "^e: |What went wrong|Could not (resolve|find)|Execution failed|error:|Unresolved|Duplicate" build.log | head -10 | while IFS= read -r line; do
+            echo "::error::${line:0:400}"
+          done
+          grep -A4 "What went wrong" build.log | head -8 | while IFS= read -r line; do
+            echo "::error::${line:0:400}"
+          done
 
       - name: Name the APK
         run: cp app/build/outputs/apk/release/app-release.apk AniBiar.apk
