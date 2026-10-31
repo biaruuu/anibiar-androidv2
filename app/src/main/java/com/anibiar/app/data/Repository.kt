@@ -175,8 +175,46 @@ class AnimeRepository(context: Context) {
     suspend fun malScore(idMal: Int): String? = withContext(Dispatchers.IO) {
         val key = "mal_$idMal.txt"
         cache.read(key)?.takeIf { it.isNotBlank() }?.let { return@withContext it }
-        val score = jikanScore(idMal) ?: shikimoriScore(idMal) ?: malPageScore(idMal)
+        // Every source at once, first real answer wins: the official MAL API (when a client id is set), then
+        // Jikan, Shikimori and MAL's own page as fallbacks. A slow or blocked source can't hold the score back.
+        val score = coroutineScope {
+            val sources = buildList<kotlinx.coroutines.Deferred<String?>> {
+                if (BuildConfig.MAL_CLIENT_ID.isNotBlank()) add(async { malApiScore(idMal) })
+                add(async { jikanScore(idMal) })
+                add(async { shikimoriScore(idMal) })
+                add(async { malPageScore(idMal) })
+            }
+            val pending = sources.toMutableList()
+            var found: String? = null
+            while (pending.isNotEmpty() && found == null) {
+                val done = kotlinx.coroutines.selects.select<kotlinx.coroutines.Deferred<String?>> {
+                    pending.forEach { d -> d.onAwait { d } }
+                }
+                pending.remove(done)
+                found = done.getCompleted()
+            }
+            sources.forEach { it.cancel() }
+            found
+        }
         score?.also { cache.write(key, it) }
+    }
+
+    /** Official MyAnimeList API v2 (needs the MAL_CLIENT_ID build secret). */
+    private fun malApiScore(id: Int): String? = try {
+        val request = okhttp3.Request.Builder()
+            .url("https://api.myanimelist.net/v2/anime/$id?fields=mean")
+            .header("X-MAL-CLIENT-ID", BuildConfig.MAL_CLIENT_ID)
+            .header("Accept", "application/json")
+            .build()
+        Http.plain.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val mean = org.json.JSONObject(response.body?.string().orEmpty()).optDouble("mean", Double.NaN)
+            fmtScore(mean)
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     private fun fmtScore(value: Double): String? =

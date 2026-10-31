@@ -129,7 +129,7 @@ fun DetailsScreen(
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     var topBarPx by remember { mutableStateOf(0) }
-    var fullscreenUrl by remember { mutableStateOf<String?>(null) }
+    var fullscreenTrailer by remember { mutableStateOf<FsTrailer?>(null) }
     // Total distance scrolled (px), read only while drawing, so the backdrop fade never recomposes.
     var scrollPx by remember { mutableStateOf(0f) }
     val scrollConnection = remember {
@@ -191,7 +191,7 @@ fun DetailsScreen(
                 }
                 media.trailer?.takeIf { !it.id.isNullOrBlank() }?.let { trailer ->
                     item(key = "trailer") {
-                        Trailer(media, trailer.id.orEmpty(), trailer.site, trailer.thumbnail, { fullscreenUrl = it }, Modifier.padding(horizontal = side))
+                        Trailer(media, trailer.id.orEmpty(), trailer.site, trailer.thumbnail, { fullscreenTrailer = it }, Modifier.padding(horizontal = side))
                     }
                 }
                 val episodeCount = media.airedEpisodes ?: media.episodes ?: media.streamingEpisodes.size
@@ -272,7 +272,7 @@ fun DetailsScreen(
             AniTopBar(scrolled = scrolled, onSearch = comingSoon, onMenu = comingSoon, onLogo = onHome)
         }
 
-        fullscreenUrl?.let { url -> TrailerFullscreen(url) { fullscreenUrl = null } }
+        fullscreenTrailer?.let { t -> TrailerFullscreen(t) { fullscreenTrailer = null } }
     }
 }
 
@@ -681,30 +681,94 @@ private tailrec fun Context.findActivity(): android.app.Activity? = when (this) 
     else -> null
 }
 
-@android.annotation.SuppressLint("SetJavaScriptEnabled")
-private fun newTrailerWebView(ctx: Context, url: String): android.webkit.WebView =
-    android.webkit.WebView(ctx).apply {
-        setBackgroundColor(android.graphics.Color.BLACK)
-        settings.javaScriptEnabled = true
-        settings.domStorageEnabled = true
-        settings.mediaPlaybackRequiresUserGesture = false
-        webChromeClient = android.webkit.WebChromeClient()
-        webViewClient = android.webkit.WebViewClient()
-        loadUrl(url, mapOf("Referer" to "https://anibiartv.vercel.app"))
-    }
+private data class FsTrailer(val kind: String, val videoId: String, val start: Int)
+
+private class TrailerBridge(private val ready: () -> Unit, private val failed: () -> Unit) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+
+    @android.webkit.JavascriptInterface
+    fun onReady() { main.post { ready() } }
+
+    @android.webkit.JavascriptInterface
+    fun onError(code: Int) { main.post { failed() } }
+}
 
 /**
- * Trailer card that plays inside the page. The embed is the WebView's top-level page (a nested iframe rendered
- * black on some phones). YouTube's own fullscreen button does nothing in a WebView, so it is hidden and ours
- * reopens the video from the current second in a full-screen overlay (same window, landscape).
+ * The page the WebView shows for YouTube: the official IFrame Player API, loaded with youtube.com as its base
+ * URL. That is what YouTube-player libraries do; it keeps the player same-site (a cross-site iframe rendered
+ * black on some phones) and the API tells us when the video can't be embedded.
  */
+private fun trailerHtml(videoId: String, start: Int): String = """
+<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#player{position:absolute;top:0;left:0;width:100%;height:100%}</style>
+</head><body><div id="player"></div>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+var player;
+function onYouTubeIframeAPIReady(){
+  player = new YT.Player('player', {
+    width:'100%', height:'100%', videoId:'$videoId',
+    playerVars:{autoplay:1, playsinline:1, rel:0, modestbranding:1, fs:0, controls:1, start:$start, origin:'https://www.youtube.com'},
+    events:{
+      onReady:function(e){ e.target.playVideo(); Android.onReady(); },
+      onError:function(e){ Android.onError(e.data); }
+    }
+  });
+}
+function getTime(){ return (player && player.getCurrentTime) ? Math.floor(player.getCurrentTime()) : 0; }
+</script></body></html>
+"""
+
+@Composable
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
+private fun TrailerPlayer(
+    kind: String,
+    videoId: String,
+    start: Int,
+    onWebView: (android.webkit.WebView) -> Unit,
+    onReady: () -> Unit,
+    onFailed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            android.webkit.WebView(ctx).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
+                webChromeClient = android.webkit.WebChromeClient()
+                addJavascriptInterface(TrailerBridge(onReady, onFailed), "Android")
+                webViewClient = object : android.webkit.WebViewClient() {
+                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                        if (kind != "youtube") onReady()
+                    }
+                }
+                if (kind == "youtube") {
+                    loadDataWithBaseURL("https://www.youtube.com", trailerHtml(videoId, start), "text/html", "utf-8", null)
+                } else {
+                    loadUrl("https://www.dailymotion.com/embed/video/$videoId?autoplay=1&startTime=$start")
+                }
+                onWebView(this)
+            }
+        },
+        onRelease = { it.destroy() },
+    )
+}
+
+private fun watchUrl(kind: String, videoId: String) =
+    if (kind == "youtube") "https://www.youtube.com/watch?v=$videoId" else "https://www.dailymotion.com/video/$videoId"
+
+/** Trailer card that plays inside the page, with its own fullscreen button and an "open in YouTube" fallback. */
 @Composable
 private fun Trailer(
     media: Media,
     videoId: String,
     site: String?,
     thumbnail: String?,
-    onFullscreen: (String) -> Unit,
+    onFullscreen: (FsTrailer) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -712,12 +776,16 @@ private fun Trailer(
     if (kind != "youtube" && kind != "dailymotion") return
     val shape = RoundedCornerShape(14.dp)
     var playing by remember(videoId) { mutableStateOf(false) }
+    var ready by remember(videoId, playing) { mutableStateOf(false) }
+    var failed by remember(videoId, playing) { mutableStateOf(false) }
+    var slow by remember(videoId, playing) { mutableStateOf(false) }
     var webRef by remember { mutableStateOf<android.webkit.WebView?>(null) }
 
-    val embedUrl = if (kind == "youtube") {
-        "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&origin=https://anibiartv.vercel.app"
-    } else {
-        "https://www.dailymotion.com/embed/video/$videoId?autoplay=1"
+    androidx.compose.runtime.LaunchedEffect(playing) {
+        if (playing) {
+            kotlinx.coroutines.delay(7_000)
+            slow = true
+        }
     }
 
     Column(modifier.fillMaxWidth().padding(top = 32.dp)) {
@@ -733,38 +801,70 @@ private fun Trailer(
             contentAlignment = Alignment.Center,
         ) {
             if (playing) {
-                androidx.compose.ui.viewinterop.AndroidView(
+                TrailerPlayer(
+                    kind = kind,
+                    videoId = videoId,
+                    start = 0,
+                    onWebView = { webRef = it },
+                    onReady = { ready = true },
+                    onFailed = { failed = true },
                     modifier = Modifier.fillMaxSize(),
-                    factory = { ctx -> newTrailerWebView(ctx, embedUrl).also { webRef = it } },
-                    onRelease = {
-                        if (webRef === it) webRef = null
-                        it.destroy()
-                    },
                 )
-                Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 10.dp)
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
-                        .clickable {
-                            fun open(start: Int) {
-                                playing = false
-                                onFullscreen(if (kind == "youtube") "$embedUrl&start=$start" else "$embedUrl&startTime=$start")
-                            }
-                            val web = webRef
-                            if (web != null) {
-                                val js = "(function(){var v=document.querySelector('video');return v?Math.floor(v.currentTime):0;})()"
-                                web.evaluateJavascript(js) { value -> open(value?.trim('"')?.toDoubleOrNull()?.toInt() ?: 0) }
-                            } else {
-                                open(0)
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(AniIcons.Fullscreen, contentDescription = "Fullscreen", tint = Color.White, modifier = Modifier.size(22.dp))
+                if (!ready && !failed) {
+                    CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp, modifier = Modifier.size(32.dp))
+                }
+                if (failed || (slow && !ready)) {
+                    Column(
+                        Modifier.fillMaxSize().background(Color.Black),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            if (failed) "This trailer can't be played inside the app." else "Taking longer than usual\u2026",
+                            style = inter(13.5f),
+                            color = Ani.Muted,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Watch on ${if (kind == "youtube") "YouTube" else "Dailymotion"}",
+                            style = inter(14f, FontWeight.SemiBold),
+                            color = Color.Black,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White)
+                                .clickable { openUrl(context, watchUrl(kind, videoId)) }
+                                .padding(horizontal = 18.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+                if (ready && !failed) {
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 10.dp, bottom = 10.dp)
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
+                            .clickable {
+                                fun open(start: Int) {
+                                    webRef = null
+                                    playing = false
+                                    onFullscreen(FsTrailer(kind, videoId, start))
+                                }
+                                val web = webRef
+                                if (web != null && kind == "youtube") {
+                                    web.evaluateJavascript("getTime()") { value ->
+                                        open(value?.trim('"')?.toDoubleOrNull()?.toInt() ?: 0)
+                                    }
+                                } else {
+                                    open(0)
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(AniIcons.Fullscreen, contentDescription = "Fullscreen", tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
                 }
             } else {
                 val full = if (kind == "youtube") "https://img.youtube.com/vi/$videoId/maxresdefault.jpg" else thumbnail
@@ -797,11 +897,12 @@ private fun Trailer(
     }
 }
 
-/** Full-screen trailer layered over the whole page (same window as the inline player, which is known to render). */
+/** Full-screen trailer layered over the whole page (same window as the inline player). */
 @Composable
-private fun TrailerFullscreen(url: String, onClose: () -> Unit) {
+private fun TrailerFullscreen(trailer: FsTrailer, onClose: () -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
+    var failed by remember { mutableStateOf(false) }
     BackHandler { onClose() }
     androidx.compose.runtime.DisposableEffect(Unit) {
         val window = activity?.window
@@ -824,11 +925,35 @@ private fun TrailerFullscreen(url: String, onClose: () -> Unit) {
                 indication = null,
             ) {},
     ) {
-        androidx.compose.ui.viewinterop.AndroidView(
+        TrailerPlayer(
+            kind = trailer.kind,
+            videoId = trailer.videoId,
+            start = trailer.start,
+            onWebView = {},
+            onReady = {},
+            onFailed = { failed = true },
             modifier = Modifier.fillMaxSize(),
-            factory = { ctx -> newTrailerWebView(ctx, url) },
-            onRelease = { it.destroy() },
         )
+        if (failed) {
+            Column(
+                Modifier.fillMaxSize().background(Color.Black),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("This trailer can't be played inside the app.", style = inter(14f), color = Ani.Muted)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Watch on ${if (trailer.kind == "youtube") "YouTube" else "Dailymotion"}",
+                    style = inter(14f, FontWeight.SemiBold),
+                    color = Color.Black,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White)
+                        .clickable { openUrl(context, watchUrl(trailer.kind, trailer.videoId)) }
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                )
+            }
+        }
         Box(
             Modifier
                 .align(Alignment.TopStart)

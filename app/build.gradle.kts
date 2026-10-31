@@ -13,6 +13,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 val tmdbKey: String = (System.getenv("TMDB_API_KEY") ?: localProps.getProperty("TMDB_API_KEY") ?: "").trim()
+val malClientId: String = (System.getenv("MAL_CLIENT_ID") ?: localProps.getProperty("MAL_CLIENT_ID") ?: "").trim()
 
 android {
     namespace = "com.anibiar.app"
@@ -26,6 +27,7 @@ android {
         versionCode = run
         versionName = "0.3.$run"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
+        buildConfigField("String", "MAL_CLIENT_ID", "\"$malClientId\"")
     }
 
     signingConfigs {
