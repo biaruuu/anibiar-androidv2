@@ -175,7 +175,7 @@ class AnimeRepository(context: Context) {
     suspend fun malScore(idMal: Int): String? = withContext(Dispatchers.IO) {
         val key = "mal_$idMal.txt"
         cache.read(key)?.takeIf { it.isNotBlank() }?.let { return@withContext it }
-        val score = jikanScore(idMal) ?: malPageScore(idMal)
+        val score = jikanScore(idMal) ?: shikimoriScore(idMal) ?: malPageScore(idMal)
         score?.also { cache.write(key, it) }
     }
 
@@ -211,6 +211,24 @@ class AnimeRepository(context: Context) {
             kotlinx.coroutines.delay(1200)
         }
         return null
+    }
+
+    /** Shikimori mirrors MyAnimeList ids and scores; used when Jikan is unreachable. */
+    private fun shikimoriScore(id: Int): String? = try {
+        val request = okhttp3.Request.Builder()
+            .url("https://shikimori.one/api/animes/$id")
+            .header("Accept", "application/json")
+            .header("User-Agent", "AniBiar")
+            .build()
+        Http.plain.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val score = org.json.JSONObject(response.body?.string().orEmpty()).optString("score").toDoubleOrNull()
+            score?.let { fmtScore(it) }
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     private fun malPageScore(id: Int): String? = try {
