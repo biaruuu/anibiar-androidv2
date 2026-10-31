@@ -115,7 +115,7 @@ object Queries {
     val DISCOVER = """
         query {
           top: Page(page: 1, perPage: 10) {
-            media(type: ANIME, status: RELEASING, sort: TRENDING_DESC, isAdult: false) { ...HeroFields }
+            media(type: ANIME, status: RELEASING, sort: POPULARITY_DESC, isAdult: false) { ...HeroFields }
           }
           upcoming: Page(page: 1, perPage: 10) {
             media(type: ANIME, status: NOT_YET_RELEASED, sort: POPULARITY_DESC, isAdult: false) { ...HeroFields }

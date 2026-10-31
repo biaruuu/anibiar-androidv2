@@ -136,7 +136,9 @@ class TmdbApi(
             val path = item.optString("file_path")
             if (path.isEmpty()) continue
             val textless = item.isNull("iso_639_1") || item.optString("iso_639_1").isEmpty()
-            val score = (if (textless) 100.0 else 0.0) + item.optDouble("vote_average", 0.0)
+            // Textless first, then prefer true full-HD+ art so it stays sharp on tall phone screens.
+            val resolution = if (item.optInt("width") >= 1920) 50.0 else 0.0
+            val score = (if (textless) 100.0 else 0.0) + resolution + item.optDouble("vote_average", 0.0)
             if (score > bestScore) {
                 bestScore = score
                 best = path
@@ -187,11 +189,11 @@ class TmdbApi(
         )
     }
 
-    private fun prefKey(id: Int) = "art2_$id"
+    private fun prefKey(id: Int) = "art3_$id"
 
     private companion object {
         const val BASE = "https://api.themoviedb.org/3"
-        const val LOGO_BASE = "https://image.tmdb.org/t/p/w500"
-        const val BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
+        const val LOGO_BASE = "https://image.tmdb.org/t/p/original"
+        const val BACKDROP_BASE = "https://image.tmdb.org/t/p/original"
     }
 }

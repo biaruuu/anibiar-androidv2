@@ -55,16 +55,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,27 +127,36 @@ private fun HomeContent(
     var heroIndex by remember { mutableIntStateOf(0) }
 
     val currentHero = state.hero.getOrNull(heroIndex)
-    val backdrop = currentHero?.let { state.art[it.id]?.backdrop ?: it.bannerImage ?: it.posterUrl }
+    val backdrop = currentHero?.let { hero ->
+        val art = state.art[hero.id]
+        when {
+            art?.backdrop != null -> art.backdrop
+            art == null && BuildConfig.TMDB_API_KEY.isNotBlank() -> null // wait for the sharp TMDB art
+            else -> hero.bannerImage ?: hero.posterUrl
+        }
+    }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx)) {
+    // Total distance scrolled, in px. Read only while drawing, so scrolling never recomposes the backdrop.
+    var scrollPx by rememberSaveable { mutableStateOf(0f) }
+    val scrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                scrollPx = (scrollPx - consumed.y).coerceAtLeast(0f)
+                return Offset.Zero
+            }
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx).nestedScroll(scrollConnection)) {
         // Everything below adapts to the real screen size.
         val heroHeight = (maxHeight * 0.80f).coerceIn(440.dp, 780.dp)
-        val heroPx = with(LocalDensity.current) { heroHeight.toPx() }
         val columns = when {
             maxWidth >= 900.dp -> 6
             maxWidth >= 600.dp -> 4
             else -> 3
         }
 
-        // Read only while drawing, so scrolling never recomposes the backdrop.
-        val scrollProgress: () -> Float = {
-            if (listState.firstVisibleItemIndex == 0) {
-                listState.firstVisibleItemScrollOffset / heroPx
-            } else {
-                1f + ((listState.firstVisibleItemIndex - 1) * 700f + listState.firstVisibleItemScrollOffset) / heroPx
-            }
-        }
-        HeroBackdrop(url = backdrop, scrollProgress = scrollProgress, modifier = Modifier.fillMaxSize())
+        HeroBackdrop(url = backdrop, scrollPx = { scrollPx }, modifier = Modifier.fillMaxSize())
 
         when {
             state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
@@ -340,7 +352,7 @@ private fun HeroPager(
  * scrolls, stays faintly visible just below the hero, and fades out completely further down.
  */
 @Composable
-private fun HeroBackdrop(url: String?, scrollProgress: () -> Float, modifier: Modifier = Modifier) {
+private fun HeroBackdrop(url: String?, scrollPx: () -> Float, modifier: Modifier = Modifier) {
     Box(modifier) {
         Crossfade(
             targetState = url,
@@ -377,9 +389,14 @@ private fun HeroBackdrop(url: String?, scrollProgress: () -> Float, modifier: Mo
             Modifier
                 .fillMaxSize()
                 .drawBehind {
-                    val p = scrollProgress().coerceIn(0f, 2.2f)
-                    val alpha = if (p <= 1f) 0.10f + 0.62f * p else 0.72f + (p - 1f) / 1.2f * 0.27f
-                    drawRect(Ani.Onyx.copy(alpha = alpha.coerceIn(0f, 0.99f)))
+                    // Distance scrolled in screens: 0.8 = hero just left, 1.8 = a few rows of cards later.
+                    val s = scrollPx() / size.height
+                    val alpha = when {
+                        s <= 0.8f -> 0.10f + 0.50f * (s / 0.8f)
+                        s <= 1.8f -> 0.60f + 0.28f * (s - 0.8f)
+                        else -> (0.88f + 0.105f * ((s - 1.8f) / 1.4f)).coerceAtMost(0.985f)
+                    }
+                    drawRect(Ani.Onyx.copy(alpha = alpha))
                 },
         )
     }
@@ -465,8 +482,7 @@ private fun HeroSlide(
                     modifier = Modifier
                         .height(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.12f))
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+                        .background(Ani.ButtonDark)
                         .clickable(onClick = onDetails)
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -479,8 +495,7 @@ private fun HeroSlide(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.12f))
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+                        .background(Ani.ButtonDark)
                         .clickable(onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -782,7 +797,7 @@ private fun InfoBadge(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    background: Color = Color.White.copy(alpha = 0.08f),
+    background: Color = Ani.Chip,
     textSize: Float = 12f,
     iconSize: Dp = 13.dp,
     hPad: Dp = 8.dp,
@@ -792,7 +807,6 @@ private fun InfoBadge(
         modifier = modifier
             .clip(RoundedCornerShape(7.dp))
             .background(background)
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(7.dp))
             .padding(horizontal = hPad, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {
