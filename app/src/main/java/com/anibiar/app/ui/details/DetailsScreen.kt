@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import kotlin.math.sqrt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -121,6 +123,8 @@ fun DetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    var artFilter by rememberSaveable { mutableStateOf("All") }
+    var artExpanded by rememberSaveable { mutableStateOf(false) }
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 
     val scrolled by remember {
@@ -130,12 +134,13 @@ fun DetailsScreen(
     val media = state.media
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        val side = ((maxWidth - 720.dp) / 2).coerceAtLeast(16.dp)
+        val maxContent = if (maxWidth >= 900.dp) 900.dp else 720.dp
+        val side = ((maxWidth - maxContent) / 2).coerceAtLeast(16.dp)
         val content = maxWidth - side * 2
-        val cardW = (content * 0.42f).coerceIn(132.dp, 200.dp)
-        val epW = (content * 0.71f).coerceIn(230.dp, 340.dp)
-        val posterW = (content * 0.31f).coerceIn(96.dp, 180.dp)
-        val titleSp = (content.value / 328f * 22f).coerceIn(20f, 28f)
+        val cardW = (content * 0.42f).coerceIn(132.dp, 230.dp)
+        val epW = (content * 0.71f).coerceIn(230.dp, 380.dp)
+        val posterW = (content * 0.31f).coerceIn(96.dp, 220.dp)
+        val titleSp = (content.value / 328f * 22f).coerceIn(20f, 32f)
 
         if (media != null) {
             DetailsBackdrop(media, listState)
@@ -201,9 +206,14 @@ fun DetailsScreen(
 
                 val images = state.images
                 if (images != null && images.total > 0) {
-                    item(key = "artwork") {
-                        Artwork(images, Modifier.padding(horizontal = side))
-                    }
+                    artworkItems(
+                        images = images,
+                        filter = artFilter,
+                        onFilter = { artFilter = it; artExpanded = false },
+                        expanded = artExpanded,
+                        onToggle = { artExpanded = !artExpanded },
+                        side = side,
+                    )
                 }
 
                 val recs = media.recommendations?.nodes.orEmpty().mapNotNull { it.mediaRecommendation }
@@ -249,33 +259,37 @@ private fun DetailsBackdrop(media: Media, listState: LazyListState) {
     val context = LocalContext.current
     val url = media.bannerImage ?: media.posterUrl
     val request = remember(url) {
-        // A tiny decode scaled up with high-quality filtering is already a soft blur.
-        ImageRequest.Builder(context).data(url).size(160, 160).crossfade(true).build()
+        ImageRequest.Builder(context).data(url).size(720, 720).crossfade(true).build()
     }
-    val scroll by remember {
+    val scrollPx by remember {
         derivedStateOf {
             if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 100_000
         }
     }
+    // Fixed behind the page like Miruro: strong at the top, dimming as you scroll, gone further down.
     Box(
         Modifier
             .fillMaxWidth()
-            .height(440.dp)
-            .graphicsLayer { translationY = -scroll.toFloat() },
+            .height(600.dp)
+            .graphicsLayer {
+                val scrolledDp = scrollPx / this.density
+                val t = (1f - scrolledDp / 560f).coerceIn(0f, 1f)
+                alpha = t * sqrt(t)
+            },
     ) {
         AsyncImage(
             model = request,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             filterQuality = FilterQuality.High,
-            alpha = 0.55f,
-            modifier = Modifier.fillMaxSize().blur(24.dp),
+            alpha = 0.9f,
+            modifier = Modifier.fillMaxSize().blur(18.dp),
         )
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.55f to Ani.Onyx.copy(alpha = 0.55f),
+                    0f to Ani.Onyx.copy(alpha = 0.30f),
+                    0.45f to Ani.Onyx.copy(alpha = 0.55f),
                     1f to Ani.Onyx,
                 ),
             ),
@@ -692,7 +706,8 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(shape)
+                // Clipping a WebView forces an offscreen layer, which blanks the video surface; skip it while playing.
+                .then(if (playing) Modifier else Modifier.clip(shape))
                 .border(1.dp, Ani.Border, shape)
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
@@ -703,6 +718,7 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
                     factory = { ctx ->
                         android.webkit.WebView(ctx).apply {
                             setBackgroundColor(android.graphics.Color.BLACK)
+                            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
                             settings.mediaPlaybackRequiresUserGesture = false
@@ -1124,23 +1140,25 @@ private fun OutlinedDropdown(current: String, options: List<String>, onSelect: (
 
 private const val TMDB_IMG = "https://image.tmdb.org/t/p/"
 
-@Composable
-private fun Artwork(images: TmdbImages, modifier: Modifier = Modifier) {
-    var filter by rememberSaveable { mutableStateOf("All") }
-    var showAll by rememberSaveable { mutableStateOf(false) }
-
-    val list = remember(images, filter) {
-        when (filter) {
-            "Backdrops" -> images.backdrops
-            "Posters" -> images.posters
-            "Logos" -> images.logos
-            else -> images.backdrops + images.posters + images.logos
-        }
+private fun LazyListScope.artworkItems(
+    images: TmdbImages,
+    filter: String,
+    onFilter: (String) -> Unit,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    side: Dp,
+) {
+    val list = when (filter) {
+        "Backdrops" -> images.backdrops
+        "Posters" -> images.posters
+        "Logos" -> images.logos
+        else -> images.backdrops + images.posters + images.logos
     }
-    val shape = RoundedCornerShape(14.dp)
+    val logos = images.logos.toSet()
+    val pad = Modifier.padding(horizontal = side)
 
-    Column(modifier.fillMaxWidth().padding(top = 36.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    item(key = "art-header") {
+        Row(pad.fillMaxWidth().padding(top = 36.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Ani.Chip),
                 contentAlignment = Alignment.Center,
@@ -1152,100 +1170,127 @@ private fun Artwork(images: TmdbImages, modifier: Modifier = Modifier) {
                 Text("Artwork & Posters", style = inter(18f, FontWeight.SemiBold))
                 Text("${images.total} images", style = inter(13f), color = Ani.Muted)
             }
-            OutlinedDropdown(filter, listOf("All", "Backdrops", "Posters", "Logos")) {
-                filter = it
-                showAll = false
-            }
+            OutlinedDropdown(filter, listOf("All", "Backdrops", "Posters", "Logos"), onFilter)
         }
         Spacer(Modifier.height(14.dp))
+    }
 
-        val first = list.firstOrNull()
-        if (first == null) {
-            Text("No images in this category.", style = inter(14f), color = Ani.Muted)
-        } else {
-            val context = LocalContext.current
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(first.aspect.coerceIn(0.5f, 2.2f))
-                    .clip(shape)
-                    .border(1.dp, Ani.Border, shape)
-                    .background(Ani.Item),
+    val first = list.firstOrNull()
+    if (first == null) {
+        item(key = "art-empty") {
+            Text("No images in this category.", style = inter(14f), color = Ani.Muted, modifier = pad)
+        }
+        return
+    }
+
+    item(key = "art-first-$filter") {
+        ArtImage(first, isLogo = first in logos, original = true, fade = !expanded, modifier = pad.fillMaxWidth())
+    }
+
+    if (expanded) {
+        val rows = buildArtRows(list.drop(1))
+        items(rows.size, key = { "art-row-$filter-$it" }) { i ->
+            val row = rows[i]
+            Row(
+                pad.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val request = remember(first.path) {
-                    ImageRequest.Builder(context).data(TMDB_IMG + "original" + first.path)
-                        .size(Size.ORIGINAL).crossfade(true).build()
+                row.forEach { image ->
+                    ArtImage(image, isLogo = image in logos, original = false, fade = false, modifier = Modifier.weight(1f))
                 }
-                AsyncImage(
-                    model = request,
+                if (row.size == 1 && row[0].aspect < 1f) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+
+    if (list.size > 1) {
+        item(key = "art-toggle") {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                pad
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onToggle),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (expanded) "Show fewer images" else "View all ${list.size} images",
+                    style = inter(14f, FontWeight.Medium),
+                    color = Ani.Soft,
+                )
+                Icon(
+                    AniIcons.ArrowDown,
                     contentDescription = null,
-                    contentScale = if (filter == "Logos") ContentScale.Fit else ContentScale.Crop,
-                    filterQuality = FilterQuality.High,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                Box(
-                    Modifier.fillMaxWidth().height(70.dp).align(Alignment.BottomCenter).background(
-                        Brush.verticalGradient(0f to Color.Transparent, 1f to Ani.Onyx.copy(alpha = 0.55f)),
-                    ),
+                    tint = Ani.Muted,
+                    modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = if (expanded) 180f else 0f },
                 )
             }
+        }
+    }
+}
 
-            if (showAll) {
-                Spacer(Modifier.height(10.dp))
-                list.drop(1).take(40).chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { image ->
-                            Box(
-                                Modifier
-                                    .weight(1f)
-                                    .aspectRatio(image.aspect.coerceIn(0.5f, 2.2f))
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .border(1.dp, Ani.Border, RoundedCornerShape(12.dp))
-                                    .background(Ani.Item),
-                            ) {
-                                val req = remember(image.path) {
-                                    ImageRequest.Builder(context).data(TMDB_IMG + "w780" + image.path)
-                                        .size(Size.ORIGINAL).crossfade(true).build()
-                                }
-                                AsyncImage(
-                                    model = req,
-                                    contentDescription = null,
-                                    contentScale = if (image in images.logos) ContentScale.Fit else ContentScale.Crop,
-                                    filterQuality = FilterQuality.High,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
+/** Landscape art takes a full row; portrait posters pair up two to a row. */
+private fun buildArtRows(list: List<com.anibiar.app.data.TmdbImage>): List<List<com.anibiar.app.data.TmdbImage>> {
+    val rows = ArrayList<List<com.anibiar.app.data.TmdbImage>>()
+    var pending: com.anibiar.app.data.TmdbImage? = null
+    for (image in list) {
+        if (image.aspect >= 1f) {
+            pending?.let { rows += listOf(it) }
+            pending = null
+            rows += listOf(image)
+        } else {
+            val p = pending
+            if (p == null) pending = image else {
+                rows += listOf(p, image)
+                pending = null
             }
+        }
+    }
+    pending?.let { rows += listOf(it) }
+    return rows
+}
 
-            if (list.size > 1) {
-                Spacer(Modifier.height(4.dp))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Ani.Item)
-                        .clickable { showAll = !showAll },
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        if (showAll) "Show fewer" else "View all ${list.size} images",
-                        style = inter(13.5f, FontWeight.Medium),
-                        color = Ani.Soft,
-                    )
-                    Icon(
-                        AniIcons.ArrowDown,
-                        contentDescription = null,
-                        tint = Ani.Muted,
-                        modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (showAll) 180f else 0f },
-                    )
-                }
-            }
+@Composable
+private fun ArtImage(
+    image: com.anibiar.app.data.TmdbImage,
+    isLogo: Boolean,
+    original: Boolean,
+    fade: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(14.dp)
+    val size = when {
+        original -> "original"
+        isLogo -> "w780"
+        image.aspect >= 1f -> "w1280"
+        else -> "w780"
+    }
+    val request = remember(image.path, size) {
+        ImageRequest.Builder(context).data(TMDB_IMG + size + image.path).size(Size.ORIGINAL).crossfade(true).build()
+    }
+    Box(
+        modifier
+            .aspectRatio(image.aspect.coerceIn(0.5f, 2.4f))
+            .clip(shape)
+            .border(1.dp, Ani.Border, shape)
+            .background(Ani.Item),
+    ) {
+        AsyncImage(
+            model = request,
+            contentDescription = null,
+            contentScale = if (isLogo) ContentScale.Fit else ContentScale.Crop,
+            filterQuality = FilterQuality.High,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (fade) {
+            Box(
+                Modifier.fillMaxWidth().height(80.dp).align(Alignment.BottomCenter).background(
+                    Brush.verticalGradient(0f to Color.Transparent, 1f to Ani.Onyx.copy(alpha = 0.6f)),
+                ),
+            )
         }
     }
 }

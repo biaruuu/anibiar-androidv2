@@ -63,6 +63,14 @@ object Http {
 
     val client: OkHttpClient by lazy { create() }
 
+    /** Plain OkHttp (no Cronet) for third-party sites where HTTP/3 gives no benefit. */
+    val plain: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
     private fun create(): OkHttpClient {
         val plain = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)

@@ -171,36 +171,66 @@ class AnimeRepository(context: Context) {
         null
     }
 
-    /** MyAnimeList score (what Miruro lists next to the AniList score), via Jikan. Null when unavailable. */
+    /** MyAnimeList score (what Miruro lists next to the AniList score): Jikan first, then MAL's own page. */
     suspend fun malScore(idMal: Int): String? = withContext(Dispatchers.IO) {
         val key = "mal_$idMal.txt"
-        cache.read(key)?.let { return@withContext it.takeIf { s -> s.isNotBlank() } }
-        try {
-            val request = okhttp3.Request.Builder()
-                .url("https://api.jikan.moe/v4/anime/$idMal")
-                .header("Accept", "application/json")
-                .build()
+        cache.read(key)?.takeIf { it.isNotBlank() }?.let { return@withContext it }
+        val score = jikanScore(idMal) ?: malPageScore(idMal)
+        score?.also { cache.write(key, it) }
+    }
+
+    private fun fmtScore(value: Double): String? =
+        if (value.isNaN() || value <= 0.0) null else String.format(java.util.Locale.US, "%.2f", value)
+
+    private suspend fun jikanScore(id: Int): String? {
+        val request = okhttp3.Request.Builder()
+            .url("https://api.jikan.moe/v4/anime/$id")
+            .header("Accept", "application/json")
+            .header("User-Agent", UA)
+            .build()
+        for (attempt in 0..2) {
+            var retry = false
             var result: String? = null
-            for (attempt in 0..2) {
-                val retry = Http.client.newCall(request).execute().use { response ->
-                    if (response.code == 429 || response.code >= 500) return@use true
-                    if (!response.isSuccessful) return@use false
-                    val score = org.json.JSONObject(response.body?.string().orEmpty())
-                        .optJSONObject("data")?.optDouble("score", Double.NaN)
-                    if (score != null && !score.isNaN() && score > 0.0) {
-                        result = String.format(java.util.Locale.US, "%.2f", score).also { cache.write(key, it) }
+            try {
+                Http.plain.newCall(request).execute().use { response ->
+                    when {
+                        response.code == 429 || response.code >= 500 -> retry = true
+                        response.isSuccessful -> {
+                            val score = org.json.JSONObject(response.body?.string().orEmpty())
+                                .optJSONObject("data")?.optDouble("score", Double.NaN) ?: Double.NaN
+                            result = fmtScore(score)
+                        }
                     }
-                    false
                 }
-                if (!retry) break
-                kotlinx.coroutines.delay(1200)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                retry = true
             }
-            result
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
+            if (result != null || !retry) return result
+            kotlinx.coroutines.delay(1200)
         }
+        return null
+    }
+
+    private fun malPageScore(id: Int): String? = try {
+        val request = okhttp3.Request.Builder()
+            .url("https://myanimelist.net/anime/$id")
+            .header("User-Agent", UA)
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .build()
+        Http.plain.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val html = response.body?.string().orEmpty()
+            val match = Regex("\"ratingValue\"\\s*:\\s*\"?([0-9]+(?:\\.[0-9]+)?)")
+                .find(html)
+                ?: Regex("ratingValue[^>]*>\\s*([0-9]+(?:\\.[0-9]+)?)\\s*<").find(html)
+            match?.groupValues?.get(1)?.toDoubleOrNull()?.let { fmtScore(it) }
+        }
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 
     suspend fun tmdbImages(media: Media): TmdbImages? = tmdb.imagesFor(media)
@@ -247,6 +277,7 @@ class AnimeRepository(context: Context) {
     suspend fun art(media: Media): TmdbArt? = tmdb.artFor(media)
 
     private companion object {
+        const val UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
         const val KEY_DISCOVER = "discover.json"
         const val KEY_LATEST_1 = "latest_1.json"
         const val KEY_LATEST_2 = "latest_2.json"
