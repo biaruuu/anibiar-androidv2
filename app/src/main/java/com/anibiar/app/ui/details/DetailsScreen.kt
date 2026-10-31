@@ -265,45 +265,39 @@ fun DetailsScreen(
 private fun DetailsBackdrop(media: Media, listState: LazyListState) {
     val context = LocalContext.current
     val url = media.bannerImage ?: media.posterUrl
-    val request = remember(url) {
-        ImageRequest.Builder(context).data(url).size(720, 720).crossfade(true).build()
+    val canBlur = android.os.Build.VERSION.SDK_INT >= 31
+    val request = remember(url, canBlur) {
+        val builder = ImageRequest.Builder(context).data(url).crossfade(true)
+        // Real blur (API 31+) gets the full-resolution art; older phones get a tiny decode that scales up soft.
+        if (canBlur) builder.size(Size.ORIGINAL) else builder.size(160, 160)
+        builder.build()
     }
-    val density = androidx.compose.ui.platform.LocalDensity.current.density
-    // Eased (smoothstep) target, quantised so we only recompose a few dozen times per fade.
-    val target by remember {
-        derivedStateOf {
-            val px = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset else 100_000
-            val t = (1f - px / density / 1100f).coerceIn(0f, 1f)
-            Math.round(t * t * (3f - 2f * t) * 60f) / 60f
-        }
-    }
-    val fade by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = target,
-        animationSpec = androidx.compose.animation.core.tween(280, easing = androidx.compose.animation.core.LinearOutSlowInEasing),
-        label = "backdropFade",
-    )
-    // Fixed behind the page like Miruro: strong at the top, dimming as you scroll, gone further down.
+    // Fixed behind the page like Miruro. The fade is read inside the graphics layer straight from the scroll
+    // position, so it follows your finger with no recomposition, and it is fully gone by the Trailer section.
     Box(
         Modifier
             .fillMaxWidth()
-            .height(720.dp)
-            .graphicsLayer { alpha = fade },
+            .height(760.dp)
+            .graphicsLayer {
+                val px = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 1e6f
+                val t = (1f - px / this.density / 820f).coerceIn(0f, 1f)
+                alpha = t * t * (3f - 2f * t)
+            },
     ) {
         AsyncImage(
             model = request,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             filterQuality = FilterQuality.High,
-            alpha = 0.9f,
-            modifier = Modifier.fillMaxSize().blur(18.dp),
+            modifier = Modifier.fillMaxSize().blur(26.dp),
         )
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Ani.Onyx.copy(alpha = 0.30f),
-                    0.35f to Ani.Onyx.copy(alpha = 0.50f),
-                    0.60f to Ani.Onyx.copy(alpha = 0.78f),
-                    0.82f to Ani.Onyx.copy(alpha = 0.94f),
+                    0f to Ani.Onyx.copy(alpha = 0.10f),
+                    0.40f to Ani.Onyx.copy(alpha = 0.38f),
+                    0.70f to Ani.Onyx.copy(alpha = 0.78f),
+                    0.90f to Ani.Onyx.copy(alpha = 0.96f),
                     1f to Ani.Onyx,
                 ),
             ),
@@ -343,14 +337,33 @@ private fun Header(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(10.dp))
+                val metaSize = titleSize * 0.52f
+                val episodesMeta = run {
+                    val aired = media.airedEpisodes
+                    val total = media.episodes
+                    when {
+                        media.status == "RELEASING" && aired != null -> "$aired / ${total ?: "?"} eps"
+                        total != null -> "$total eps"
+                        aired != null -> "$aired eps"
+                        else -> null
+                    }
+                }
+                val statusColor = when (media.status) {
+                    "RELEASING" -> StatusGreen
+                    "FINISHED" -> StatusBlue
+                    "NOT_YET_RELEASED" -> Ani.Amber
+                    else -> Ani.Muted
+                }
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
-                    media.seasonLabel?.let { MetaItem(AniIcons.Calendar, it) }
-                    media.score10?.let { MetaItem(AniIcons.Star, it) }
-                    MetaItem(AniIcons.Tv, media.formatName)
-                    media.duration?.takeIf { it > 0 }?.let { MetaItem(AniIcons.Schedule, "$it min") }
+                    media.seasonLabel?.let { MetaItem(AniIcons.Calendar, it, metaSize) }
+                    media.score10?.let { MetaItem(AniIcons.Star, it, metaSize) }
+                    MetaItem(AniIcons.Tv, media.formatName, metaSize)
+                    media.duration?.takeIf { it > 0 }?.let { MetaItem(AniIcons.Schedule, "$it min", metaSize) }
+                    episodesMeta?.let { MetaItem(AniIcons.ClosedCaption, it, metaSize) }
+                    MetaItem(null, media.statusLabel, metaSize, dot = statusColor)
                 }
             }
         }
@@ -382,11 +395,15 @@ private fun Header(
 }
 
 @Composable
-private fun MetaItem(icon: ImageVector, text: String) {
+private fun MetaItem(icon: ImageVector?, text: String, size: Float, dot: Color? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(14.dp))
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size((size + 1.5f).dp))
+        } else if (dot != null) {
+            Box(Modifier.padding(horizontal = 2.dp).size(8.dp).clip(CircleShape).background(dot))
+        }
         Spacer(Modifier.width(5.dp))
-        Text(text, style = inter(13f, FontWeight.Medium), color = Ani.Soft, maxLines = 1)
+        Text(text, style = inter(size, FontWeight.Medium), color = Ani.Soft, maxLines = 1, softWrap = false)
     }
 }
 
@@ -668,8 +685,9 @@ private tailrec fun Context.findActivity(): android.app.Activity? = when (this) 
 }
 
 /**
- * Trailer card that plays inside the page. The embed is loaded as the WebView's top-level page (a nested
- * iframe rendered black on some phones), with the player's own controls and a real fullscreen mode.
+ * Trailer card that plays inside the page. The embed is the WebView's top-level page (a nested iframe rendered
+ * black on some phones). YouTube's own fullscreen button doesn't work in a WebView, so we hide it and draw ours:
+ * it reads the current time and reopens the same video, from that second, in a landscape full-screen player.
  */
 @Composable
 @android.annotation.SuppressLint("SetJavaScriptEnabled")
@@ -679,67 +697,27 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
     if (kind != "youtube" && kind != "dailymotion") return
     val shape = RoundedCornerShape(14.dp)
     var playing by remember(videoId) { mutableStateOf(false) }
-    var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
-    var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
+    var fullscreenStart by remember(videoId) { mutableStateOf<Int?>(null) }
+    var webRef by remember { mutableStateOf<android.webkit.WebView?>(null) }
     val activity = remember(context) { context.findActivity() }
 
     val embedUrl = if (kind == "youtube") {
-        "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=1&origin=https://anibiartv.vercel.app"
+        "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0&origin=https://anibiartv.vercel.app"
     } else {
         "https://www.dailymotion.com/embed/video/$videoId?autoplay=1"
     }
 
-    fun systemBars(hidden: Boolean) {
-        val window = activity?.window ?: return
-        val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-        if (hidden) {
-            controller.systemBarsBehavior =
-                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        } else {
-            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    fun newWebView(ctx: Context, url: String): android.webkit.WebView =
+        android.webkit.WebView(ctx).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            webChromeClient = android.webkit.WebChromeClient()
+            webViewClient = android.webkit.WebViewClient()
+            loadUrl(url, mapOf("Referer" to "https://anibiartv.vercel.app"))
         }
-    }
-
-    fun exitFullscreen() {
-        fullscreenView?.let { view -> (view.parent as? android.view.ViewGroup)?.removeView(view) }
-        fullscreenCallback?.onCustomViewHidden()
-        val wasFullscreen = fullscreenView != null
-        fullscreenView = null
-        fullscreenCallback = null
-        if (wasFullscreen) {
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            systemBars(false)
-        }
-    }
-
-    BackHandler(enabled = fullscreenView != null) { exitFullscreen() }
-    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { exitFullscreen() } }
-
-    val chrome = remember {
-        object : android.webkit.WebChromeClient() {
-            override fun onShowCustomView(view: android.view.View, callback: android.webkit.WebChromeClient.CustomViewCallback) {
-                if (fullscreenView != null) {
-                    callback.onCustomViewHidden()
-                    return
-                }
-                view.setBackgroundColor(android.graphics.Color.BLACK)
-                (activity?.window?.decorView as? android.widget.FrameLayout)?.addView(
-                    view,
-                    android.widget.FrameLayout.LayoutParams(
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    ),
-                )
-                fullscreenView = view
-                fullscreenCallback = callback
-                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                systemBars(true)
-            }
-
-            override fun onHideCustomView() = exitFullscreen()
-        }
-    }
 
     Column(modifier.fillMaxWidth().padding(top = 32.dp)) {
         Text("Trailer", style = inter(18f, FontWeight.SemiBold))
@@ -756,19 +734,37 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
             if (playing) {
                 androidx.compose.ui.viewinterop.AndroidView(
                     modifier = Modifier.fillMaxSize(),
-                    factory = { ctx ->
-                        android.webkit.WebView(ctx).apply {
-                            setBackgroundColor(android.graphics.Color.BLACK)
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.mediaPlaybackRequiresUserGesture = false
-                            webChromeClient = chrome
-                            webViewClient = android.webkit.WebViewClient()
-                            loadUrl(embedUrl, mapOf("Referer" to "https://anibiartv.vercel.app"))
-                        }
+                    factory = { ctx -> newWebView(ctx, embedUrl).also { webRef = it } },
+                    onRelease = {
+                        if (webRef === it) webRef = null
+                        it.destroy()
                     },
-                    onRelease = { it.destroy() },
                 )
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 10.dp, bottom = 10.dp)
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
+                        .clickable {
+                            val web = webRef
+                            val js = "(function(){var v=document.querySelector('video');return v?Math.floor(v.currentTime):0;})()"
+                            if (web != null) {
+                                web.evaluateJavascript(js) { value ->
+                                    fullscreenStart = value?.trim('"')?.toDoubleOrNull()?.toInt() ?: 0
+                                    playing = false
+                                }
+                            } else {
+                                fullscreenStart = 0
+                                playing = false
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AniIcons.Fullscreen, contentDescription = "Fullscreen", tint = Color.White, modifier = Modifier.size(22.dp))
+                }
             } else {
                 val full = if (kind == "youtube") "https://img.youtube.com/vi/$videoId/maxresdefault.jpg" else thumbnail
                 var art by remember(videoId) { mutableStateOf(full ?: thumbnail) }
@@ -794,6 +790,51 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(AniIcons.Play, contentDescription = "Play trailer", tint = Color.White, modifier = Modifier.size(28.dp))
+                }
+            }
+        }
+    }
+
+    fullscreenStart?.let { start ->
+        val startedUrl = if (kind == "youtube") "$embedUrl&start=$start" else "$embedUrl&startTime=$start"
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { fullscreenStart = null },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            val dialogWindow = (androidx.compose.ui.platform.LocalView.current.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window
+            androidx.compose.runtime.DisposableEffect(dialogWindow) {
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                dialogWindow?.let { w ->
+                    val controller = androidx.core.view.WindowCompat.getInsetsController(w, w.decorView)
+                    controller.systemBarsBehavior =
+                        androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                }
+                onDispose {
+                    activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
+            }
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                androidx.compose.ui.viewinterop.AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx -> newWebView(ctx, startedUrl) },
+                    onRelease = { it.destroy() },
+                )
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
+                        .clickable { fullscreenStart = null },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AniIcons.Close, contentDescription = "Exit fullscreen", tint = Color.White, modifier = Modifier.size(22.dp))
                 }
             }
         }
