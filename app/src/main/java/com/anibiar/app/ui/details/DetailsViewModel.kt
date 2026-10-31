@@ -21,6 +21,9 @@ data class DetailsUiState(
     val characters: CharacterConn? = null,
     val malScore: String? = null,
     val images: TmdbImages? = null,
+    val franchise: List<Media>? = null,
+    val imdbId: String? = null,
+    val tvdbId: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -79,6 +82,13 @@ class DetailsViewModel(application: Application, private val id: Int) : AndroidV
         }
         viewModelScope.launch {
             repository.tmdbImages(media)?.let { imgs -> _state.update { it.copy(images = imgs) } }
+        }
+        viewModelScope.launch {
+            repository.externalIds(media)?.let { (imdb, tvdb) -> _state.update { it.copy(imdbId = imdb, tvdbId = tvdb) } }
+        }
+        viewModelScope.launch {
+            runCatching { repository.fetchFranchise(media) }.getOrNull()
+                ?.let { list -> _state.update { it.copy(franchise = list) } }
         }
     }
 }

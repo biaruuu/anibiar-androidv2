@@ -180,13 +180,22 @@ class AnimeRepository(context: Context) {
                 .url("https://api.jikan.moe/v4/anime/$idMal")
                 .header("Accept", "application/json")
                 .build()
-            Http.client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
-                val score = org.json.JSONObject(response.body?.string().orEmpty())
-                    .optJSONObject("data")?.optDouble("score", Double.NaN)
-                if (score == null || score.isNaN() || score <= 0.0) null
-                else String.format(java.util.Locale.US, "%.2f", score).also { cache.write(key, it) }
+            var result: String? = null
+            for (attempt in 0..2) {
+                val retry = Http.client.newCall(request).execute().use { response ->
+                    if (response.code == 429 || response.code >= 500) return@use true
+                    if (!response.isSuccessful) return@use false
+                    val score = org.json.JSONObject(response.body?.string().orEmpty())
+                        .optJSONObject("data")?.optDouble("score", Double.NaN)
+                    if (score != null && !score.isNaN() && score > 0.0) {
+                        result = String.format(java.util.Locale.US, "%.2f", score).also { cache.write(key, it) }
+                    }
+                    false
+                }
+                if (!retry) break
+                kotlinx.coroutines.delay(1200)
             }
+            result
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -195,6 +204,43 @@ class AnimeRepository(context: Context) {
     }
 
     suspend fun tmdbImages(media: Media): TmdbImages? = tmdb.imagesFor(media)
+
+    suspend fun externalIds(media: Media): Pair<String?, String?>? = tmdb.externalIds(media)
+
+    private fun chainNodes(m: Media?): List<Media> = m?.relations?.edges.orEmpty()
+        .filter { (it.relationType == "PREQUEL" || it.relationType == "SEQUEL") && it.node?.type == "ANIME" }
+        .mapNotNull { it.node }
+
+    /** Walks PREQUEL / SEQUEL links so the Show section lists the whole franchise, not just direct neighbours. */
+    suspend fun fetchFranchise(root: Media): List<Media> {
+        val found = LinkedHashMap<Int, Media>()
+        val visited = HashSet<Int>().apply { add(root.id) }
+        var queue = ArrayList<Int>()
+        chainNodes(root).forEach { if (visited.add(it.id)) { found[it.id] = it; queue.add(it.id) } }
+        var fetches = 0
+        while (queue.isNotEmpty() && fetches < 14) {
+            val batch = queue.take(4)
+            val rest = queue.drop(4)
+            fetches += batch.size
+            val results = coroutineScope {
+                batch.map { id ->
+                    async {
+                        try {
+                            decodeMedia(api.execute(Queries.FRANCHISE, mapOf("id" to id)))
+                        } catch (e: IOException) {
+                            null
+                        }
+                    }
+                }.map { it.await() }
+            }
+            val next = ArrayList<Int>(rest)
+            results.forEach { r ->
+                chainNodes(r).forEach { if (visited.add(it.id)) { found[it.id] = it; next.add(it.id) } }
+            }
+            queue = next
+        }
+        return found.values.toList()
+    }
 
     // ---- TMDB artwork ----
 

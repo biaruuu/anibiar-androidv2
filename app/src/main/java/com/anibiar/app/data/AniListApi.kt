@@ -148,10 +148,19 @@ object Queries {
             nextAiringEpisode { episode airingAt }
             trailer { id site thumbnail }
             studios { edges { isMain node { name } } }
-            externalLinks { site url type }
+            externalLinks { site url type icon color }
             streamingEpisodes { title thumbnail url site }
             relations { edges { relationType(version: 2) node { $MINI_MEDIA } } }
             recommendations(perPage: 12, sort: RATING_DESC) { nodes { mediaRecommendation { $MINI_MEDIA } } }
+          }
+        }
+    """.trimIndent()
+
+    val FRANCHISE = """
+        query (${'$'}id: Int) {
+          Media(id: ${'$'}id, type: ANIME) {
+            id
+            relations { edges { relationType(version: 2) node { $MINI_MEDIA } } }
           }
         }
     """.trimIndent()

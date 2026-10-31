@@ -92,6 +92,22 @@ class TmdbApi(
         }
     }
 
+    /** IMDb and TheTVDB ids (for the link tiles). */
+    suspend fun externalIds(media: Media): Pair<String?, String?>? = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank() || keyRejected) return@withContext null
+        try {
+            val (type, tmdbId) = resolveId(media) ?: return@withContext null
+            val json = get("/$type/$tmdbId/external_ids", emptyMap()) ?: return@withContext null
+            val imdb = json.optString("imdb_id").takeIf { it.isNotBlank() && it != "null" }
+            val tvdb = json.optInt("tvdb_id", 0).takeIf { it > 0 }?.toString()
+            if (imdb == null && tvdb == null) null else imdb to tvdb
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun resolveId(media: Media): Pair<String, Int>? {
         val key = "tid1_${media.id}"
         prefs.getString(key, null)?.let { stored ->

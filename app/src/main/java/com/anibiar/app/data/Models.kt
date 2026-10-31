@@ -76,7 +76,13 @@ data class StudioEdge(val isMain: Boolean = false, val node: StudioNode? = null)
 data class StudioConn(val edges: List<StudioEdge> = emptyList())
 
 @Serializable
-data class ExternalLink(val site: String? = null, val url: String? = null, val type: String? = null)
+data class ExternalLink(
+    val site: String? = null,
+    val url: String? = null,
+    val type: String? = null,
+    val icon: String? = null,
+    val color: String? = null,
+)
 
 @Serializable
 data class StreamingEpisode(

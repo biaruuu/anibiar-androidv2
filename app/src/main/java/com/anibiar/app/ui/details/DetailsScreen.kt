@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -65,6 +67,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -128,6 +131,11 @@ fun DetailsScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx)) {
         val side = ((maxWidth - 720.dp) / 2).coerceAtLeast(16.dp)
+        val content = maxWidth - side * 2
+        val cardW = (content * 0.42f).coerceIn(132.dp, 200.dp)
+        val epW = (content * 0.71f).coerceIn(230.dp, 340.dp)
+        val posterW = (content * 0.31f).coerceIn(96.dp, 180.dp)
+        val titleSp = (content.value / 328f * 22f).coerceIn(20f, 28f)
 
         if (media != null) {
             DetailsBackdrop(media, listState)
@@ -137,14 +145,16 @@ fun DetailsScreen(
             media != null -> LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(
-                    top = statusTop + 56.dp + 14.dp,
                     bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
                 ),
                 modifier = Modifier.fillMaxSize(),
             ) {
+                item(key = "top") { Spacer(Modifier.statusBarsPadding().height(56.dp + 14.dp)) }
                 item(key = "header") {
                     Header(
                         media = media,
+                        posterWidth = posterW,
+                        titleSize = titleSp,
                         inList = media.id in saved,
                         onWatch = comingSoon,
                         onToggleList = { app.watchlist.toggle(media.id) },
@@ -152,7 +162,7 @@ fun DetailsScreen(
                     )
                 }
                 item(key = "about") {
-                    About(media, state.malScore, Modifier.padding(horizontal = side))
+                    About(media, state.malScore, state.imdbId, state.tvdbId, Modifier.padding(horizontal = side))
                 }
                 media.trailer?.takeIf { !it.id.isNullOrBlank() }?.let { trailer ->
                     item(key = "trailer") {
@@ -162,21 +172,23 @@ fun DetailsScreen(
                 val episodeCount = media.airedEpisodes ?: media.episodes ?: media.streamingEpisodes.size
                 if (episodeCount > 0) {
                     item(key = "episodes") {
-                        Episodes(media, episodeCount, side, onClick = comingSoon)
+                        Episodes(media, episodeCount, side, epW, onClick = comingSoon)
                     }
                 }
 
                 val relations = media.relations?.edges.orEmpty().filter { it.node?.type == "ANIME" }
-                val showEdges = relations.filter { it.relationType == "PREQUEL" || it.relationType == "SEQUEL" }
+                val showEdges = state.franchise?.map { it to "" }
+                    ?: relations.filter { it.relationType == "PREQUEL" || it.relationType == "SEQUEL" }
+                        .mapNotNull { e -> e.node?.let { it to e.relationType.orEmpty() } }
                 val relatedEdges = relations.filter { it.relationType != "PREQUEL" && it.relationType != "SEQUEL" }
                 if (showEdges.isNotEmpty()) {
                     item(key = "show") {
-                        ShowSection(media, showEdges.mapNotNull { e -> e.node?.let { it to e.relationType.orEmpty() } }, side, onOpen)
+                        ShowSection(media, showEdges, side, cardW, onOpen)
                     }
                 }
                 if (relatedEdges.isNotEmpty()) {
                     item(key = "related") {
-                        RelatedSection(relatedEdges.mapNotNull { e -> e.node?.let { it to e.relationType.orEmpty() } }, side, onOpen)
+                        RelatedSection(relatedEdges.mapNotNull { e -> e.node?.let { it to e.relationType.orEmpty() } }, side, cardW, onOpen)
                     }
                 }
 
@@ -206,7 +218,7 @@ fun DetailsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 items(recs, key = { it.id }) { rec ->
-                                    MediaCard(rec, badge = null, label = null, onClick = { onOpen(rec.id) })
+                                    MediaCard(rec, badge = null, label = null, width = cardW, onClick = { onOpen(rec.id) })
                                 }
                             }
                         }
@@ -276,6 +288,8 @@ private fun DetailsBackdrop(media: Media, listState: LazyListState) {
 @Composable
 private fun Header(
     media: Media,
+    posterWidth: Dp,
+    titleSize: Float,
     inList: Boolean,
     onWatch: () -> Unit,
     onToggleList: () -> Unit,
@@ -287,8 +301,8 @@ private fun Header(
                 url = media.posterUrl,
                 contentDescription = media.displayTitle,
                 modifier = Modifier
-                    .width(104.dp)
-                    .height(156.dp)
+                    .width(posterWidth)
+                    .height(posterWidth * 1.5f)
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, Ani.Border, RoundedCornerShape(12.dp)),
             )
@@ -296,7 +310,7 @@ private fun Header(
             Column(Modifier.weight(1f)) {
                 Text(
                     text = media.displayTitle,
-                    style = inter(22f, FontWeight.Bold, lineHeight = 27f),
+                    style = inter(titleSize, FontWeight.Bold, lineHeight = titleSize * 1.22f),
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -362,8 +376,8 @@ private fun ActionButton(
         modifier = modifier
             .height(40.dp)
             .clip(shape)
-            .background(if (filled) Color.White else Ani.ButtonDark.copy(alpha = 0.85f))
-            .then(if (filled) Modifier else Modifier.border(1.dp, Ani.Border, shape))
+            .background(if (filled) Color.White else Color.White.copy(alpha = 0.10f))
+            .then(if (filled) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), shape))
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -392,7 +406,7 @@ private fun Description(text: String) {
             Text(
                 text = if (expanded) "Show less" else "Read more",
                 style = inter(14f, FontWeight.SemiBold),
-                color = Ani.Lavender,
+                color = Color.White,
                 modifier = Modifier.clickable { expanded = !expanded },
             )
         }
@@ -405,7 +419,7 @@ private fun Description(text: String) {
 private fun SectionHeader(title: String, subtitle: String?, right: String?, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = inter(22f, FontWeight.Bold))
+            Text(title, style = inter(18f, FontWeight.SemiBold))
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
                 Text(subtitle, style = inter(13f), color = Ani.Muted)
@@ -416,13 +430,19 @@ private fun SectionHeader(title: String, subtitle: String?, right: String?, modi
 }
 
 @Composable
-private fun About(media: Media, malScore: String?, modifier: Modifier = Modifier) {
+private fun About(
+    media: Media,
+    malScore: String?,
+    imdbId: String?,
+    tvdbId: String?,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val number = remember { NumberFormat.getIntegerInstance(Locale.US) }
     var showAllStudios by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier.fillMaxWidth().padding(top = 32.dp)) {
-        Text("About this anime", style = inter(22f, FontWeight.Bold))
+        Text("About this anime", style = inter(18f, FontWeight.SemiBold))
         Spacer(Modifier.height(12.dp))
 
         val statusColor = when (media.status) {
@@ -442,8 +462,8 @@ private fun About(media: Media, malScore: String?, modifier: Modifier = Modifier
             else -> null
         }
         episodesText?.let { AboutRow("Episodes", it) }
-        media.averageScore?.let { AboutRow("AniList", media.score10.orEmpty()) }
-        malScore?.let { AboutRow("MyAnimeList", it) }
+        media.averageScore?.let { AboutRow("AniList score", media.score10.orEmpty()) }
+        malScore?.let { AboutRow("MAL score", it) }
         media.airedLabel?.let { AboutRow("Aired", it) }
         media.popularity?.let { AboutRow("Popularity", "#" + number.format(it)) }
         media.title.native?.takeIf { it.isNotBlank() }?.let { AboutRow("Native", it) }
@@ -451,82 +471,120 @@ private fun About(media: Media, malScore: String?, modifier: Modifier = Modifier
         val genres = media.genres.orEmpty()
         if (genres.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
+            Text("Genres", style = inter(15f), color = Ani.Muted)
+            Spacer(Modifier.height(10.dp))
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 genres.forEach { genre ->
-                    InfoBadge(genre, background = Ani.Chip, textSize = 12f, hPad = 10.dp, vPad = 5.dp)
+                    Text(
+                        text = genre,
+                        style = inter(13.5f, FontWeight.Medium),
+                        color = Color.White,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Ani.Chip)
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                    )
                 }
             }
         }
 
         val studios = media.studioNames
         if (studios.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(18.dp))
+            Text("Studios", style = inter(15f), color = Ani.Muted)
+            Spacer(Modifier.height(10.dp))
             val visible = if (showAllStudios) studios else studios.take(3)
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 visible.forEachIndexed { index, (name, isMain) ->
-                    val shape = RoundedCornerShape(8.dp)
+                    val shape = RoundedCornerShape(10.dp)
                     Text(
                         text = name,
-                        style = inter(12f, FontWeight.Medium),
-                        color = if (isMain && index == 0) Ani.Soft else Ani.Muted,
+                        style = inter(13f, FontWeight.Medium),
+                        color = if (isMain && index == 0) Color.White else Ani.Soft,
                         modifier = Modifier
                             .clip(shape)
                             .then(
                                 if (isMain && index == 0) Modifier.background(Ani.Chip)
                                 else Modifier.border(1.dp, Ani.Border, shape),
                             )
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
                     )
                 }
                 if (studios.size > 3) {
                     Text(
                         text = if (showAllStudios) "Show less" else "+${studios.size - 3} more",
-                        style = inter(12f, FontWeight.Medium),
-                        color = Ani.Lavender,
+                        style = inter(13f, FontWeight.Medium),
+                        color = Ani.Soft,
                         modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, Ani.Border, RoundedCornerShape(10.dp))
                             .clickable { showAllStudios = !showAllStudios }
-                            .padding(horizontal = 6.dp, vertical = 5.dp),
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
                     )
                 }
             }
         }
 
-        // Link tiles: AniList, MyAnimeList, then the official links AniList knows about.
+        // Link tiles with each site's real logo (AniList supplies icons for its external links).
         val links = buildList {
-            media.siteUrl?.let { add(Triple("AL", Color(0xFF02A9FF), it)) }
-            media.idMal?.let { add(Triple("MAL", Color(0xFF2E51A2), "https://myanimelist.net/anime/$it")) }
+            media.siteUrl?.let { add(LinkTile("AniList", "https://www.google.com/s2/favicons?domain=anilist.co&sz=128", null, it)) }
+            media.idMal?.let { add(LinkTile("MyAnimeList", "https://www.google.com/s2/favicons?domain=myanimelist.net&sz=128", null, "https://myanimelist.net/anime/$it")) }
             media.externalLinks
                 .filter { (it.type == "INFO" || it.type == "SOCIAL") && !it.url.isNullOrBlank() && !it.site.isNullOrBlank() }
-                .forEach { link ->
-                    val site = link.site.orEmpty()
-                    add(Triple(initials(site), colorFor(site), link.url.orEmpty()))
-                }
-        }
+                .forEach { link -> add(LinkTile(link.site.orEmpty(), link.icon, link.color, link.url.orEmpty())) }
+            imdbId?.let { add(LinkTile("IMDb", "https://www.google.com/s2/favicons?domain=imdb.com&sz=128", null, "https://www.imdb.com/title/$it")) }
+            tvdbId?.let { add(LinkTile("TheTVDB", "https://www.google.com/s2/favicons?domain=thetvdb.com&sz=128", null, "https://thetvdb.com/dereferrer/series/$it")) }
+        }.distinctBy { it.url }
         if (links.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(18.dp))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                links.forEach { (label, color, url) ->
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(color)
-                            .clickable { openUrl(context, url) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(label, style = inter(if (label.length > 2) 10f else 12f, FontWeight.Bold), color = Color.White, maxLines = 1)
-                    }
-                }
+                links.forEach { tile -> LinkTileView(tile) { openUrl(context, tile.url) } }
             }
+        }
+    }
+}
+
+private data class LinkTile(val name: String, val icon: String?, val color: String?, val url: String)
+
+@Composable
+private fun LinkTileView(tile: LinkTile, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(9.dp)
+    val brand = remember(tile.color) {
+        tile.color?.let { c -> runCatching { Color(android.graphics.Color.parseColor(c)) }.getOrNull() }
+    }
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(shape)
+            .background(brand ?: Ani.Item)
+            .then(if (brand == null) Modifier.border(1.dp, Ani.Border, shape) else Modifier)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (tile.icon != null) {
+            val context = LocalContext.current
+            val request = remember(tile.icon) {
+                ImageRequest.Builder(context).data(tile.icon).size(Size.ORIGINAL).crossfade(true).build()
+            }
+            AsyncImage(
+                model = request,
+                contentDescription = tile.name,
+                filterQuality = FilterQuality.High,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(if (brand == null) 24.dp else 20.dp).clip(RoundedCornerShape(5.dp)),
+            )
+        } else {
+            Text(initials(tile.name), style = inter(12f, FontWeight.Bold), color = Color.White, maxLines = 1)
         }
     }
 }
@@ -575,17 +633,60 @@ private fun openUrl(context: Context, url: String?) {
 
 // ------------------------------------------------------------------ trailer
 
+private tailrec fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** Trailer that plays inside the page (YouTube / Dailymotion embed in a WebView), with fullscreen support. */
 @Composable
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
 private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val url = when (site?.lowercase()) {
-        "youtube" -> "https://www.youtube.com/watch?v=$videoId"
-        "dailymotion" -> "https://www.dailymotion.com/video/$videoId"
-        else -> null
-    } ?: return
+    val kind = site?.lowercase()
+    if (kind != "youtube" && kind != "dailymotion") return
     val shape = RoundedCornerShape(14.dp)
+
+    var playing by rememberSaveable(videoId) { mutableStateOf(false) }
+    var fullscreen by remember { mutableStateOf<android.view.View?>(null) }
+    var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
+    val activity = remember(context) { context.findActivity() }
+
+    fun exitFullscreen() {
+        fullscreen?.let { view -> (view.parent as? android.view.ViewGroup)?.removeView(view) }
+        fullscreenCallback?.onCustomViewHidden()
+        fullscreen = null
+        fullscreenCallback = null
+    }
+    BackHandler(enabled = fullscreen != null) { exitFullscreen() }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { exitFullscreen() } }
+
+    val chrome = remember {
+        object : android.webkit.WebChromeClient() {
+            override fun onShowCustomView(view: android.view.View, callback: android.webkit.WebChromeClient.CustomViewCallback) {
+                if (fullscreen != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                view.setBackgroundColor(android.graphics.Color.BLACK)
+                (activity?.window?.decorView as? android.widget.FrameLayout)?.addView(
+                    view,
+                    android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+                fullscreen = view
+                fullscreenCallback = callback
+            }
+
+            override fun onHideCustomView() = exitFullscreen()
+        }
+    }
+
     Column(modifier.fillMaxWidth().padding(top = 32.dp)) {
-        Text("Trailer", style = inter(22f, FontWeight.Bold))
+        Text("Trailer", style = inter(18f, FontWeight.SemiBold))
         Spacer(Modifier.height(12.dp))
         Box(
             Modifier
@@ -593,22 +694,59 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
                 .aspectRatio(16f / 9f)
                 .clip(shape)
                 .border(1.dp, Ani.Border, shape)
-                .background(Ani.Item)
-                .clickable { openUrl(context, url) },
+                .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
-            PosterImage(
-                url = thumbnail ?: media.backdropUrl ?: media.posterUrl,
-                contentDescription = "${media.displayTitle} trailer",
-                modifier = Modifier.fillMaxSize(),
-            )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)))
-            Box(
-                Modifier.size(56.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f))
-                    .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(AniIcons.Play, contentDescription = "Play trailer", tint = Color.White, modifier = Modifier.size(28.dp))
+            if (playing) {
+                androidx.compose.ui.viewinterop.AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        android.webkit.WebView(ctx).apply {
+                            setBackgroundColor(android.graphics.Color.BLACK)
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.mediaPlaybackRequiresUserGesture = false
+                            webChromeClient = chrome
+                            webViewClient = android.webkit.WebViewClient()
+                            val src = if (kind == "youtube") {
+                                "https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1"
+                            } else {
+                                "https://www.dailymotion.com/embed/video/$videoId?autoplay=1"
+                            }
+                            val html = "<html><body style=\"margin:0;background:#000\">" +
+                                "<iframe src=\"$src\" style=\"border:0;width:100%;height:100%;position:absolute;top:0;left:0\" " +
+                                "allow=\"autoplay; encrypted-media; picture-in-picture; fullscreen\" allowfullscreen></iframe></body></html>"
+                            loadDataWithBaseURL("https://anibiartv.vercel.app", html, "text/html", "utf-8", null)
+                        }
+                    },
+                    onRelease = { it.destroy() },
+                )
+            } else {
+                val full = if (kind == "youtube") "https://img.youtube.com/vi/$videoId/maxresdefault.jpg" else thumbnail
+                var art by remember(videoId) { mutableStateOf(full ?: thumbnail) }
+                val request = remember(art) {
+                    ImageRequest.Builder(context).data(art).size(Size.ORIGINAL).crossfade(true).build()
+                }
+                AsyncImage(
+                    model = request,
+                    contentDescription = "${media.displayTitle} trailer",
+                    contentScale = ContentScale.Crop,
+                    filterQuality = FilterQuality.High,
+                    onError = { if (art != thumbnail && thumbnail != null) art = thumbnail },
+                    modifier = Modifier.fillMaxSize().clickable { playing = true },
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.20f)))
+                Box(
+                    Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                        .clickable { playing = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AniIcons.Play, contentDescription = "Play trailer", tint = Color.White, modifier = Modifier.size(28.dp))
+                }
             }
         }
     }
@@ -617,7 +755,7 @@ private fun Trailer(media: Media, videoId: String, site: String?, thumbnail: Str
 // ------------------------------------------------------------------ episodes
 
 @Composable
-private fun Episodes(media: Media, count: Int, side: Dp, onClick: () -> Unit) {
+private fun Episodes(media: Media, count: Int, side: Dp, cardWidth: Dp, onClick: () -> Unit) {
     // AniList lists streaming titles as "Episode 5 - Name"; use them when present.
     val streaming = remember(media.id) {
         val regex = Regex("""(?i)episode\s+(\d+)\s*[-:–]?\s*(.*)""")
@@ -640,7 +778,7 @@ private fun Episodes(media: Media, count: Int, side: Dp, onClick: () -> Unit) {
             items(numbers, key = { it }) { number ->
                 val info = streaming[number]
                 val shape = RoundedCornerShape(12.dp)
-                Column(Modifier.width(256.dp).clickable(onClick = onClick)) {
+                Column(Modifier.width(cardWidth).clickable(onClick = onClick)) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape)
                             .border(1.dp, Ani.Border, shape).background(Ani.Item),
@@ -688,51 +826,52 @@ private fun ShowSection(
     current: Media,
     others: List<Pair<Media, String>>,
     side: Dp,
+    cardWidth: Dp,
     onOpen: (Int) -> Unit,
 ) {
-    val entries = remember(current.id, others) {
-        (others.map { it.first to it.second } + (current to "CURRENT"))
-            .distinctBy { it.first.id }
-            .sortedBy { it.first.sortKey() }
+    var newestFirst by rememberSaveable { mutableStateOf(false) }
+    val entries = remember(current.id, others, newestFirst) {
+        val sorted = (others.map { it.first } + current).distinctBy { it.id }.sortedBy { it.sortKey() }
+        if (newestFirst) sorted.reversed() else sorted
     }
+    val currentIndex = entries.indexOfFirst { it.id == current.id }
     // Number the TV entries in release order: Season 1, Season 2 ...
     val seasonNumbers = remember(entries) {
         var n = 0
-        entries.associate { (m, _) -> m.id to if (m.format == "TV") ++n else null }
+        entries.sortedBy { it.sortKey() }.associate { m -> m.id to if (m.format == "TV") ++n else null }
     }
 
     Column(Modifier.fillMaxWidth().padding(top = 36.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = side), verticalAlignment = Alignment.CenterVertically) {
-            Text("Show", style = inter(22f, FontWeight.Bold), modifier = Modifier.weight(1f))
-            Text("${entries.size} entries", style = inter(13.5f), color = Ani.Muted)
+            SectionHeader("Show", "${entries.size} entries", null, Modifier.weight(1f))
             Spacer(Modifier.width(10.dp))
-            Text(
-                "Release order",
-                style = inter(12.5f, FontWeight.Medium),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, Ani.Border, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
+            OutlinedDropdown(
+                current = if (newestFirst) "Newest first" else "Release order",
+                options = listOf("Release order", "Newest first"),
+            ) { newestFirst = it == "Newest first" }
         }
         Spacer(Modifier.height(14.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = side),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(entries, key = { it.first.id }) { (media, relation) ->
-                val badge = when (relation) {
-                    "CURRENT" -> "✓ Current"
-                    "PREQUEL" -> "Prequel"
+            items(entries, key = { it.id }) { media ->
+                val index = entries.indexOfFirst { it.id == media.id }
+                val isCurrent = media.id == current.id
+                val before = if (newestFirst) index > currentIndex else index < currentIndex
+                val badge = when {
+                    isCurrent -> "Current"
+                    before -> "Prequel"
                     else -> "Sequel"
                 }
-                val seasonLabel = seasonNumbers[media.id]?.let { "Season $it" }
                 MediaCard(
                     media = media,
                     badge = badge,
-                    label = seasonLabel,
+                    badgeIcon = if (isCurrent) AniIcons.Check else null,
+                    label = seasonNumbers[media.id]?.let { "Season $it" } ?: media.formatName,
                     labelColor = Ani.Amber,
-                    onClick = { if (media.id != current.id) onOpen(media.id) },
+                    width = cardWidth,
+                    onClick = { if (!isCurrent) onOpen(media.id) },
                 )
             }
         }
@@ -740,7 +879,7 @@ private fun ShowSection(
 }
 
 @Composable
-private fun RelatedSection(items: List<Pair<Media, String>>, side: Dp, onOpen: (Int) -> Unit) {
+private fun RelatedSection(items: List<Pair<Media, String>>, side: Dp, cardWidth: Dp, onOpen: (Int) -> Unit) {
     val entries = remember(items) { items.distinctBy { it.first.id } }
     Column(Modifier.fillMaxWidth().padding(top = 36.dp)) {
         SectionHeader(
@@ -761,6 +900,7 @@ private fun RelatedSection(items: List<Pair<Media, String>>, side: Dp, onOpen: (
                     badge = label,
                     label = label,
                     labelColor = if (label == "Alternative") Color(0xFFFB923C) else Color(0xFFFDBA74),
+                    width = cardWidth,
                     onClick = { onOpen(media.id) },
                 )
             }
@@ -787,10 +927,12 @@ private fun MediaCard(
     badge: String?,
     label: String?,
     onClick: () -> Unit,
+    width: Dp = 151.dp,
+    badgeIcon: ImageVector? = null,
     labelColor: Color = Ani.Amber,
 ) {
     val shape = RoundedCornerShape(14.dp)
-    Column(Modifier.width(151.dp).clickable(onClick = onClick)) {
+    Column(Modifier.width(width).clickable(onClick = onClick)) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(shape).background(Ani.Item)) {
             PosterImage(
                 url = media.posterUrl,
@@ -798,39 +940,45 @@ private fun MediaCard(
                 modifier = Modifier.fillMaxSize(),
             )
             if (badge != null) {
-                Text(
-                    text = badge,
-                    style = inter(11f, FontWeight.SemiBold),
-                    color = Color.White,
-                    maxLines = 1,
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .clip(RoundedCornerShape(50))
                         .background(Color.Black.copy(alpha = 0.62f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (badgeIcon != null) {
+                        Icon(badgeIcon, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                    }
+                    Text(badge, style = inter(11.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1)
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             val eps = media.airedEpisodes ?: media.episodes
             eps?.takeIf { it > 0 }?.let {
-                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = 10.5f, iconSize = 11.dp, hPad = 6.dp, vPad = 4.dp)
+                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = 11f, iconSize = 12.dp, hPad = 7.dp, vPad = 4.dp)
             }
-            InfoBadge(media.formatLabel, textSize = 10.5f, hPad = 6.dp, vPad = 4.dp)
+            InfoBadge(media.formatLabel, textSize = 11f, hPad = 7.dp, vPad = 4.dp)
             media.year?.let {
-                InfoBadge(it.toString(), textSize = 10.5f, hPad = 6.dp, vPad = 4.dp)
+                InfoBadge(it.toString(), textSize = 11f, hPad = 7.dp, vPad = 4.dp)
             }
         }
         Spacer(Modifier.height(6.dp))
         if (label != null) {
-            Text(label, style = inter(11.5f, FontWeight.SemiBold), color = labelColor, maxLines = 1)
+            Text(label, style = inter(13.5f, FontWeight.SemiBold), color = labelColor, maxLines = 1)
             Spacer(Modifier.height(2.dp))
         }
         Text(
             text = media.displayTitle,
-            style = inter(13.5f, FontWeight.SemiBold, lineHeight = 17.5f),
+            style = inter(13.5f, FontWeight.SemiBold, lineHeight = 18f),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -852,11 +1000,9 @@ private fun Characters(total: Int, edges: List<CharacterEdge>, modifier: Modifie
 
     Column(modifier.fillMaxWidth().padding(top = 36.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Characters", style = inter(22f, FontWeight.Bold))
-                Spacer(Modifier.height(2.dp))
-                Text("$total characters", style = inter(13f), color = Ani.Muted)
-            }
+            Text("Characters", style = inter(18f, FontWeight.SemiBold), modifier = Modifier.weight(1f))
+            Text("$total", style = inter(13.5f), color = Ani.Muted)
+            Spacer(Modifier.width(10.dp))
             if (languages.size > 1) {
                 OutlinedDropdown(selected, languages) { language = it }
             }
@@ -907,7 +1053,7 @@ private fun CharacterRow(edge: CharacterEdge, language: String) {
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(
                 edge.node?.displayName.orEmpty(),
-                style = inter(14f, FontWeight.SemiBold, lineHeight = 18f),
+                style = inter(14f, FontWeight.Medium, lineHeight = 18f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1003,7 +1149,7 @@ private fun Artwork(images: TmdbImages, modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Artwork & Posters", style = inter(20f, FontWeight.Bold))
+                Text("Artwork & Posters", style = inter(18f, FontWeight.SemiBold))
                 Text("${images.total} images", style = inter(13f), color = Ani.Muted)
             }
             OutlinedDropdown(filter, listOf("All", "Backdrops", "Posters", "Logos")) {
