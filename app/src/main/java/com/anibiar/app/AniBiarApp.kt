@@ -8,6 +8,7 @@ import coil.memory.MemoryCache
 import com.anibiar.app.data.AnimeRepository
 import com.anibiar.app.data.Http
 import com.anibiar.app.data.WatchHistory
+import com.anibiar.app.data.Watchlist
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +20,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
 
     val repository: AnimeRepository by lazy { AnimeRepository(this) }
     val history: WatchHistory by lazy { WatchHistory(this) }
+    val watchlist: Watchlist by lazy { Watchlist(this) }
 
     override fun onCreate() {
         super.onCreate()

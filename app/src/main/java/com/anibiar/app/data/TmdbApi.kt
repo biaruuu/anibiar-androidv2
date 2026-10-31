@@ -17,6 +17,16 @@ data class TmdbArt(val logo: String?, val backdrop: String?) {
     val isEmpty: Boolean get() = logo == null && backdrop == null
 }
 
+data class TmdbImage(val path: String, val aspect: Float)
+
+data class TmdbImages(
+    val posters: List<TmdbImage> = emptyList(),
+    val backdrops: List<TmdbImage> = emptyList(),
+    val logos: List<TmdbImage> = emptyList(),
+) {
+    val total: Int get() = posters.size + backdrops.size + logos.size
+}
+
 /**
  * Looks up artwork on TMDB. Results are cached in memory and in SharedPreferences,
  * so each title is looked up only once.
@@ -51,6 +61,56 @@ class TmdbApi(
         memory[media.id] = art
         prefs.edit().putString(prefKey(media.id), encode(art)).apply()
         art.takeUnless { it.isEmpty }
+    }
+
+    private val imagesMemory = ConcurrentHashMap<Int, TmdbImages>()
+
+    /** Every poster / backdrop / logo TMDB has for the title (the "Artwork & Posters" section). */
+    suspend fun imagesFor(media: Media): TmdbImages? = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank() || keyRejected) return@withContext null
+        imagesMemory[media.id]?.let { return@withContext it }
+        try {
+            val (type, tmdbId) = resolveId(media) ?: return@withContext null
+            val json = get("/$type/$tmdbId/images", mapOf("include_image_language" to "en,ja,null"))
+                ?: return@withContext null
+            fun list(key: String): List<TmdbImage> {
+                val arr = json.optJSONArray(key) ?: return emptyList()
+                return (0 until arr.length()).mapNotNull { i ->
+                    val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                    val path = o.optString("file_path")
+                    if (path.isEmpty() || path.endsWith(".svg", true)) null
+                    else TmdbImage(path, o.optDouble("aspect_ratio", 1.0).toFloat())
+                }
+            }
+            val result = TmdbImages(list("posters"), list("backdrops"), list("logos"))
+            imagesMemory[media.id] = result
+            result
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun resolveId(media: Media): Pair<String, Int>? {
+        val key = "tid1_${media.id}"
+        prefs.getString(key, null)?.let { stored ->
+            if (stored == "none") return null
+            val parts = stored.split(":")
+            val id = parts.getOrNull(1)?.toIntOrNull()
+            if (parts.size == 2 && id != null) return parts[0] to id
+        }
+        val type = if (media.format == "MOVIE") "movie" else "tv"
+        val names = listOfNotNull(media.title.english, media.title.romaji)
+            .map { cleanTitle(it) }.filter { it.isNotBlank() }.distinct()
+        for (name in names) {
+            val results = get("/search/$type", mapOf("query" to name))?.optJSONArray("results") ?: continue
+            val id = pickResult(results, media.year) ?: continue
+            prefs.edit().putString(key, "$type:$id").apply()
+            return type to id
+        }
+        prefs.edit().putString(key, "none").apply()
+        return null
     }
 
     private fun lookup(media: Media): TmdbArt {

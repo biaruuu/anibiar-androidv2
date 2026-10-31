@@ -76,5 +76,5 @@ jobs:
         run: |
           gh release create "build-${{ github.run_number }}" AniBiar.apk \
             --title "AniBiar build ${{ github.run_number }}" \
-            --notes "Home screen build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS" \
+            --notes "Home + Details build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS" \
             --latest

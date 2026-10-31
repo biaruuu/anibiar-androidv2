@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 data class Title(
     val romaji: String? = null,
     val english: String? = null,
+    val native: String? = null,
 )
 
 @Serializable
@@ -16,7 +17,11 @@ data class Cover(
 )
 
 @Serializable
-data class FuzzyDate(val year: Int? = null)
+data class FuzzyDate(
+    val year: Int? = null,
+    val month: Int? = null,
+    val day: Int? = null,
+)
 
 @Serializable
 data class NextAiring(
@@ -41,7 +46,90 @@ data class Media(
     val nextAiringEpisode: NextAiring? = null,
     val countryOfOrigin: String? = null,
     val isAdult: Boolean? = null,
+    // ---- details page only ----
+    val type: String? = null,
+    val idMal: Int? = null,
+    val duration: Int? = null,
+    val season: String? = null,
+    val endDate: FuzzyDate? = null,
+    val popularity: Int? = null,
+    val siteUrl: String? = null,
+    val trailer: Trailer? = null,
+    val studios: StudioConn? = null,
+    val externalLinks: List<ExternalLink> = emptyList(),
+    val streamingEpisodes: List<StreamingEpisode> = emptyList(),
+    val relations: RelationConn? = null,
+    val recommendations: RecommendationConn? = null,
+    val characters: CharacterConn? = null,
 )
+
+@Serializable
+data class Trailer(val id: String? = null, val site: String? = null, val thumbnail: String? = null)
+
+@Serializable
+data class StudioNode(val name: String? = null)
+
+@Serializable
+data class StudioEdge(val isMain: Boolean = false, val node: StudioNode? = null)
+
+@Serializable
+data class StudioConn(val edges: List<StudioEdge> = emptyList())
+
+@Serializable
+data class ExternalLink(val site: String? = null, val url: String? = null, val type: String? = null)
+
+@Serializable
+data class StreamingEpisode(
+    val title: String? = null,
+    val thumbnail: String? = null,
+    val url: String? = null,
+    val site: String? = null,
+)
+
+@Serializable
+data class RelationEdge(val relationType: String? = null, val node: Media? = null)
+
+@Serializable
+data class RelationConn(val edges: List<RelationEdge> = emptyList())
+
+@Serializable
+data class Recommendation(val mediaRecommendation: Media? = null)
+
+@Serializable
+data class RecommendationConn(val nodes: List<Recommendation> = emptyList())
+
+@Serializable
+data class PageInfo(val total: Int? = null)
+
+@Serializable
+data class PersonName(val full: String? = null)
+
+@Serializable
+data class PersonImage(val large: String? = null, val medium: String? = null)
+
+@Serializable
+data class Person(
+    val id: Int? = null,
+    val name: PersonName? = null,
+    val image: PersonImage? = null,
+    val languageV2: String? = null,
+)
+
+@Serializable
+data class CharacterEdge(
+    val role: String? = null,
+    val node: Person? = null,
+    val voiceActors: List<Person> = emptyList(),
+)
+
+@Serializable
+data class CharacterConn(
+    val pageInfo: PageInfo? = null,
+    val edges: List<CharacterEdge> = emptyList(),
+)
+
+@Serializable
+data class MediaHolder(@kotlinx.serialization.SerialName("Media") val media: Media? = null)
 
 // ---- GraphQL response wrappers ----
 
@@ -135,3 +223,60 @@ fun timeAgo(epochSeconds: Long): String {
         else -> "${diff / 604800}w ago"
     }
 }
+
+// ---- Details helpers ----
+
+val Media.formatName: String
+    get() = when (format) {
+        "TV" -> "TV Series"
+        "TV_SHORT" -> "TV Short"
+        "MOVIE" -> "Movie"
+        "ONA" -> "ONA"
+        "OVA" -> "OVA"
+        "SPECIAL" -> "Special"
+        "MUSIC" -> "Music"
+        else -> format ?: "TV Series"
+    }
+
+val Media.seasonLabel: String?
+    get() {
+        val y = seasonYear ?: startDate?.year ?: return null
+        val s = season?.lowercase()?.replaceFirstChar { it.uppercase() }
+        return if (s != null) "$s $y" else y.toString()
+    }
+
+val Media.statusLabel: String
+    get() = when (status) {
+        "RELEASING" -> "Airing"
+        "FINISHED" -> "Finished"
+        "NOT_YET_RELEASED" -> "Upcoming"
+        "CANCELLED" -> "Cancelled"
+        "HIATUS" -> "On Hiatus"
+        else -> status ?: "Unknown"
+    }
+
+/** AniList score on a 10-point scale, e.g. 7.5. */
+val Media.score10: String?
+    get() = averageScore?.let { String.format(java.util.Locale.US, "%.1f", it / 10.0) }
+
+private fun FuzzyDate.format(): String? {
+    val y = year ?: return null
+    val m = month ?: return y.toString()
+    val d = day ?: return String.format(java.util.Locale.US, "%d-%02d", y, m)
+    return String.format(java.util.Locale.US, "%d-%02d-%02d", y, m, d)
+}
+
+val Media.airedLabel: String?
+    get() {
+        val start = startDate?.format() ?: return null
+        val end = endDate?.format()
+        return if (end != null && end != start) "$start \u2013 $end" else start
+    }
+
+/** Studios: main studio first, then the rest. */
+val Media.studioNames: List<Pair<String, Boolean>>
+    get() = studios?.edges.orEmpty()
+        .mapNotNull { e -> e.node?.name?.let { it to e.isMain } }
+        .sortedByDescending { it.second }
+
+val Person.displayName: String get() = name?.full ?: ""

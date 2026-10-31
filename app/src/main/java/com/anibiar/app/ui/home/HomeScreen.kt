@@ -105,10 +105,15 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
+    val saved by app.watchlist.ids.collectAsStateWithLifecycle()
     HomeContent(
         state = state,
+        saved = saved,
+        onToggleSaved = app.watchlist::toggle,
+        onOpen = onOpen,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -117,6 +122,9 @@ fun HomeScreen(viewModel: HomeViewModel = viewModel()) {
 @Composable
 private fun HomeContent(
     state: HomeUiState,
+    saved: Set<Int>,
+    onToggleSaved: (Int) -> Unit,
+    onOpen: (Int) -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -198,9 +206,10 @@ private fun HomeContent(
                                 art = state.art,
                                 height = heroHeight,
                                 onPageChanged = { heroIndex = it },
-                                onWatch = comingSoon,
-                                onDetails = comingSoon,
-                                onAdd = comingSoon,
+                                saved = saved,
+                                onWatch = onOpen,
+                                onDetails = onOpen,
+                                onAdd = onToggleSaved,
                             )
                         }
                     }
@@ -209,7 +218,7 @@ private fun HomeContent(
                         item(key = "continue") {
                             ContinueWatching(
                                 entries = state.history,
-                                onClick = comingSoon,
+                                onClick = { onOpen(it.mediaId) },
                                 onRemove = onRemoveHistory,
                             )
                         }
@@ -239,7 +248,7 @@ private fun HomeContent(
                         }
                     } else {
                         items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], columns, onClick = comingSoon)
+                            EpisodeRow(rows[index], columns, onClick = { onOpen(it.media.id) })
                             Spacer(Modifier.height(16.dp))
                         }
                     }
@@ -251,7 +260,7 @@ private fun HomeContent(
                                 title = "TOP AIRING",
                                 items = state.topAiring,
                                 dot = Ani.Lime,
-                                onClick = comingSoon,
+                                onClick = { onOpen(it.id) },
                             )
                         }
                     }
@@ -263,7 +272,7 @@ private fun HomeContent(
                                 title = "UPCOMING",
                                 items = state.upcoming,
                                 dot = Ani.Amber,
-                                onClick = comingSoon,
+                                onClick = { onOpen(it.id) },
                             )
                             Spacer(Modifier.height(32.dp))
                         }
@@ -279,7 +288,12 @@ private fun HomeContent(
 // ---------------------------------------------------------------- top bar
 
 @Composable
-private fun AniTopBar(scrolled: Boolean, onSearch: () -> Unit, onMenu: () -> Unit) {
+internal fun AniTopBar(
+    scrolled: Boolean,
+    onSearch: () -> Unit,
+    onMenu: () -> Unit,
+    onLogo: (() -> Unit)? = null,
+) {
     val background by animateColorAsState(
         targetValue = if (scrolled) Ani.Onyx.copy(alpha = 0.92f) else Color.Transparent,
         label = "topBarBackground",
@@ -297,7 +311,7 @@ private fun AniTopBar(scrolled: Boolean, onSearch: () -> Unit, onMenu: () -> Uni
                 contentDescription = "AniBiar TV",
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                modifier = Modifier.height(30.dp).width(78.dp),
+                modifier = Modifier.height(30.dp).width(78.dp).then(if (onLogo != null) Modifier.clickable(onClick = onLogo) else Modifier),
             )
             Spacer(Modifier.weight(1f))
             Icon(
@@ -328,9 +342,10 @@ private fun HeroPager(
     art: Map<Int, TmdbArt>,
     height: Dp,
     onPageChanged: (Int) -> Unit,
-    onWatch: () -> Unit,
-    onDetails: () -> Unit,
-    onAdd: () -> Unit,
+    saved: Set<Int>,
+    onWatch: (Int) -> Unit,
+    onDetails: (Int) -> Unit,
+    onAdd: (Int) -> Unit,
 ) {
     val pagerState = rememberPagerState(pageCount = { items.size })
 
@@ -349,7 +364,14 @@ private fun HeroPager(
         modifier = Modifier.fillMaxWidth().height(height),
     ) { index ->
         val media = items[index]
-        HeroSlide(media, art[media.id], onWatch, onDetails, onAdd)
+        HeroSlide(
+            media = media,
+            art = art[media.id],
+            inList = media.id in saved,
+            onWatch = { onWatch(media.id) },
+            onDetails = { onDetails(media.id) },
+            onAdd = { onAdd(media.id) },
+        )
     }
 }
 
@@ -423,6 +445,7 @@ private fun HeroBackdrop(
 private fun HeroSlide(
     media: Media,
     art: TmdbArt?,
+    inList: Boolean,
     onWatch: () -> Unit,
     onDetails: () -> Unit,
     onAdd: () -> Unit,
@@ -516,7 +539,7 @@ private fun HeroSlide(
                         .clickable(onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(AniIcons.Add, contentDescription = "Add to list", tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(if (inList) AniIcons.Check else AniIcons.Add, contentDescription = "Add to list", tint = Color.White, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -524,7 +547,7 @@ private fun HeroSlide(
 }
 
 @Composable
-private fun HeroChip(label: String) {
+internal fun HeroChip(label: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
@@ -541,7 +564,7 @@ private fun HeroChip(label: String) {
 @Composable
 private fun ContinueWatching(
     entries: List<HistoryItem>,
-    onClick: () -> Unit,
+    onClick: (HistoryItem) -> Unit,
     onRemove: (HistoryItem) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
@@ -563,7 +586,7 @@ private fun ContinueWatching(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(entries, key = { it.mediaId }) { item ->
-                Column(Modifier.width(240.dp).clickable(onClick = onClick)) {
+                Column(Modifier.width(240.dp).clickable { onClick(item) }) {
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -709,13 +732,13 @@ private fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () 
 }
 
 @Composable
-private fun EpisodeRow(rowItems: List<LatestEpisode>, columns: Int, onClick: () -> Unit) {
+private fun EpisodeRow(rowItems: List<LatestEpisode>, columns: Int, onClick: (LatestEpisode) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         rowItems.forEach { episode ->
-            EpisodeCard(episode, onClick, Modifier.weight(1f))
+            EpisodeCard(episode, { onClick(episode) }, Modifier.weight(1f))
         }
         repeat((columns - rowItems.size).coerceAtLeast(0)) {
             Spacer(Modifier.weight(1f))
@@ -809,7 +832,7 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
 }
 
 @Composable
-private fun InfoBadge(
+internal fun InfoBadge(
     text: String,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
@@ -843,7 +866,7 @@ private fun InfoBadge(
 // ---------------------------------------------------------------- top airing / upcoming
 
 @Composable
-private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: () -> Unit) {
+private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: (Media) -> Unit) {
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val visible = if (expanded) items else items.take(COLLAPSED_COUNT)
     val shape = RoundedCornerShape(16.dp)
@@ -895,7 +918,7 @@ private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: ()
 private const val COLLAPSED_COUNT = 5
 
 @Composable
-private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
+private fun RankRow(media: Media, dot: Color, onClick: (Media) -> Unit) {
     val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
 
     Box(
@@ -904,7 +927,7 @@ private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
             .height(96.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Ani.Item)
-            .clickable(onClick = onClick),
+            .clickable { onClick(media) },
     ) {
         // Faint grayscale artwork on the right, fading into the row colour.
         AsyncImage(
@@ -967,7 +990,7 @@ private fun RankRow(media: Media, dot: Color, onClick: () -> Unit) {
 
 /** Poster art decoded at full resolution and scaled with high-quality filtering, so cards stay crisp. */
 @Composable
-private fun PosterImage(url: String?, contentDescription: String?, modifier: Modifier = Modifier) {
+internal fun PosterImage(url: String?, contentDescription: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val request = remember(url) {
         ImageRequest.Builder(context)
@@ -988,7 +1011,7 @@ private fun PosterImage(url: String?, contentDescription: String?, modifier: Mod
 // ---------------------------------------------------------------- error
 
 @Composable
-private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

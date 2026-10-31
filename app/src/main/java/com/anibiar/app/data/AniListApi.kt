@@ -124,6 +124,54 @@ object Queries {
         $HERO_FIELDS
     """.trimIndent()
 
+    private const val MINI_MEDIA = """
+        id type format status episodes seasonYear
+        title { romaji english }
+        coverImage { extraLarge large }
+        startDate { year month day }
+        nextAiringEpisode { episode }
+    """
+
+    val DETAILS = """
+        query (${'$'}id: Int) {
+          Media(id: ${'$'}id, type: ANIME) {
+            id idMal type
+            title { romaji english native }
+            description(asHtml: false)
+            episodes duration format status season seasonYear
+            startDate { year month day }
+            endDate { year month day }
+            genres averageScore popularity siteUrl
+            bannerImage
+            coverImage { extraLarge large color }
+            countryOfOrigin isAdult
+            nextAiringEpisode { episode airingAt }
+            trailer { id site thumbnail }
+            studios { edges { isMain node { name } } }
+            externalLinks { site url type }
+            streamingEpisodes { title thumbnail url site }
+            relations { edges { relationType(version: 2) node { $MINI_MEDIA } } }
+            recommendations(perPage: 12, sort: RATING_DESC) { nodes { mediaRecommendation { $MINI_MEDIA } } }
+          }
+        }
+    """.trimIndent()
+
+    val CHARACTERS = """
+        query (${'$'}id: Int) {
+          Media(id: ${'$'}id, type: ANIME) {
+            id
+            characters(perPage: 50, sort: [ROLE, RELEVANCE, ID]) {
+              pageInfo { total }
+              edges {
+                role
+                node { id name { full } image { large } }
+                voiceActors { id name { full } languageV2 image { large } }
+              }
+            }
+          }
+        }
+    """.trimIndent()
+
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {
           latest: Page(page: ${'$'}page, perPage: 50) {

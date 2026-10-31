@@ -140,6 +140,62 @@ class AnimeRepository(context: Context) {
         }
     }
 
+    // ---- Details ----
+
+    suspend fun cachedDetails(id: Int): Media? = withContext(Dispatchers.IO) {
+        cache.read("detail_$id.json")?.let { decodeMedia(it) }
+    }
+
+    suspend fun cachedCharacters(id: Int): CharacterConn? = withContext(Dispatchers.IO) {
+        cache.read("chars_$id.json")?.let { decodeMedia(it)?.characters }
+    }
+
+    suspend fun fetchDetails(id: Int): Media {
+        val body = api.execute(Queries.DETAILS, mapOf("id" to id))
+        val media = withContext(Dispatchers.Default) { decodeMedia(body) }
+            ?: throw IOException("Unexpected AniList response")
+        cache.write("detail_$id.json", body)
+        return media
+    }
+
+    suspend fun fetchCharacters(id: Int): CharacterConn? {
+        val body = api.execute(Queries.CHARACTERS, mapOf("id" to id))
+        val chars = withContext(Dispatchers.Default) { decodeMedia(body)?.characters }
+        if (chars != null) cache.write("chars_$id.json", body)
+        return chars
+    }
+
+    private fun decodeMedia(body: String): Media? = try {
+        json.decodeFromString<GraphQlResponse<MediaHolder>>(body).data?.media
+    } catch (e: Exception) {
+        null
+    }
+
+    /** MyAnimeList score (what Miruro lists next to the AniList score), via Jikan. Null when unavailable. */
+    suspend fun malScore(idMal: Int): String? = withContext(Dispatchers.IO) {
+        val key = "mal_$idMal.txt"
+        cache.read(key)?.let { return@withContext it.takeIf { s -> s.isNotBlank() } }
+        try {
+            val request = okhttp3.Request.Builder()
+                .url("https://api.jikan.moe/v4/anime/$idMal")
+                .header("Accept", "application/json")
+                .build()
+            Http.client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val score = org.json.JSONObject(response.body?.string().orEmpty())
+                    .optJSONObject("data")?.optDouble("score", Double.NaN)
+                if (score == null || score.isNaN() || score <= 0.0) null
+                else String.format(java.util.Locale.US, "%.2f", score).also { cache.write(key, it) }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun tmdbImages(media: Media): TmdbImages? = tmdb.imagesFor(media)
+
     // ---- TMDB artwork ----
 
     suspend fun art(media: Media): TmdbArt? = tmdb.artFor(media)
