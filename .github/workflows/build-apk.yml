@@ -43,6 +43,24 @@ jobs:
             echo "status=REJECTED (HTTP $code, logos disabled)" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check MAL client id
+        id: mal
+        env:
+          MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
+        run: |
+          if [ -z "$MAL_CLIENT_ID" ]; then
+            echo "status=MISSING (secret MAL_CLIENT_ID not found)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          body=$(curl -s -w '\n%{http_code}' -H "X-MAL-CLIENT-ID: $MAL_CLIENT_ID" "https://api.myanimelist.net/v2/anime/16498?fields=mean")
+          code=$(echo "$body" | tail -n1)
+          mean=$(echo "$body" | head -n1 | grep -o '"mean":[0-9.]*' | head -n1)
+          if [ "$code" = "200" ]; then
+            echo "status=OK (HTTP 200, Attack on Titan $mean)" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=REJECTED (HTTP $code)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build release APK
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
@@ -74,8 +92,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TMDB_STATUS: ${{ steps.tmdb.outputs.status }}
+          MAL_STATUS: ${{ steps.mal.outputs.status }}
         run: |
           gh release create "build-${{ github.run_number }}" AniBiar.apk \
             --title "AniBiar build ${{ github.run_number }}" \
-            --notes "Home + Details build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS" \
+            --notes "Home + Details build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS. MAL client id: $MAL_STATUS" \
             --latest
