@@ -164,6 +164,7 @@ private fun HomeContent(
     var dubMode by rememberSaveable { mutableStateOf(false) }
     var popularPage by rememberSaveable { mutableStateOf(0) }
     var trendingPage by rememberSaveable { mutableStateOf(0) }
+    var trendingDub by rememberSaveable { mutableStateOf(false) }
     var popularDub by rememberSaveable { mutableStateOf(false) }
     var heroIndex by remember { mutableIntStateOf(0) }
 
@@ -308,10 +309,9 @@ private fun HomeContent(
                         item(key = "trending-header") {
                             Spacer(Modifier.height(12.dp))
                             LatestHeader(
-                                title = "Trending",
-                                dubMode = false,
-                                onModeChange = {},
-                                showToggle = false,
+                                title = "Trending Now",
+                                dubMode = trendingDub,
+                                onModeChange = { trendingDub = it },
                                 page = trCur,
                                 pageCount = trCount,
                                 onPrev = { trendingPage = (trCur - 1).coerceAtLeast(0) },
@@ -319,30 +319,41 @@ private fun HomeContent(
                             )
                             Spacer(Modifier.height(14.dp))
                         }
-                        items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(13.dp),
-                            ) {
-                                trRows[index].forEachIndexed { col, media ->
-                                    val rank = trCur * EPISODES_PER_PAGE + index * columns + col + 1
-                                    MediaGridCard(
-                                        media = media,
-                                        leftText = "#$rank",
-                                        rightText = "",
-                                        rating = media.averageScore?.let { it / 10f },
-                                        ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                        onClick = { onOpen(media.id) },
-                                        saved = media.id in saved,
-                                        onToggleSaved = { onToggleSaved(media.id) },
-                                        armed = armedId == "R${media.id}",
-                                        onArm = { armedId = "R${media.id}" },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                repeat((columns - trRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                        if (trendingDub) {
+                            item(key = "trending-dub-empty") {
+                                Text(
+                                    text = "Dubbed releases aren't available yet.",
+                                    style = inter(15f),
+                                    color = Ani.Muted,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+                                )
                             }
-                            Spacer(Modifier.height(16.dp))
+                        } else {
+                            items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                ) {
+                                    trRows[index].forEachIndexed { col, media ->
+                                        val rank = trCur * EPISODES_PER_PAGE + index * columns + col + 1
+                                        MediaGridCard(
+                                            media = media,
+                                            leftText = "#$rank",
+                                            rightText = "",
+                                            rating = media.averageScore?.let { it / 10f },
+                                            ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                            onClick = { onOpen(media.id) },
+                                            saved = media.id in saved,
+                                            onToggleSaved = { onToggleSaved(media.id) },
+                                            armed = armedId == "N${media.id}",
+                                            onArm = { armedId = "N${media.id}" },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                    repeat((columns - trRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                            }
                         }
                     }
 
