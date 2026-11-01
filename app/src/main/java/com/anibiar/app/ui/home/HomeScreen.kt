@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -113,6 +114,18 @@ fun HomeScreen(onOpen: (Int) -> Unit, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
+    // Live data: refresh whenever Home is on screen, then every minute while it stays visible.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            var first = true
+            while (true) {
+                if (!first) viewModel.refresh()
+                first = false
+                delay(60_000)
+            }
+        }
+    }
     HomeContent(
         state = state,
         saved = saved,
@@ -137,7 +150,7 @@ private fun HomeContent(
 
     val listState = rememberLazyListState()
     // The card showing its play/+ buttons after a long press; clears after 5s or on any other tap.
-    var armedId by remember { mutableStateOf<Int?>(null) }
+    var armedId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(armedId) {
         if (armedId != null) {
             delay(5000)
@@ -288,9 +301,14 @@ private fun HomeContent(
                             Spacer(Modifier.height(12.dp))
                             ListPanel(
                                 title = "TOP AIRING",
+                                keyPrefix = "T",
                                 items = state.topAiring,
                                 dot = Ani.Lime,
                                 onClick = { onOpen(it.id) },
+                                saved = saved,
+                                onToggleSaved = onToggleSaved,
+                                armedId = armedId,
+                                onArm = { armedId = it },
                             )
                         }
                     }
@@ -300,9 +318,14 @@ private fun HomeContent(
                             Spacer(Modifier.height(16.dp))
                             ListPanel(
                                 title = "UPCOMING",
+                                keyPrefix = "U",
                                 items = state.upcoming,
                                 dot = Ani.Amber,
                                 onClick = { onOpen(it.id) },
+                                saved = saved,
+                                onToggleSaved = onToggleSaved,
+                                armedId = armedId,
+                                onArm = { armedId = it },
                             )
                             Spacer(Modifier.height(32.dp))
                         }
@@ -760,8 +783,8 @@ private fun EpisodeRow(
     columns: Int,
     saved: Set<Int>,
     onToggleSaved: (Int) -> Unit,
-    armedId: Int?,
-    onArm: (Int) -> Unit,
+    armedId: String?,
+    onArm: (String) -> Unit,
     onClick: (LatestEpisode) -> Unit,
 ) {
     Row(
@@ -774,8 +797,8 @@ private fun EpisodeRow(
                 { onClick(episode) },
                 saved = episode.media.id in saved,
                 onToggleSaved = { onToggleSaved(episode.media.id) },
-                armed = armedId == episode.media.id,
-                onArm = { onArm(episode.media.id) },
+                armed = armedId == "L${episode.media.id}",
+                onArm = { onArm("L${episode.media.id}") },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -802,6 +825,11 @@ private fun EpisodeCard(
     val chipText by accentColor(active, accent, Ani.Muted)
     val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
     val titleColor by accentColor(active, accent, Color.White)
+    // "5m ago" stays live: re-evaluated every 30s.
+    val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+        while (true) { delay(30_000); value = System.currentTimeMillis() }
+    }
+    val agoLabel = remember(now, item.airingAt) { timeAgo(item.airingAt) }
     BoxWithConstraints(modifier.hoverCard(hover, onClick, onArm = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
         val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
@@ -847,7 +875,7 @@ private fun EpisodeCard(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        timeAgo(item.airingAt),
+                        agoLabel,
                         style = inter(10.5f, FontWeight.Medium),
                         color = Color.White.copy(alpha = 0.92f),
                         maxLines = 1,
@@ -924,7 +952,17 @@ internal fun InfoBadge(
 // ---------------------------------------------------------------- top airing / upcoming
 
 @Composable
-private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: (Media) -> Unit) {
+private fun ListPanel(
+    title: String,
+    keyPrefix: String,
+    items: List<Media>,
+    dot: Color,
+    onClick: (Media) -> Unit,
+    saved: Set<Int>,
+    onToggleSaved: (Int) -> Unit,
+    armedId: String?,
+    onArm: (String) -> Unit,
+) {
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val visible = if (expanded) items else items.take(COLLAPSED_COUNT)
     val shape = RoundedCornerShape(16.dp)
@@ -948,7 +986,13 @@ private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: (M
         }
 
         visible.forEach { media ->
-            RankRow(media, dot, onClick)
+            RankRow(
+                media, dot, onClick,
+                saved = media.id in saved,
+                onToggleSaved = { onToggleSaved(media.id) },
+                armed = armedId == "$keyPrefix${media.id}",
+                onArm = { onArm("$keyPrefix${media.id}") },
+            )
             Spacer(Modifier.height(8.dp))
         }
 
@@ -976,38 +1020,58 @@ private fun ListPanel(title: String, items: List<Media>, dot: Color, onClick: (M
 private const val COLLAPSED_COUNT = 5
 
 @Composable
-private fun RankRow(media: Media, dot: Color, onClick: (Media) -> Unit) {
+private fun RankRow(
+    media: Media,
+    dot: Color,
+    onClick: (Media) -> Unit,
+    saved: Boolean,
+    onToggleSaved: () -> Unit,
+    armed: Boolean,
+    onArm: () -> Unit,
+) {
     val grayscale = remember { ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) }
+    val hover = rememberCardHover()
+    val active = hover.active() || armed
+    val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
+    val chipText by accentColor(active, accent, Ani.Muted)
+    val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.ChipOnItem)
+    val titleColor by accentColor(active, accent, Color.White)
+    val tint by accentColor(active, accent.copy(alpha = 0.30f), Ani.Item)
+    val rowBorder by accentColor(active, accent.copy(alpha = 0.55f), Color.Transparent)
+    val shape = RoundedCornerShape(12.dp)
 
     Box(
         Modifier
             .fillMaxWidth()
             .height(96.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shape)
             .background(Ani.Item)
-            .clickable { onClick(media) },
+            .border(1.dp, rowBorder, shape)
+            .hoverCard(hover, { onClick(media) }, onArm = onArm),
     ) {
-        // Faint grayscale artwork on the right, fading into the row colour.
-        AsyncImage(
-            model = media.backdropUrl ?: media.posterUrl,
+        // Artwork on the right (grayscale at rest, full colour on hover), fading into the row colour.
+        PosterImage(
+            url = media.backdropUrl ?: media.posterUrl,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
-            colorFilter = grayscale,
-            alpha = 0.20f,
+            colorFilter = if (active) null else grayscale,
+            alpha = if (active) 0.30f else 0.20f,
             modifier = Modifier.fillMaxSize(),
         )
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Brush.horizontalGradient(listOf(Ani.Item, Ani.Item.copy(alpha = 0.45f)))),
+                .background(Brush.horizontalGradient(listOf(tint, Ani.Item.copy(alpha = 0.45f)))),
         )
 
         Row(Modifier.fillMaxSize()) {
-            PosterImage(
-                url = media.posterUrl,
-                contentDescription = media.displayTitle,
-                modifier = Modifier.width(68.dp).fillMaxHeight(),
-            )
+            Box(Modifier.width(68.dp).fillMaxHeight()) {
+                PosterImage(
+                    url = media.posterUrl,
+                    contentDescription = media.displayTitle,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                HoverOverlay(active, playSize = 30)
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -1021,24 +1085,43 @@ private fun RankRow(media: Media, dot: Color, onClick: (Media) -> Unit) {
                     Text(
                         text = media.displayTitle,
                         style = inter(14.5f, FontWeight.SemiBold, lineHeight = 19f),
+                        color = titleColor,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                Row(
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier.padding(start = 17.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    InfoBadge(media.formatLabel, background = Ani.ChipOnItem, textSize = 10.5f, hPad = 7.dp, vPad = 4.dp)
+                    if (active || saved) {
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(Color(0xFF1C1C1F))
+                                .clickable(onClick = onToggleSaved)
+                                .padding(horizontal = 7.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (saved) AniIcons.Check else AniIcons.Add,
+                                contentDescription = "Add to list",
+                                tint = accent,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                    InfoBadge(media.formatLabel, background = chipBg, textColor = chipText, textSize = 10.5f, hPad = 7.dp, vPad = 4.dp)
                     media.year?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.Calendar, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
+                        InfoBadge(it.toString(), icon = AniIcons.Calendar, background = chipBg, textColor = chipText, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                     media.airedEpisodes?.takeIf { it > 0 }?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
+                        InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, background = chipBg, textColor = chipText, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                     media.averageScore?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.Star, background = Ani.ChipOnItem, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
+                        InfoBadge(it.toString(), icon = AniIcons.Star, background = chipBg, textColor = chipText, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                 }
             }
@@ -1048,7 +1131,13 @@ private fun RankRow(media: Media, dot: Color, onClick: (Media) -> Unit) {
 
 /** Poster art decoded at full resolution and scaled with high-quality filtering, so cards stay crisp. */
 @Composable
-internal fun PosterImage(url: String?, contentDescription: String?, modifier: Modifier = Modifier) {
+internal fun PosterImage(
+    url: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    colorFilter: ColorFilter? = null,
+    alpha: Float = 1f,
+) {
     val context = LocalContext.current
     val request = remember(url) {
         ImageRequest.Builder(context)
@@ -1062,6 +1151,8 @@ internal fun PosterImage(url: String?, contentDescription: String?, modifier: Mo
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         filterQuality = FilterQuality.High,
+        colorFilter = colorFilter,
+        alpha = alpha,
         modifier = modifier,
     )
 }
