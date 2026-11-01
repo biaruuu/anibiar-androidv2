@@ -162,6 +162,8 @@ private fun HomeContent(
     }
     var latestPage by rememberSaveable { mutableStateOf(0) }
     var dubMode by rememberSaveable { mutableStateOf(false) }
+    var popularPage by rememberSaveable { mutableStateOf(0) }
+    var popularDub by rememberSaveable { mutableStateOf(false) }
     var heroIndex by remember { mutableIntStateOf(0) }
 
     val currentHero = state.hero.getOrNull(heroIndex)
@@ -293,6 +295,61 @@ private fun HomeContent(
                         items(rows.size, key = { "row-$page-$it" }) { index ->
                             EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
                             Spacer(Modifier.height(16.dp))
+                        }
+                    }
+
+                    if (state.popular.isNotEmpty()) {
+                        val popPages = state.popular.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                        val popPageCount = popPages.size.coerceAtLeast(1)
+                        val popCur = popularPage.coerceIn(0, popPageCount - 1)
+                        val popRows = popPages.getOrNull(popCur).orEmpty().chunked(columns)
+                        item(key = "popular-header") {
+                            Spacer(Modifier.height(12.dp))
+                            LatestHeader(
+                                title = "Most Popular",
+                                dubMode = popularDub,
+                                onModeChange = { popularDub = it },
+                                page = popCur,
+                                pageCount = popPageCount,
+                                onPrev = { popularPage = (popCur - 1).coerceAtLeast(0) },
+                                onNext = { popularPage = (popCur + 1).coerceAtMost(popPageCount - 1) },
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
+                        if (popularDub) {
+                            item(key = "popular-dub-empty") {
+                                Text(
+                                    text = "Dubbed releases aren't available yet.",
+                                    style = inter(15f),
+                                    color = Ani.Muted,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+                                )
+                            }
+                        } else {
+                            items(popRows.size, key = { "pop-$popCur-$it" }) { index ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                ) {
+                                    popRows[index].forEachIndexed { col, media ->
+                                        val rank = popCur * EPISODES_PER_PAGE + index * columns + col + 1
+                                        MediaGridCard(
+                                            media = media,
+                                            leftText = "#$rank",
+                                            rightText = media.averageScore?.let { "★ %.1f".format(it / 10f) } ?: "",
+                                            ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                            onClick = { onOpen(media.id) },
+                                            saved = media.id in saved,
+                                            onToggleSaved = { onToggleSaved(media.id) },
+                                            armed = armedId == "P${media.id}",
+                                            onArm = { armedId = "P${media.id}" },
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                    }
+                                    repeat((columns - popRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                            }
                         }
                     }
 
@@ -585,7 +642,8 @@ private fun HeroSlide(
                         .clickable(onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(if (inList) AniIcons.Check else AniIcons.Add, contentDescription = "Add to list", tint = Color.White, modifier = Modifier.size(22.dp))
+                    val addTint by animateColorAsState(accentOf(media.coverImage.color), tween(400), label = "heroAdd")
+                    Icon(if (inList) AniIcons.Check else AniIcons.Add, contentDescription = "Add to list", tint = addTint, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -684,6 +742,7 @@ private fun ContinueWatching(
 
 @Composable
 private fun LatestHeader(
+    title: String = "Latest Episodes",
     dubMode: Boolean,
     onModeChange: (Boolean) -> Unit,
     page: Int,
@@ -696,7 +755,7 @@ private fun LatestHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "Latest Episodes",
+            text = title,
             style = inter(20f, FontWeight.SemiBold),
             color = Ani.Soft,
             maxLines = 1,
@@ -818,18 +877,45 @@ private fun EpisodeCard(
     onArm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val media = item.media
+    // "5m ago" stays live: re-evaluated every 30s.
+    val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+        while (true) { delay(30_000); value = System.currentTimeMillis() }
+    }
+    val agoLabel = remember(now, item.airingAt) { timeAgo(item.airingAt) }
+    MediaGridCard(
+        media = item.media,
+        leftText = "EP ${item.episode}",
+        rightText = agoLabel,
+        ccText = item.episode.toString(),
+        onClick = onClick,
+        saved = saved,
+        onToggleSaved = onToggleSaved,
+        armed = armed,
+        onArm = onArm,
+        modifier = modifier,
+    )
+}
+
+/** The Latest-Episodes card style, reused by Most Popular (left/right overlay texts differ). */
+@Composable
+private fun MediaGridCard(
+    media: Media,
+    leftText: String,
+    rightText: String,
+    ccText: String?,
+    onClick: () -> Unit,
+    saved: Boolean,
+    onToggleSaved: () -> Unit,
+    armed: Boolean,
+    onArm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val hover = rememberCardHover()
     val active = hover.active() || armed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
     val chipText by accentColor(active, accent, Ani.Muted)
     val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
     val titleColor by accentColor(active, accent, Color.White)
-    // "5m ago" stays live: re-evaluated every 30s.
-    val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
-        while (true) { delay(30_000); value = System.currentTimeMillis() }
-    }
-    val agoLabel = remember(now, item.airingAt) { timeAgo(item.airingAt) }
     BoxWithConstraints(modifier.hoverCard(hover, onClick, onArm = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
         val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
@@ -867,7 +953,7 @@ private fun EpisodeCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "EP ${item.episode}",
+                        leftText,
                         style = inter(11f, FontWeight.SemiBold),
                         color = Color.White,
                         maxLines = 1,
@@ -875,7 +961,7 @@ private fun EpisodeCard(
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        agoLabel,
+                        rightText,
                         style = inter(10.5f, FontWeight.Medium),
                         color = Color.White.copy(alpha = 0.92f),
                         maxLines = 1,
@@ -887,16 +973,18 @@ private fun EpisodeCard(
             Spacer(Modifier.height(7.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                InfoBadge(
-                    text = item.episode.toString(),
-                    icon = AniIcons.ClosedCaption,
-                    textSize = badgeText,
-                    iconSize = badgeIcon,
-                    hPad = badgePad,
-                    vPad = 4.dp,
-                    background = chipBg,
-                    textColor = chipText,
-                )
+                ccText?.let {
+                    InfoBadge(
+                        text = it,
+                        icon = AniIcons.ClosedCaption,
+                        textSize = badgeText,
+                        iconSize = badgeIcon,
+                        hPad = badgePad,
+                        vPad = 4.dp,
+                        background = chipBg,
+                        textColor = chipText,
+                    )
+                }
                 InfoBadge(text = media.formatLabel, textSize = badgeText, hPad = badgePad, vPad = 4.dp, background = chipBg, textColor = chipText)
                 media.year?.let {
                     InfoBadge(text = it.toString(), textSize = badgeText, hPad = badgePad, vPad = 4.dp, background = chipBg, textColor = chipText)

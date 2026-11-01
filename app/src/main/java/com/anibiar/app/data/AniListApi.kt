@@ -189,6 +189,26 @@ object Queries {
         }
     """.trimIndent()
 
+    val POPULAR = """
+        query {
+          popular: Page(page: 1, perPage: 60) {
+            media(type: ANIME, sort: POPULARITY_DESC, isAdult: false) {
+              id
+              title { romaji english }
+              episodes
+              format
+              status
+              seasonYear
+              startDate { year }
+              averageScore
+              popularity
+              coverImage { extraLarge large color }
+              nextAiringEpisode { episode airingAt }
+            }
+          }
+        }
+    """.trimIndent()
+
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {
           latest: Page(page: ${'$'}page, perPage: 50) {

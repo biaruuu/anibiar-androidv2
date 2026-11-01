@@ -159,6 +159,9 @@ data class Schedule(
 data class SchedulePage(val airingSchedules: List<Schedule> = emptyList())
 
 @Serializable
+data class PopularData(val popular: MediaPage = MediaPage())
+
+@Serializable
 data class LatestData(val latest: SchedulePage = SchedulePage())
 
 @Serializable

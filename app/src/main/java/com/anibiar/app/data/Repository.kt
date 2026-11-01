@@ -71,6 +71,25 @@ class AnimeRepository(context: Context) {
 
     // ---- Latest episodes (airing schedule, newest first, de-duplicated per anime) ----
 
+    // ---- Most Popular (AniList all-time popularity, top 60) ----
+
+    suspend fun cachedPopular(): List<Media> = withContext(Dispatchers.IO) {
+        cache.read(KEY_POPULAR)?.let { decodePopular(it) }.orEmpty()
+    }
+
+    suspend fun fetchPopular(): List<Media> {
+        val body = api.execute(Queries.POPULAR)
+        val list = withContext(Dispatchers.Default) { decodePopular(body) }.orEmpty()
+        if (list.isNotEmpty()) cache.write(KEY_POPULAR, body)
+        return list
+    }
+
+    private fun decodePopular(body: String): List<Media>? = try {
+        json.decodeFromString<GraphQlResponse<PopularData>>(body).data?.popular?.media
+    } catch (e: Exception) {
+        null
+    }
+
     suspend fun cachedLatest(): List<LatestEpisode> = withContext(Dispatchers.IO) {
         buildLatest(listOfNotNull(cache.read(KEY_LATEST_1), cache.read(KEY_LATEST_2)))
     }
@@ -430,6 +449,7 @@ class AnimeRepository(context: Context) {
     private companion object {
         const val UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
         const val KEY_DISCOVER = "discover.json"
+        const val KEY_POPULAR = "popular.json"
         const val KEY_LATEST_1 = "latest_1.json"
         const val KEY_LATEST_2 = "latest_2.json"
     }
