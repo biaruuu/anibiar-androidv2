@@ -152,7 +152,7 @@ object Queries {
             genres averageScore popularity siteUrl
             bannerImage
             coverImage { extraLarge large color }
-            countryOfOrigin isAdult
+            countryOfOrigin isAdult synonyms source
             nextAiringEpisode { episode airingAt }
             trailer { id site thumbnail }
             studios { edges { isMain node { name } } }
@@ -208,6 +208,8 @@ object Queries {
           }
         }
     """.trimIndent()
+
+    val TRENDING = POPULAR.replace("popular: Page", "trending: Page").replace("POPULARITY_DESC", "TRENDING_DESC")
 
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {

@@ -163,6 +163,7 @@ private fun HomeContent(
     var latestPage by rememberSaveable { mutableStateOf(0) }
     var dubMode by rememberSaveable { mutableStateOf(false) }
     var popularPage by rememberSaveable { mutableStateOf(0) }
+    var trendingPage by rememberSaveable { mutableStateOf(0) }
     var popularDub by rememberSaveable { mutableStateOf(false) }
     var heroIndex by remember { mutableIntStateOf(0) }
 
@@ -224,7 +225,7 @@ private fun HomeContent(
                 LazyColumn(
                     state = listState,
                     // extra room so the floating tab bar never covers the last row
-                    contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp),
+                    contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp),
                     modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                         // Only a real tap on empty space clears the hover; scrolling/dragging never does.
                         val slop = viewConfiguration.touchSlop
@@ -295,6 +296,52 @@ private fun HomeContent(
                     } else {
                         items(rows.size, key = { "row-$page-$it" }) { index ->
                             EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
+                            Spacer(Modifier.height(16.dp))
+                        }
+                    }
+
+                    if (state.trending.isNotEmpty()) {
+                        val trPages = state.trending.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                        val trCount = trPages.size.coerceAtLeast(1)
+                        val trCur = trendingPage.coerceIn(0, trCount - 1)
+                        val trRows = trPages.getOrNull(trCur).orEmpty().chunked(columns)
+                        item(key = "trending-header") {
+                            Spacer(Modifier.height(12.dp))
+                            LatestHeader(
+                                title = "Trending",
+                                dubMode = false,
+                                onModeChange = {},
+                                showToggle = false,
+                                page = trCur,
+                                pageCount = trCount,
+                                onPrev = { trendingPage = (trCur - 1).coerceAtLeast(0) },
+                                onNext = { trendingPage = (trCur + 1).coerceAtMost(trCount - 1) },
+                            )
+                            Spacer(Modifier.height(14.dp))
+                        }
+                        items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(13.dp),
+                            ) {
+                                trRows[index].forEachIndexed { col, media ->
+                                    val rank = trCur * EPISODES_PER_PAGE + index * columns + col + 1
+                                    MediaGridCard(
+                                        media = media,
+                                        leftText = "#$rank",
+                                        rightText = "",
+                                        rating = media.averageScore?.let { it / 10f },
+                                        ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                        onClick = { onOpen(media.id) },
+                                        saved = media.id in saved,
+                                        onToggleSaved = { onToggleSaved(media.id) },
+                                        armed = armedId == "R${media.id}",
+                                        onArm = { armedId = "R${media.id}" },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                repeat((columns - trRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                            }
                             Spacer(Modifier.height(16.dp))
                         }
                     }
@@ -747,6 +794,7 @@ private fun LatestHeader(
     title: String = "Latest Episodes",
     dubMode: Boolean,
     onModeChange: (Boolean) -> Unit,
+    showToggle: Boolean = true,
     page: Int,
     pageCount: Int,
     onPrev: () -> Unit,
@@ -765,8 +813,10 @@ private fun LatestHeader(
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(8.dp))
-        SubDubToggle(dubMode, onModeChange)
-        Spacer(Modifier.width(8.dp))
+        if (showToggle) {
+            SubDubToggle(dubMode, onModeChange)
+            Spacer(Modifier.width(8.dp))
+        }
         PagerPill(page, pageCount, onPrev, onNext)
     }
 }

@@ -90,6 +90,25 @@ class AnimeRepository(context: Context) {
         null
     }
 
+    // ---- Trending (AniList trending score, top 60) ----
+
+    suspend fun cachedTrending(): List<Media> = withContext(Dispatchers.IO) {
+        cache.read(KEY_TRENDING)?.let { decodeTrending(it) }.orEmpty()
+    }
+
+    suspend fun fetchTrending(): List<Media> {
+        val body = api.execute(Queries.TRENDING)
+        val list = withContext(Dispatchers.Default) { decodeTrending(body) }.orEmpty()
+        if (list.isNotEmpty()) cache.write(KEY_TRENDING, body)
+        return list
+    }
+
+    private fun decodeTrending(body: String): List<Media>? = try {
+        json.decodeFromString<GraphQlResponse<TrendingData>>(body).data?.trending?.media
+    } catch (e: Exception) {
+        null
+    }
+
     suspend fun cachedLatest(): List<LatestEpisode> = withContext(Dispatchers.IO) {
         buildLatest(listOfNotNull(cache.read(KEY_LATEST_1), cache.read(KEY_LATEST_2)))
     }
@@ -450,6 +469,7 @@ class AnimeRepository(context: Context) {
         const val UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
         const val KEY_DISCOVER = "discover.json"
         const val KEY_POPULAR = "popular.json"
+        const val KEY_TRENDING = "trending.json"
         const val KEY_LATEST_1 = "latest_1.json"
         const val KEY_LATEST_2 = "latest_2.json"
     }

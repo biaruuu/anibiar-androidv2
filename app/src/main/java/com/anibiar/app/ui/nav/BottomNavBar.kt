@@ -46,23 +46,23 @@ enum class NavTab(val label: String, val icon: ImageVector) {
 /** Floating glass pill: Home / Search / Profile / Settings. The selected tab sits in a lighter glass capsule. */
 @Composable
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(32.dp)
+    val shape = RoundedCornerShape(50)
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Row(
             modifier = Modifier
-                .widthIn(max = 520.dp)
-                .fillMaxWidth()
-                .height(64.dp)
-                .shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 380.dp)
+                .height(48.dp)
+                .shadow(14.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
                 .clip(shape)
-                .background(Color(0xE6141416))
-                .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.10f), Color.White.copy(alpha = 0.03f))))
+                .background(Color(0xA32B2B2E))
+                .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.06f))))
                 .border(
                     1.dp,
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.08f))),
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.22f))),
                     shape,
                 )
-                .padding(6.dp),
+                .padding(3.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -75,9 +75,9 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 @Composable
 private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val itemShape = RoundedCornerShape(26.dp)
+    val itemShape = RoundedCornerShape(50)
     val tint by animateColorAsState(if (selected) Color.White else Color.White.copy(alpha = 0.72f), tween(200), label = "navTint")
-    val fill by animateColorAsState(if (selected) Color.White.copy(alpha = 0.16f) else Color.Transparent, tween(220), label = "navFill")
+    val fill by animateColorAsState(if (selected) Color.White.copy(alpha = 0.20f) else Color.Transparent, tween(220), label = "navFill")
     val edge by animateColorAsState(if (selected) Color.White.copy(alpha = 0.22f) else Color.Transparent, tween(220), label = "navEdge")
     Box(
         modifier = modifier
@@ -89,9 +89,9 @@ private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit, modifie
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.height(2.dp))
-            Text(tab.label, style = inter(11f, FontWeight.SemiBold), color = tint, maxLines = 1)
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.height(1.dp))
+            Text(tab.label, style = inter(10f, FontWeight.SemiBold), color = tint, maxLines = 1)
         }
     }
 }

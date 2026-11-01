@@ -531,6 +531,10 @@ private fun About(
             else -> null
         }
         episodesText?.let { AboutRow("Episodes", it) }
+        media.nextAiringEpisode?.takeIf { media.status == "RELEASING" && it.airingAt != null }?.let { next ->
+            AboutRow("Next episode", "EP ${next.episode} · ${countdownLabel(next.airingAt ?: 0L)}", Ani.Lime)
+        }
+        media.duration?.takeIf { it > 0 }?.let { AboutRow("Duration", "$it min per ep") }
         media.averageScore?.let {
             AboutRow("AniList score", media.score10.orEmpty(), ratingColor(it / 10f), AniIcons.Star)
         }
@@ -540,6 +544,15 @@ private fun About(
         media.airedLabel?.let { AboutRow("Aired", it) }
         media.popularity?.let { AboutRow("Popularity", "#" + number.format(it)) }
         media.title.native?.takeIf { it.isNotBlank() }?.let { AboutRow("Native", it) }
+        media.countryOfOrigin?.takeIf { it.isNotBlank() }?.let { AboutRow("Country", countryName(it)) }
+        media.source?.takeIf { it.isNotBlank() }?.let { AboutRow("Source", titleCase(it)) }
+        val synonyms = media.synonyms.orEmpty().filter { it.isNotBlank() }.take(6)
+        if (synonyms.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text("Also known as", style = inter(13.5f), color = Ani.Muted)
+            Spacer(Modifier.height(4.dp))
+            Text(synonyms.joinToString(" · "), style = inter(13f, lineHeight = 19f), color = Ani.Soft)
+        }
 
         val genres = media.genres.orEmpty()
         if (genres.isNotEmpty()) {
@@ -1610,5 +1623,30 @@ private fun Footer(side: Dp) {
         Text("AniBiar TV", style = inter(15f, FontWeight.SemiBold))
         Spacer(Modifier.height(4.dp))
         Text("Data: AniList · TMDB · MyAnimeList", style = inter(12.5f), color = Ani.Muted)
+    }
+}
+
+
+private fun countryName(code: String) = when (code.uppercase()) {
+    "JP" -> "Japan"
+    "CN" -> "China"
+    "KR" -> "South Korea"
+    "TW" -> "Taiwan"
+    else -> code
+}
+
+private fun titleCase(raw: String) =
+    raw.lowercase().split('_').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
+
+/** "in 2d 5h" / "in 3h 12m" / "in 14m" for an AniList airingAt epoch (seconds). */
+private fun countdownLabel(airingAt: Long): String {
+    val diff = (airingAt - System.currentTimeMillis() / 1000).coerceAtLeast(0)
+    val d = diff / 86400
+    val h = (diff % 86400) / 3600
+    val m = (diff % 3600) / 60
+    return when {
+        d > 0 -> "in ${d}d ${h}h"
+        h > 0 -> "in ${h}h ${m}m"
+        else -> "in ${m.coerceAtLeast(1)}m"
     }
 }

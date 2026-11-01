@@ -115,4 +115,4 @@ private fun AppNavigation() {
 
 private fun Modifier.androidx_navPadding(): Modifier = this
     .navigationBarsPadding()
-    .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
+    .padding(bottom = 10.dp)

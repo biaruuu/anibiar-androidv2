@@ -46,6 +46,8 @@ data class Media(
     val nextAiringEpisode: NextAiring? = null,
     val countryOfOrigin: String? = null,
     val isAdult: Boolean? = null,
+    val synonyms: List<String>? = null,
+    val source: String? = null,
     // ---- details page only ----
     val type: String? = null,
     val idMal: Int? = null,
@@ -160,6 +162,9 @@ data class SchedulePage(val airingSchedules: List<Schedule> = emptyList())
 
 @Serializable
 data class PopularData(val popular: MediaPage = MediaPage())
+
+@Serializable
+data class TrendingData(val trending: MediaPage = MediaPage())
 
 @Serializable
 data class LatestData(val latest: SchedulePage = SchedulePage())

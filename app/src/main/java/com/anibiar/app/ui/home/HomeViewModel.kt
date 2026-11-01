@@ -22,6 +22,7 @@ data class HomeUiState(
     val upcoming: List<Media> = emptyList(),
     val latest: List<LatestEpisode> = emptyList(),
     val popular: List<Media> = emptyList(),
+    val trending: List<Media> = emptyList(),
     val history: List<HistoryItem> = emptyList(),
     val art: Map<Int, TmdbArt> = emptyMap(),
     val loading: Boolean = true,
@@ -59,13 +60,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             repository.cachedPopular().takeIf { it.isNotEmpty() }?.let { c -> _state.update { it.copy(popular = c) } }
 
+            repository.cachedTrending().takeIf { it.isNotEmpty() }?.let { c -> _state.update { it.copy(trending = c) } }
+
             // 2) Refresh from AniList in parallel.
+            val trendingJob = async { runCatching { repository.fetchTrending() } }
             val popularJob = async { runCatching { repository.fetchPopular() } }
             val discoverJob = async { runCatching { repository.fetchDiscover() } }
             val latestJob = async { runCatching { repository.fetchLatest() } }
 
             val discover = discoverJob.await()
             val latest = latestJob.await()
+            trendingJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
+                _state.update { it.copy(trending = list) }
+                repository.preloadImages(list.take(12).map { it.posterUrl })
+            }
             popularJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(popular = list) }
                 repository.preloadImages(list.take(12).map { it.posterUrl })
