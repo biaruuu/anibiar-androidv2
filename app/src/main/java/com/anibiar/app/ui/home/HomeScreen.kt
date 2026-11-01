@@ -1227,7 +1227,7 @@ private fun RankRow(
                         InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, background = chipBg, textColor = chipText, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                     media.averageScore?.let {
-                        InfoBadge(it.toString(), icon = AniIcons.Star, background = chipBg, textColor = chipText, textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
+                        InfoBadge("%.1f".format(java.util.Locale.US, it / 10f), icon = AniIcons.Star, background = chipBg, textColor = ratingColor(it / 10f), textSize = 10.5f, iconSize = 11.dp, hPad = 7.dp, vPad = 4.dp)
                     }
                 }
             }

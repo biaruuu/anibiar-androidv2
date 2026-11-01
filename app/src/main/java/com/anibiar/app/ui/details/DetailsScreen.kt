@@ -104,6 +104,7 @@ import com.anibiar.app.ui.home.ErrorState
 import com.anibiar.app.ui.home.InfoBadge
 import com.anibiar.app.ui.home.active
 import com.anibiar.app.ui.home.hoverCard
+import com.anibiar.app.ui.home.ratingColor
 import com.anibiar.app.ui.home.clearOnEmptyTap
 import androidx.lifecycle.repeatOnLifecycle
 import com.anibiar.app.ui.home.PosterImage
@@ -384,7 +385,7 @@ private fun Header(
                     verticalArrangement = Arrangement.spacedBy(7.dp),
                 ) {
                     media.seasonLabel?.let { MetaItem(AniIcons.Calendar, it, metaSize) }
-                    media.score10?.let { MetaItem(AniIcons.Star, it, metaSize) }
+                    media.score10?.let { MetaItem(AniIcons.Star, it, metaSize, tint = ratingColor((media.averageScore ?: 0) / 10f)) }
                     MetaItem(AniIcons.Tv, media.formatName, metaSize)
                     media.duration?.takeIf { it > 0 }?.let { MetaItem(AniIcons.Schedule, "$it min", metaSize) }
                 }
@@ -418,15 +419,15 @@ private fun Header(
 }
 
 @Composable
-private fun MetaItem(icon: ImageVector?, text: String, size: Float, dot: Color? = null) {
+private fun MetaItem(icon: ImageVector?, text: String, size: Float, dot: Color? = null, tint: Color? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size((size + 1.5f).dp))
+            Icon(icon, contentDescription = null, tint = tint ?: Ani.Muted, modifier = Modifier.size((size + 1.5f).dp))
         } else if (dot != null) {
             Box(Modifier.padding(horizontal = 2.dp).size(8.dp).clip(CircleShape).background(dot))
         }
         Spacer(Modifier.width(5.dp))
-        Text(text, style = inter(size, FontWeight.Medium), color = Ani.Soft, maxLines = 1, softWrap = false)
+        Text(text, style = inter(size, FontWeight.Medium), color = tint ?: Ani.Soft, maxLines = 1, softWrap = false)
     }
 }
 
@@ -530,8 +531,12 @@ private fun About(
             else -> null
         }
         episodesText?.let { AboutRow("Episodes", it) }
-        media.averageScore?.let { AboutRow("AniList score", media.score10.orEmpty()) }
-        malScore?.let { AboutRow("MAL score", it) }
+        media.averageScore?.let {
+            AboutRow("AniList score", media.score10.orEmpty(), ratingColor(it / 10f), AniIcons.Star)
+        }
+        malScore?.let { mal ->
+            AboutRow("MAL score", mal, mal.toFloatOrNull()?.let { ratingColor(it) } ?: Color.White, AniIcons.Star)
+        }
         media.airedLabel?.let { AboutRow("Aired", it) }
         media.popularity?.let { AboutRow("Popularity", "#" + number.format(it)) }
         media.title.native?.takeIf { it.isNotBlank() }?.let { AboutRow("Native", it) }
@@ -666,19 +671,24 @@ private fun LinkTileView(tile: LinkTile, onClick: () -> Unit) {
 }
 
 @Composable
-private fun AboutRow(label: String, value: String, valueColor: Color = Color.White) {
+private fun AboutRow(label: String, value: String, valueColor: Color = Color.White, valueIcon: ImageVector? = null) {
     Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = inter(13.5f), color = Ani.Muted)
         Spacer(Modifier.width(16.dp))
-        Text(
-            text = value,
-            style = inter(13f, FontWeight.Medium),
-            color = valueColor,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+            if (valueIcon != null) {
+                Icon(valueIcon, contentDescription = null, tint = valueColor, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(
+                text = value,
+                style = inter(13f, if (valueIcon != null) FontWeight.SemiBold else FontWeight.Medium),
+                color = valueColor,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
