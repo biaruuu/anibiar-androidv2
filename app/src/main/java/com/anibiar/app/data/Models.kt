@@ -159,6 +159,9 @@ data class Schedule(
 data class SchedulePage(val airingSchedules: List<Schedule> = emptyList())
 
 @Serializable
+data class ByIdsData(@kotlinx.serialization.SerialName("Page") val page: MediaPage = MediaPage())
+
+@Serializable
 data class PopularData(val popular: MediaPage = MediaPage())
 
 @Serializable
@@ -298,3 +301,7 @@ data class EpisodeInfo(
     val runtime: Int?,
     val image: String?,
 )
+
+/** One dubbed episode that has aired (from the AnimeSchedule dub timetable, matched to an AniList entry). */
+@Serializable
+data class DubEntry(val media: Media, val episode: Int, val airingAt: Long)

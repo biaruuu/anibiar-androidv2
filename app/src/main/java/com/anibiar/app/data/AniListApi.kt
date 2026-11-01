@@ -209,6 +209,32 @@ object Queries {
         }
     """.trimIndent()
 
+    private const val DUB_MEDIA = """
+        id
+        title { romaji english native }
+        episodes
+        format
+        status
+        seasonYear
+        startDate { year }
+        averageScore
+        popularity
+        coverImage { extraLarge large color }
+        nextAiringEpisode { episode airingAt }
+    """
+
+    /** Several title searches in one request (aliases m0, m1, ...). Titles are escaped string literals. */
+    fun searchMany(titles: List<String>): String {
+        fun esc(t: String) = t.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
+        val body = titles.mapIndexed { i, t ->
+            "m$i: Page(perPage: 4) { media(search: \"${esc(t)}\", type: ANIME, isAdult: false) { $DUB_MEDIA } }"
+        }.joinToString("\n")
+        return "query {\n$body\n}"
+    }
+
+    fun byIds(ids: List<Int>): String =
+        "query { Page(perPage: 50) { media(id_in: [${ids.joinToString(",")}], type: ANIME) { $DUB_MEDIA } } }"
+
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {
           latest: Page(page: ${'$'}page, perPage: 50) {

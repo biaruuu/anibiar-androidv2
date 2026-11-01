@@ -106,6 +106,9 @@ import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.delay
 
+private fun dubEmptyText(configured: Boolean) =
+    if (configured) "No dubbed episodes have aired recently." else "Dub data isn't connected in this build yet."
+
 private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
@@ -214,8 +217,12 @@ private fun HomeContent(
             )
 
             else -> {
-                val pages = remember(state.latest) {
-                    state.latest.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                val dubCounts = remember(state.dub) { state.dub.associate { it.media.id to it.episode } }
+                val latestSource = remember(state.latest, state.dub, dubMode) {
+                    if (dubMode) state.dub.map { LatestEpisode(it.media, it.episode, it.airingAt) } else state.latest
+                }
+                val pages = remember(latestSource) {
+                    latestSource.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
                 }
                 val pageCount = pages.size.coerceAtLeast(1)
                 val page = latestPage.coerceIn(0, pageCount - 1)
@@ -273,7 +280,7 @@ private fun HomeContent(
                         Spacer(Modifier.height(28.dp))
                         LatestHeader(
                             dubMode = dubMode,
-                            onModeChange = { dubMode = it },
+                            onModeChange = { dubMode = it; latestPage = 0 },
                             page = page,
                             pageCount = pageCount,
                             onPrev = { latestPage = (page - 1).coerceAtLeast(0) },
@@ -282,33 +289,36 @@ private fun HomeContent(
                         Spacer(Modifier.height(14.dp))
                     }
 
-                    if (dubMode) {
+                    if (dubMode && latestSource.isEmpty()) {
                         item(key = "dub-empty") {
                             Text(
-                                text = "Dubbed releases aren't available yet.",
+                                text = dubEmptyText(state.dubConfigured),
                                 style = inter(15f),
                                 color = Ani.Muted,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
                             )
                         }
                     } else {
-                        items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
+                        items(rows.size, key = { "row-$dubMode-$page-$it" }) { index ->
+                            EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, dubMode, dubCounts, onClick = { onOpen(it.media.id) })
                             Spacer(Modifier.height(16.dp))
                         }
                     }
 
-                    if (state.popular.isNotEmpty()) {
-                        val popPages = state.popular.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                    run {
+                        // Dub tab: the titles being dubbed right now, ranked by AniList popularity.
+                        val dubCountsPop = state.dub.associate { it.media.id to it.episode }
+                        val popSource = if (popularDub) state.dub.map { it.media }.sortedByDescending { it.popularity ?: 0 } else state.popular
+                        val popPages = popSource.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
                         val popPageCount = popPages.size.coerceAtLeast(1)
                         val popCur = popularPage.coerceIn(0, popPageCount - 1)
                         val popRows = popPages.getOrNull(popCur).orEmpty().chunked(columns)
-                        item(key = "popular-header") {
+                        if (state.popular.isNotEmpty() || state.dub.isNotEmpty()) item(key = "popular-header") {
                             Spacer(Modifier.height(12.dp))
                             LatestHeader(
                                 title = "Most Popular",
                                 dubMode = popularDub,
-                                onModeChange = { popularDub = it },
+                                onModeChange = { popularDub = it; popularPage = 0 },
                                 page = popCur,
                                 pageCount = popPageCount,
                                 onPrev = { popularPage = (popCur - 1).coerceAtLeast(0) },
@@ -316,17 +326,17 @@ private fun HomeContent(
                             )
                             Spacer(Modifier.height(14.dp))
                         }
-                        if (popularDub) {
+                        if (popularDub && popSource.isEmpty()) {
                             item(key = "popular-dub-empty") {
                                 Text(
-                                    text = "Dubbed releases aren't available yet.",
+                                    text = dubEmptyText(state.dubConfigured),
                                     style = inter(15f),
                                     color = Ani.Muted,
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
                                 )
                             }
                         } else {
-                            items(popRows.size, key = { "pop-$popCur-$it" }) { index ->
+                            items(popRows.size, key = { "pop-$popularDub-$popCur-$it" }) { index ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                                     horizontalArrangement = Arrangement.spacedBy(13.dp),
@@ -338,7 +348,10 @@ private fun HomeContent(
                                             leftText = "#$rank",
                                             rightText = "",
                                             rating = media.averageScore?.let { it / 10f },
-                                            ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                            ccText = if (popularDub) dubCountsPop[media.id]?.toString()
+                                                else (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                            ccIcon = if (popularDub) AniIcons.Mic else AniIcons.ClosedCaption,
+                                            micText = if (popularDub) null else dubCountsPop[media.id]?.toString(),
                                             onClick = { onOpen(media.id) },
                                             saved = media.id in saved,
                                             onToggleSaved = { onToggleSaved(media.id) },
@@ -845,6 +858,8 @@ private fun EpisodeRow(
     onToggleSaved: (Int) -> Unit,
     armedId: String?,
     onArm: (String) -> Unit,
+    dubMode: Boolean,
+    dubCounts: Map<Int, Int>,
     onClick: (LatestEpisode) -> Unit,
 ) {
     Row(
@@ -857,6 +872,8 @@ private fun EpisodeRow(
                 { onClick(episode) },
                 saved = episode.media.id in saved,
                 onToggleSaved = { onToggleSaved(episode.media.id) },
+                dubMode = dubMode,
+                dubCount = dubCounts[episode.media.id],
                 armed = armedId == "L${episode.media.id}",
                 onArm = { onArm("L${episode.media.id}") },
                 modifier = Modifier.weight(1f),
@@ -876,6 +893,8 @@ private fun EpisodeCard(
     onToggleSaved: () -> Unit,
     armed: Boolean,
     onArm: () -> Unit,
+    dubMode: Boolean = false,
+    dubCount: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     // "5m ago" stays live: re-evaluated every 30s.
@@ -888,6 +907,8 @@ private fun EpisodeCard(
         leftText = "EP ${item.episode}",
         rightText = agoLabel,
         ccText = item.episode.toString(),
+        ccIcon = if (dubMode) AniIcons.Mic else AniIcons.ClosedCaption,
+        micText = if (dubMode) null else dubCount?.toString(),
         onClick = onClick,
         saved = saved,
         onToggleSaved = onToggleSaved,
@@ -904,6 +925,8 @@ private fun MediaGridCard(
     leftText: String,
     rightText: String,
     ccText: String?,
+    ccIcon: ImageVector = AniIcons.ClosedCaption,
+    micText: String? = null,
     rating: Float? = null,
     onClick: () -> Unit,
     saved: Boolean,
@@ -994,7 +1017,19 @@ private fun MediaGridCard(
                 ccText?.let {
                     InfoBadge(
                         text = it,
-                        icon = AniIcons.ClosedCaption,
+                        icon = ccIcon,
+                        textSize = badgeText,
+                        iconSize = badgeIcon,
+                        hPad = badgePad,
+                        vPad = 4.dp,
+                        background = chipBg,
+                        textColor = chipText,
+                    )
+                }
+                micText?.let {
+                    InfoBadge(
+                        text = it,
+                        icon = AniIcons.Mic,
                         textSize = badgeText,
                         iconSize = badgeIcon,
                         hPad = badgePad,
