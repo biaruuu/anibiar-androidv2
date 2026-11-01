@@ -45,6 +45,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -461,7 +464,7 @@ private fun ActionButton(
 private fun Description(text: String) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var overflow by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().animateContentSize(tween(320))) {
         Text(
             text = text,
             style = inter(14f, lineHeight = 23f),
@@ -472,12 +475,21 @@ private fun Description(text: String) {
         )
         if (overflow || expanded) {
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = if (expanded) "Show less" else "Read more",
-                style = inter(14f, FontWeight.SemiBold),
-                color = Color.White,
-                modifier = Modifier.clickable { expanded = !expanded },
-            )
+            val turn by animateFloatAsState(if (expanded) 180f else 0f, tween(300), label = "descTurn")
+            Row(
+                Modifier.clip(RoundedCornerShape(8.dp)).clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (expanded) "Show less" else "Read more",
+                    style = inter(14f, FontWeight.SemiBold),
+                    color = Color.White,
+                )
+                Icon(
+                    AniIcons.ArrowDown, contentDescription = null, tint = Color.White,
+                    modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = turn },
+                )
+            }
         }
     }
 }
@@ -1429,7 +1441,8 @@ private fun OutlinedDropdown(current: String, options: List<String>, onSelect: (
         ) {
             Text(current, style = inter(13f, FontWeight.Medium))
             Spacer(Modifier.width(2.dp))
-            Icon(AniIcons.ArrowDown, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
+            val turn by animateFloatAsState(if (open) 180f else 0f, tween(250), label = "ddTurn")
+            Icon(AniIcons.ArrowDown, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = turn })
         }
         DropdownMenu(
             expanded = open,
@@ -1533,11 +1546,12 @@ private fun LazyListScope.artworkItems(
                     style = inter(14f, FontWeight.Medium),
                     color = Ani.Soft,
                 )
+                val turn by animateFloatAsState(if (expanded) 180f else 0f, tween(300), label = "artTurn")
                 Icon(
                     AniIcons.ArrowDown,
                     contentDescription = null,
                     tint = Ani.Muted,
-                    modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = if (expanded) 180f else 0f },
+                    modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = turn },
                 )
             }
         }

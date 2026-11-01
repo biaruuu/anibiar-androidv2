@@ -1,6 +1,11 @@
 package com.anibiar.app.ui.search
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
@@ -86,6 +91,7 @@ private val SORTS = listOf(
     "FAVOURITES_DESC" to "Most Favorited", "UPDATED_AT_DESC" to "Recently Updated", "START_DATE_DESC" to "Newest",
     "START_DATE" to "Oldest", "TITLE_ROMAJI" to "Title A–Z", "TITLE_ROMAJI_DESC" to "Title Z–A", "EPISODES_DESC" to "Most Episodes",
 )
+private val RANK_SORTS = setOf("POPULARITY_DESC", "TRENDING_DESC", "SCORE_DESC", "FAVOURITES_DESC")
 private val LANGUAGES = listOf("SUB" to "Sub", "DUB" to "Dub")
 private val SOURCES = listOf(
     "ORIGINAL" to "Original", "MANGA" to "Manga", "LIGHT_NOVEL" to "Light Novel", "WEB_NOVEL" to "Web Novel", "NOVEL" to "Novel",
@@ -169,7 +175,7 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                     onReset = viewModel::reset,
                     onToggle = { showFilters = !showFilters },
                 )
-                AnimatedVisibility(showFilters, enter = expandVertically(), exit = shrinkVertically()) {
+                AnimatedVisibility(showFilters, enter = expandVertically(tween(300)) + fadeIn(tween(300)), exit = shrinkVertically(tween(260)) + fadeOut(tween(200))) {
                     Column(Modifier.padding(horizontal = 8.dp).padding(top = 8.dp)) {
                         FilterRow(
                             FilterDropdown("Genres", null, GENRES, filters.genres, true) { viewModel.setFilters(filters.copy(genres = it)) },
@@ -227,17 +233,19 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                 }
                 else -> {
                     val rows = state.results.chunked(columns)
+                    val ranked = state.query.isBlank() && (filters.sort ?: "POPULARITY_DESC") in RANK_SORTS
                     items(rows.size, key = { "r${state.page}-$it-${rows[it].first().id}" }) { index ->
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            rows[index].forEach { media ->
+                            rows[index].forEachIndexed { col, media ->
+                                val rank = (state.page - 1) * 30 + index * columns + col + 1
                                 MediaGridCard(
                                     media = media,
-                                    leftText = "",
+                                    leftText = if (ranked) "#$rank" else "",
                                     rightText = "",
-                                    overlay = false,
+                                    rating = media.averageScore?.let { it / 10f },
                                     ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
                                     onClick = { onOpen(media.id) },
                                     saved = media.id in saved,
@@ -314,14 +322,15 @@ private fun ToolBar(activeCount: Int, expanded: Boolean, onApply: () -> Unit, on
         Box(Modifier.width(1.dp).fillMaxSize().background(Ani.Border))
         ToolCell(AniIcons.Refresh, if (activeCount > 0) Color.White else Ani.Muted, Modifier.weight(1f), onReset)
         Box(Modifier.width(1.dp).fillMaxSize().background(Ani.Border))
-        ToolCell(if (expanded) AniIcons.ArrowUp else AniIcons.ArrowDown, Ani.Soft, Modifier.weight(1f), onToggle)
+        ToolCell(AniIcons.ArrowDown, Ani.Soft, Modifier.weight(1f), onToggle, turn = if (expanded) 180f else 0f)
     }
 }
 
 @Composable
-private fun ToolCell(icon: ImageVector, tint: Color, modifier: Modifier, onClick: () -> Unit) {
+private fun ToolCell(icon: ImageVector, tint: Color, modifier: Modifier, onClick: () -> Unit, turn: Float = 0f) {
+    val angle by animateFloatAsState(turn, tween(300), label = "toolTurn")
     Box(modifier.fillMaxSize().clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = angle })
     }
 }
 
@@ -373,7 +382,8 @@ private fun FilterBox(f: FilterDropdown) {
                 shown, style = inter(14f), color = if (active) Color.White else Ani.Muted,
                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
-            Icon(AniIcons.ArrowDown, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
+            val turn by animateFloatAsState(if (open) 180f else 0f, tween(250), label = "boxTurn")
+            Icon(AniIcons.ArrowDown, null, tint = Ani.Muted, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = turn })
         }
         DropdownMenu(
             expanded = open,
