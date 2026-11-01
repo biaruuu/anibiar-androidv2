@@ -86,6 +86,7 @@ internal fun HoverOverlay(
     active: Boolean,
     saved: Boolean = false,
     showAdd: Boolean = false,
+    accent: Color = Ani.Lavender,
     onToggleSaved: () -> Unit = {},
     playSize: Int = 44,
 ) {
@@ -96,22 +97,22 @@ internal fun HoverOverlay(
             AniIcons.Play, contentDescription = null, tint = Color.White,
             modifier = Modifier.align(Alignment.Center).size(playSize.dp).alpha(a),
         )
-        if (showAdd && (active || saved)) {
+        if (showAdd && active) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
-                    .size(34.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(Color(0xFF1C1C1F))
                     .clickable(onClick = onToggleSaved),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     if (saved) AniIcons.Check else AniIcons.Add,
                     contentDescription = "Add to list",
-                    tint = if (saved) Ani.Lime else Color.White,
-                    modifier = Modifier.size(20.dp),
+                    tint = accent,
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }

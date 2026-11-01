@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +67,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -132,6 +135,17 @@ private fun HomeContent(
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 
     val listState = rememberLazyListState()
+    // The card showing its play/+ buttons after a long press; clears after 5s, on scroll, or on any other tap.
+    var armedId by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(armedId) {
+        if (armedId != null) {
+            delay(5000)
+            armedId = null
+        }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { if (it) armedId = null }
+    }
     val scrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 200 }
     }
@@ -197,7 +211,14 @@ private fun HomeContent(
                 LazyColumn(
                     state = listState,
                     contentPadding = WindowInsets.navigationBars.asPaddingValues(),
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Final)
+                                if (event.changes.any { it.pressed && !it.previousPressed && !it.isConsumed }) armedId = null
+                            }
+                        }
+                    },
                 ) {
                     if (state.hero.isNotEmpty()) {
                         item(key = "hero") {
@@ -248,7 +269,7 @@ private fun HomeContent(
                         }
                     } else {
                         items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], columns, saved, onToggleSaved, onClick = { onOpen(it.media.id) })
+                            EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
                             Spacer(Modifier.height(16.dp))
                         }
                     }
@@ -737,6 +758,8 @@ private fun EpisodeRow(
     columns: Int,
     saved: Set<Int>,
     onToggleSaved: (Int) -> Unit,
+    armedId: Int?,
+    onArm: (Int) -> Unit,
     onClick: (LatestEpisode) -> Unit,
 ) {
     Row(
@@ -749,6 +772,8 @@ private fun EpisodeRow(
                 { onClick(episode) },
                 saved = episode.media.id in saved,
                 onToggleSaved = { onToggleSaved(episode.media.id) },
+                armed = armedId == episode.media.id,
+                onArm = { onArm(episode.media.id) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -764,16 +789,18 @@ private fun EpisodeCard(
     onClick: () -> Unit,
     saved: Boolean,
     onToggleSaved: () -> Unit,
+    armed: Boolean,
+    onArm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val media = item.media
     val hover = rememberCardHover()
-    val active = hover.active()
+    val active = hover.active() || armed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
     val chipText by accentColor(active, accent, Ani.Muted)
     val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
     val titleColor by accentColor(active, accent, Color.White)
-    BoxWithConstraints(modifier.hoverCard(hover, onClick, onLongPress = onToggleSaved)) {
+    BoxWithConstraints(modifier.hoverCard(hover, onClick, onLongPress = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
         val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
         val badgeText = 9.5f * fit
@@ -793,7 +820,7 @@ private fun EpisodeCard(
                     contentDescription = media.displayTitle,
                     modifier = Modifier.fillMaxSize(),
                 )
-                HoverOverlay(active, saved = saved, showAdd = true, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt())
+                HoverOverlay(active, saved = saved, showAdd = true, accent = accent, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt())
                 Box(
                     Modifier
                         .align(Alignment.BottomCenter)

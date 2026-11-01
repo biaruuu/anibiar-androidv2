@@ -81,12 +81,12 @@ jobs:
           done
 
       - name: Name the APK
-        run: cp app/build/outputs/apk/release/app-release.apk AniBiar.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Kiro.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AniBiar-apk
-          path: AniBiar.apk
+          name: Kiro-apk
+          path: Kiro.apk
 
       - name: Publish GitHub Release
         env:
@@ -94,7 +94,7 @@ jobs:
           TMDB_STATUS: ${{ steps.tmdb.outputs.status }}
           MAL_STATUS: ${{ steps.mal.outputs.status }}
         run: |
-          gh release create "build-${{ github.run_number }}" AniBiar.apk \
+          gh release create "build-${{ github.run_number }}" Kiro.apk \
             --title "AniBiar build ${{ github.run_number }}" \
-            --notes "Home + Details build. Install AniBiar.apk on Android 7.0+. TMDB key: $TMDB_STATUS. MAL client id: $MAL_STATUS" \
+            --notes "Home + Details build. Install Kiro.apk on Android 7.0+. TMDB key: $TMDB_STATUS. MAL client id: $MAL_STATUS" \
             --latest
