@@ -24,6 +24,9 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import com.anibiar.app.ui.details.DetailsScreen
 import com.anibiar.app.ui.home.HomeScreen
 import com.anibiar.app.ui.theme.Ani
@@ -45,8 +48,32 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        // Floating glass tab bar, only on the Home level (a details page slides over it).
+        androidx.compose.animation.AnimatedVisibility(
+            visible = stack.isEmpty(),
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
+            enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),
+        ) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            com.anibiar.app.ui.nav.BottomNavBar(
+                selected = com.anibiar.app.ui.nav.NavTab.Home,
+                onSelect = { tab ->
+                    if (tab != com.anibiar.app.ui.nav.NavTab.Home) {
+                        android.widget.Toast.makeText(context, "${tab.label} is coming soon", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier
+                    .androidx_navPadding(),
+            )
+        }
     }
 }
+
+private fun Modifier.androidx_navPadding(): Modifier = this
+    .navigationBarsPadding()
+    .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
 
 /** A tiny back stack: empty = Home, otherwise the top entry is the anime whose Details page is open. */
 @Composable

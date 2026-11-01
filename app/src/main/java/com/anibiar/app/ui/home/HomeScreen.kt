@@ -223,7 +223,8 @@ private fun HomeContent(
 
                 LazyColumn(
                     state = listState,
-                    contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+                    // extra room so the floating tab bar never covers the last row
+                    contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp),
                     modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                         // Only a real tap on empty space clears the hover; scrolling/dragging never does.
                         val slop = viewConfiguration.touchSlop
