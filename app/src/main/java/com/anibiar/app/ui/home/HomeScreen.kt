@@ -335,7 +335,7 @@ internal fun AniTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.drawable.kiro_wordmark),
+                bitmap = androidx.compose.ui.res.imageResource(R.drawable.kiro_wordmark),
                 contentDescription = "Kiro",
                 contentScale = ContentScale.Fit,
                 filterQuality = FilterQuality.High,
