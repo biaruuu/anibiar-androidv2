@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -335,7 +336,7 @@ internal fun AniTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                bitmap = androidx.compose.ui.res.imageResource(R.drawable.kiro_wordmark),
+                bitmap = androidx.compose.ui.graphics.ImageBitmap.imageResource(R.drawable.kiro_wordmark),
                 contentDescription = "Kiro",
                 contentScale = ContentScale.Fit,
                 filterQuality = FilterQuality.High,
