@@ -72,11 +72,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val latest = latestJob.await()
             trendingJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(trending = list) }
-                repository.preloadImages(list.take(12).map { it.posterUrl })
             }
             popularJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(popular = list) }
-                repository.preloadImages(list.take(12).map { it.posterUrl })
             }
 
             discover.getOrNull()?.let { applyDiscover(it.top.media, it.upcoming.media) }

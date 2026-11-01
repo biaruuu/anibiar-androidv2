@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.composed
@@ -77,6 +78,7 @@ internal fun Modifier.hoverCard(
     val armNow by rememberUpdatedState(onArm)
     val hasArm = onArm != null
     this
+    .appearOnScroll()
     .hoverable(state.source)
     .pointerInput(hasArm) {
         awaitEachGesture {
@@ -190,4 +192,23 @@ internal fun ratingColor(score10: Float): Color = when {
     score10 >= 6.0f -> Color(0xFFFFA31A)
     score10 >= 5.0f -> Color(0xFFF0524B)
     else -> Color(0xFFA46BD6)
+}
+
+
+/**
+ * Cards only compose (and so only start loading their art) once scrolled near the viewport; this makes them
+ * rise and fade in as they arrive instead of popping in.
+ */
+internal fun Modifier.appearOnScroll(): Modifier = composed {
+    val p = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        p.animateTo(1f, androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    this.graphicsLayer {
+        alpha = p.value
+        translationY = (1f - p.value) * 36.dp.toPx()
+        val sc = 0.94f + 0.06f * p.value
+        scaleX = sc
+        scaleY = sc
+    }
 }
