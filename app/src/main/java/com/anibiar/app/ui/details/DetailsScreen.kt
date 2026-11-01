@@ -104,6 +104,8 @@ import com.anibiar.app.ui.home.ErrorState
 import com.anibiar.app.ui.home.InfoBadge
 import com.anibiar.app.ui.home.active
 import com.anibiar.app.ui.home.hoverCard
+import com.anibiar.app.ui.home.clearOnEmptyTap
+import androidx.lifecycle.repeatOnLifecycle
 import com.anibiar.app.ui.home.PosterImage
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
@@ -145,6 +147,28 @@ fun DetailsScreen(
     var artFilter by rememberSaveable { mutableStateOf("All") }
     var artExpanded by rememberSaveable { mutableStateOf(false) }
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
+    // The card lit by touch/hover: one at a time, cleared after 5s or by tapping empty space (not by scrolling).
+    var armedId by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(armedId) {
+        if (armedId != null) {
+            kotlinx.coroutines.delay(5000)
+            armedId = null
+        }
+    }
+    val cardArm = remember(armedId, saved) {
+        com.anibiar.app.ui.home.CardArm(armedId, { armedId = it }, saved, app.watchlist::toggle)
+    }
+    // Live data: re-fetch while this page is on screen.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            kotlinx.coroutines.delay(60_000)
+            while (true) {
+                viewModel.refreshLive()
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+    }
 
     val scrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 120 }
@@ -166,12 +190,12 @@ fun DetailsScreen(
         }
 
         when {
-            media != null -> LazyColumn(
+            media != null -> androidx.compose.runtime.CompositionLocalProvider(com.anibiar.app.ui.home.LocalCardArm provides cardArm) { LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(
                     bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
                 ),
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().clearOnEmptyTap { armedId = null },
             ) {
                 item(key = "top") {
                     val minTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp
@@ -250,14 +274,14 @@ fun DetailsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 items(recs, key = { it.id }) { rec ->
-                                    MediaCard(rec, badge = null, label = null, width = cardW, onClick = { onOpen(rec.id) })
+                                    MediaCard(rec, badge = null, label = null, width = cardW, section = "C", onClick = { onOpen(rec.id) })
                                 }
                             }
                         }
                     }
                 }
                 item(key = "footer") { Footer(side) }
-            }
+            } }
 
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Ani.Lavender, strokeWidth = 3.dp, modifier = Modifier.size(34.dp))
@@ -1022,10 +1046,11 @@ private fun Episodes(
                     ?: "Episode $number"
                 val shape = RoundedCornerShape(12.dp)
                 val hover = com.anibiar.app.ui.home.rememberCardHover()
-                val active = hover.active()
+                val arm = com.anibiar.app.ui.home.LocalCardArm.current
+                val active = hover.active() || arm?.armed == "E$number"
                 val titleColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender, Color.White)
                 val borderColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender.copy(alpha = 0.7f), Ani.Border)
-                Column(Modifier.width(cardWidth).hoverCard(hover, onClick)) {
+                Column(Modifier.width(cardWidth).hoverCard(hover, onClick, onArm = arm?.let { a -> { a.arm("E$number") } })) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape)
                             .border(1.dp, borderColor, shape).background(Ani.Item),
@@ -1133,6 +1158,7 @@ private fun ShowSection(
                     label = seasonNumbers[media.id]?.let { "Season $it" } ?: media.formatName,
                     labelColor = Ani.Amber,
                     width = cardWidth,
+                    section = "S",
                     onClick = { if (!isCurrent) onOpen(media.id) },
                 )
             }
@@ -1163,6 +1189,7 @@ private fun RelatedSection(items: List<Pair<Media, String>>, side: Dp, cardWidth
                     label = label,
                     labelColor = if (label == "Alternative") Color(0xFFFB923C) else Color(0xFFFDBA74),
                     width = cardWidth,
+                    section = "R",
                     onClick = { onOpen(media.id) },
                 )
             }
@@ -1192,22 +1219,32 @@ private fun MediaCard(
     width: Dp = 151.dp,
     badgeIcon: ImageVector? = null,
     labelColor: Color = Ani.Amber,
+    section: String = "M",
 ) {
     val shape = RoundedCornerShape(14.dp)
     val hover = com.anibiar.app.ui.home.rememberCardHover()
-    val active = hover.active()
+    val arm = com.anibiar.app.ui.home.LocalCardArm.current
+    val key = "$section${media.id}"
+    val active = hover.active() || arm?.armed == key
     val accent = remember(media.coverImage.color) { com.anibiar.app.ui.home.accentOf(media.coverImage.color) }
     val chipText by com.anibiar.app.ui.home.accentColor(active, accent, Ani.Muted)
     val chipBg by com.anibiar.app.ui.home.accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
     val titleColor by com.anibiar.app.ui.home.accentColor(active, accent, Color.White)
-    Column(Modifier.width(width).hoverCard(hover, onClick)) {
+    Column(Modifier.width(width).hoverCard(hover, onClick, onArm = arm?.let { a -> { a.arm(key) } })) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(shape).background(Ani.Item)) {
             PosterImage(
                 url = media.posterUrl,
                 contentDescription = media.displayTitle,
                 modifier = Modifier.fillMaxSize(),
             )
-            com.anibiar.app.ui.home.HoverOverlay(active, playSize = 40)
+            com.anibiar.app.ui.home.HoverOverlay(
+                active,
+                saved = media.id in (arm?.saved ?: emptySet()),
+                showAdd = arm != null,
+                accent = accent,
+                onToggleSaved = { arm?.toggle?.invoke(media.id) },
+                playSize = 40,
+            )
             if (badge != null) {
                 Row(
                     modifier = Modifier

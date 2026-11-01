@@ -41,6 +41,17 @@ class DetailsViewModel(application: Application, private val id: Int) : AndroidV
 
     fun retry() = load()
 
+    /** Quiet live update: fresh AniList record + episode list, no spinners. */
+    fun refreshLive() {
+        viewModelScope.launch {
+            runCatching { repository.fetchDetails(id) }.getOrNull()?.let { fresh ->
+                _state.update { it.copy(media = fresh) }
+                val eps = repository.fetchEpisodes(fresh.id, fresh.idMal)
+                if (eps.isNotEmpty()) _state.update { it.copy(episodes = eps) }
+            }
+        }
+    }
+
     private fun load() {
         viewModelScope.launch {
             _state.update { it.copy(error = null, loading = it.media == null) }

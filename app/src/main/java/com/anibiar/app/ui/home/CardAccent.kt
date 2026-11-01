@@ -61,8 +61,8 @@ internal fun CardHover.active(): Boolean {
 }
 
 /**
- * Quick tap = open. Holding ~0.2s "hovers" the card ([onArm], when given) and the release then does NOT open it,
- * so the play / + buttons stay available. Scrolling that starts on the card cancels the gesture.
+ * Touching a card lights it up ([onArm]) and it stays lit. A quick tap opens it; holding ~0.2s and releasing does
+ * NOT open it, so the play / + buttons stay available. Scrolling that starts on the card cancels only the tap.
  */
 internal fun Modifier.hoverCard(
     state: CardHover,
@@ -74,6 +74,7 @@ internal fun Modifier.hoverCard(
         awaitEachGesture {
             awaitFirstDown()
             state.pressed = true
+            onArm?.invoke() // the touched card lights up at once and stays lit (even if the finger starts scrolling)
             try {
                 var released = false
                 val quick = withTimeoutOrNull(HOLD_MS) {
@@ -85,12 +86,9 @@ internal fun Modifier.hoverCard(
                     quick != null -> { quick.consume(); onClick() }
                     released -> Unit // cancelled by a scroll/drag
                     else -> {
-                        if (onArm != null) {
-                            onArm()
-                            waitForUpOrCancellation()
-                        } else {
-                            waitForUpOrCancellation()?.let { it.consume(); onClick() }
-                        }
+                        // Held: with hover-arming the release only keeps the card lit; otherwise it is a normal tap.
+                        val up = waitForUpOrCancellation()
+                        if (onArm == null && up != null) { up.consume(); onClick() }
                     }
                 }
             } finally {
@@ -139,6 +137,36 @@ internal fun HoverOverlay(
                     tint = accent,
                     modifier = Modifier.size(16.dp),
                 )
+            }
+        }
+    }
+}
+
+/** Shared "which card is lit" state for a screen: one key at a time, plus the watchlist for the + button. */
+internal class CardArm(
+    val armed: String?,
+    val arm: (String) -> Unit,
+    val saved: Set<Int>,
+    val toggle: (Int) -> Unit,
+)
+
+internal val LocalCardArm = androidx.compose.runtime.compositionLocalOf<CardArm?> { null }
+
+/** Clears [onClear] only for a real tap on empty space — never for scrolling or dragging. */
+internal fun Modifier.clearOnEmptyTap(onClear: () -> Unit): Modifier = pointerInput(Unit) {
+    val slop = viewConfiguration.touchSlop
+    awaitPointerEventScope {
+        var downAt: androidx.compose.ui.geometry.Offset? = null
+        while (true) {
+            val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
+            for (c in event.changes) {
+                if (c.pressed && !c.previousPressed) {
+                    downAt = if (c.isConsumed) null else c.position
+                } else if (!c.pressed && c.previousPressed) {
+                    val start = downAt
+                    if (start != null && (c.position - start).getDistance() < slop) onClear()
+                    downAt = null
+                }
             }
         }
     }
