@@ -310,8 +310,7 @@ private fun HomeContent(
             }
         }
 
-        AniTopBar(scrolled = scrolled, onSearch = comingSoon),
-        )
+        AniTopBar(scrolled = scrolled, onSearch = comingSoon)
     }
 }
 
