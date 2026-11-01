@@ -209,7 +209,7 @@ object Queries {
         }
     """.trimIndent()
 
-    val TRENDING = POPULAR.replace("popular: Page", "trending: Page").replace("POPULARITY_DESC", "TRENDING_DESC")
+    val TRENDING = POPULAR.replace("popular: Page", "trending: Page").replace("sort: POPULARITY_DESC", "sort: TRENDING_DESC, status_not: NOT_YET_RELEASED")
 
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {
