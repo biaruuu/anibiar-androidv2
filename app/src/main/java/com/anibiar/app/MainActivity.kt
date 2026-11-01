@@ -37,7 +37,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AniBiarTheme {
-                AppNavigation()
+                var splash by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
+                Box(Modifier.fillMaxSize()) {
+                    AppNavigation()
+                    if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
+                }
             }
         }
     }
