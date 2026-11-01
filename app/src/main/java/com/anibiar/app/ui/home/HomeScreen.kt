@@ -336,7 +336,8 @@ private fun HomeContent(
                                         MediaGridCard(
                                             media = media,
                                             leftText = "#$rank",
-                                            rightText = media.averageScore?.let { "★ %.1f".format(it / 10f) } ?: "",
+                                            rightText = "",
+                                            rating = media.averageScore?.let { it / 10f },
                                             ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
                                             onClick = { onOpen(media.id) },
                                             saved = media.id in saved,
@@ -903,6 +904,7 @@ private fun MediaGridCard(
     leftText: String,
     rightText: String,
     ccText: String?,
+    rating: Float? = null,
     onClick: () -> Unit,
     saved: Boolean,
     onToggleSaved: () -> Unit,
@@ -960,13 +962,29 @@ private fun MediaGridCard(
                         softWrap = false,
                     )
                     Spacer(Modifier.width(4.dp))
-                    Text(
-                        rightText,
-                        style = inter(10.5f, FontWeight.Medium),
-                        color = Color.White.copy(alpha = 0.92f),
-                        maxLines = 1,
-                        softWrap = false,
-                    )
+                    if (rating != null) {
+                        // Score tinted by tier (Absolute Cinema blue ... Garbage purple), star included.
+                        val tier = ratingColor(rating)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(AniIcons.Star, contentDescription = null, tint = tier, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                "%.1f".format(rating),
+                                style = inter(11.5f, FontWeight.Bold),
+                                color = tier,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        }
+                    } else {
+                        Text(
+                            rightText,
+                            style = inter(10.5f, FontWeight.Medium),
+                            color = Color.White.copy(alpha = 0.92f),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 }
             }
 

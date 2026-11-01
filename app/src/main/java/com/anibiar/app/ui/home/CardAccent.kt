@@ -171,3 +171,14 @@ internal fun Modifier.clearOnEmptyTap(onClear: () -> Unit): Modifier = pointerIn
         }
     }
 }
+
+/** Rating tiers: Absolute Cinema 9.7+, Awesome 9.0+, Great 8.0+, Good 7.0+, Average 6.0+, Bad 5.0+, Garbage below. */
+internal fun ratingColor(score10: Float): Color = when {
+    score10 >= 9.7f -> Color(0xFF38A9FF)
+    score10 >= 9.0f -> Color(0xFF1FA35C)
+    score10 >= 8.0f -> Color(0xFF6EE79A)
+    score10 >= 7.0f -> Color(0xFFF5D547)
+    score10 >= 6.0f -> Color(0xFFFFA31A)
+    score10 >= 5.0f -> Color(0xFFF0524B)
+    else -> Color(0xFFA46BD6)
+}
