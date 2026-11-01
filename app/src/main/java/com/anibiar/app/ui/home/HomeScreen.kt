@@ -215,10 +215,21 @@ private fun HomeContent(
                     state = listState,
                     contentPadding = WindowInsets.navigationBars.asPaddingValues(),
                     modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                        // Only a real tap on empty space clears the hover; scrolling/dragging never does.
+                        val slop = viewConfiguration.touchSlop
                         awaitPointerEventScope {
+                            var downAt: androidx.compose.ui.geometry.Offset? = null
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Final)
-                                if (event.changes.any { it.pressed && !it.previousPressed && !it.isConsumed }) armedId = null
+                                for (c in event.changes) {
+                                    if (c.pressed && !c.previousPressed) {
+                                        downAt = if (c.isConsumed) null else c.position
+                                    } else if (!c.pressed && c.previousPressed) {
+                                        val start = downAt
+                                        if (start != null && (c.position - start).getDistance() < slop) armedId = null
+                                        downAt = null
+                                    }
+                                }
                             }
                         }
                     },
@@ -340,11 +351,11 @@ internal fun AniTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.drawable.anibiar_wordmark),
-                contentDescription = "AniBiar TV",
+                painter = painterResource(R.drawable.kiro_wordmark),
+                contentDescription = "Kiro TV",
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.CenterStart,
-                modifier = Modifier.height(30.dp).width(78.dp).then(if (onLogo != null) Modifier.clickable(onClick = onLogo) else Modifier),
+                modifier = Modifier.height(22.dp).width(73.dp).then(if (onLogo != null) Modifier.clickable(onClick = onLogo) else Modifier),
             )
             Spacer(Modifier.weight(1f))
             Icon(
