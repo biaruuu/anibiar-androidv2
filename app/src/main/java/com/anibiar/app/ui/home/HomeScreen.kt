@@ -803,7 +803,7 @@ private fun ContinueWatching(
 // ---------------------------------------------------------------- latest episodes
 
 @Composable
-private fun LatestHeader(
+internal fun LatestHeader(
     title: String = "Latest Episodes",
     dubMode: Boolean,
     onModeChange: (Boolean) -> Unit,
@@ -835,7 +835,7 @@ private fun LatestHeader(
 }
 
 @Composable
-private fun SubDubToggle(dubMode: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SubDubToggle(dubMode: Boolean, onChange: (Boolean) -> Unit) {
     val shape = RoundedCornerShape(50)
     Row(
         modifier = Modifier

@@ -63,6 +63,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.data.Media
 import com.anibiar.app.data.airedEpisodes
+import com.anibiar.app.ui.home.LatestHeader
 import com.anibiar.app.ui.home.MediaGridCard
 import com.anibiar.app.ui.home.clearOnEmptyTap
 import com.anibiar.app.ui.theme.Ani
@@ -131,12 +132,12 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
             modifier = Modifier.fillMaxSize().clearOnEmptyTap { armedId = null },
             contentPadding = PaddingValues(
                 top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 12.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 90.dp,
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp,
             ),
         ) {
             item(key = "bar") {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -152,6 +153,12 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                     )
                 }
                 Spacer(Modifier.height(14.dp))
+                Column(Modifier.padding(horizontal = 12.dp)) {
+                    Text("Search", style = inter(24f, FontWeight.Bold), color = Color.White)
+                    Spacer(Modifier.height(2.dp))
+                    Text("Simple when you want it, extremely specific when you need it.", style = inter(13f, lineHeight = 18f), color = Ani.Muted)
+                }
+                Spacer(Modifier.height(14.dp))
             }
 
             item(key = "tools") {
@@ -163,7 +170,7 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                     onToggle = { showFilters = !showFilters },
                 )
                 AnimatedVisibility(showFilters, enter = expandVertically(), exit = shrinkVertically()) {
-                    Column(Modifier.padding(horizontal = 16.dp).padding(top = 12.dp)) {
+                    Column(Modifier.padding(horizontal = 8.dp).padding(top = 8.dp)) {
                         FilterRow(
                             FilterDropdown("Genres", null, GENRES, filters.genres, true) { viewModel.setFilters(filters.copy(genres = it)) },
                             FilterDropdown("Formats", null, FORMATS, filters.formats, true) { viewModel.setFilters(filters.copy(formats = it)) },
@@ -194,14 +201,16 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
             }
 
             item(key = "pagehead") {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Page ${state.page}", style = inter(17f), color = Ani.Muted, modifier = Modifier.weight(1f))
-                    PagerButtons(state.page > 1, state.hasNext, { viewModel.goTo(state.page - 1) }, { viewModel.goTo(state.page + 1) })
-                }
-                Spacer(Modifier.height(18.dp))
+                LatestHeader(
+                    title = "Results",
+                    dubMode = filters.language == "DUB",
+                    onModeChange = { dub -> viewModel.setFilters(filters.copy(language = if (dub) "DUB" else null)) },
+                    page = state.page - 1,
+                    pageCount = state.lastPage.coerceAtLeast(state.page),
+                    onPrev = { viewModel.goTo(state.page - 1) },
+                    onNext = { viewModel.goTo(state.page + 1) },
+                )
+                Spacer(Modifier.height(14.dp))
             }
 
             when {
@@ -221,7 +230,7 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                     items(rows.size, key = { "r${state.page}-$it-${rows[it].first().id}" }) { index ->
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(13.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             rows[index].forEach { media ->
                                 MediaGridCard(
@@ -240,7 +249,7 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                             }
                             repeat((columns - rows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(12.dp))
                     }
                     item(key = "bottompager") {
                         Spacer(Modifier.height(14.dp))
@@ -271,16 +280,16 @@ private fun Hint(text: String) {
 private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier) {
     val shape = RoundedCornerShape(12.dp)
     Row(
-        modifier.height(48.dp).clip(shape).border(1.dp, Ani.Border, shape),
+        modifier.height(40.dp).clip(shape).border(1.dp, Ani.Border, shape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text("Search anime…", style = inter(16f), color = Ani.Muted)
+            if (value.isEmpty()) Text("Search anime…", style = inter(14f), color = Ani.Muted)
             BasicTextField(
                 value = value,
                 onValueChange = onValue,
                 singleLine = true,
-                textStyle = inter(16f).copy(color = Color.White),
+                textStyle = inter(14f).copy(color = Color.White),
                 cursorBrush = SolidColor(Ani.Lavender),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
@@ -289,9 +298,9 @@ private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -
         }
         Box(Modifier.width(1.dp).fillMaxSize().background(Ani.Border))
         Box(
-            Modifier.width(52.dp).fillMaxSize().clickable(onClick = onSubmit),
+            Modifier.width(44.dp).fillMaxSize().clickable(onClick = onSubmit),
             contentAlignment = Alignment.Center,
-        ) { Icon(AniIcons.Search, contentDescription = "Search", tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
+        ) { Icon(AniIcons.Search, contentDescription = "Search", tint = Ani.Muted, modifier = Modifier.size(20.dp)) }
     }
 }
 
@@ -299,7 +308,7 @@ private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -
 private fun ToolBar(activeCount: Int, expanded: Boolean, onApply: () -> Unit, onReset: () -> Unit, onToggle: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(48.dp).clip(shape).border(1.dp, Ani.Border, shape),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(40.dp).clip(shape).border(1.dp, Ani.Border, shape),
     ) {
         ToolCell(AniIcons.Checklist, if (activeCount > 0) Color.White else Ani.Soft, Modifier.weight(1f), onApply)
         Box(Modifier.width(1.dp).fillMaxSize().background(Ani.Border))
@@ -312,7 +321,7 @@ private fun ToolBar(activeCount: Int, expanded: Boolean, onApply: () -> Unit, on
 @Composable
 private fun ToolCell(icon: ImageVector, tint: Color, modifier: Modifier, onClick: () -> Unit) {
     Box(modifier.fillMaxSize().clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -329,7 +338,7 @@ private class FilterDropdown(
 
 @Composable
 private fun FilterRow(a: FilterDropdown, b: FilterDropdown?) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.weight(1f)) { FilterBox(a) }
         Box(Modifier.weight(1f)) { if (b != null) FilterBox(b) }
     }
@@ -349,22 +358,22 @@ private fun FilterBox(f: FilterDropdown) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(40.dp)
                 .clip(shape)
                 .border(1.dp, if (active) Ani.Lavender.copy(alpha = 0.7f) else Ani.Border, shape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { open = true }
-                .padding(horizontal = 14.dp),
+                  .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (f.icon != null) {
-                Icon(f.icon, null, tint = if (active) Ani.Lavender else Ani.Muted, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(10.dp))
+                Icon(f.icon, null, tint = if (active) Ani.Lavender else Ani.Muted, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
             }
             Text(
-                shown, style = inter(16f), color = if (active) Color.White else Ani.Muted,
+                shown, style = inter(14f), color = if (active) Color.White else Ani.Muted,
                 maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
             )
-            Icon(AniIcons.ArrowDown, null, tint = Ani.Muted, modifier = Modifier.size(22.dp))
+            Icon(AniIcons.ArrowDown, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
         }
         DropdownMenu(
             expanded = open,
@@ -395,37 +404,18 @@ private fun FilterBox(f: FilterDropdown) {
 }
 
 @Composable
-private fun PagerButtons(canPrev: Boolean, canNext: Boolean, onPrev: () -> Unit, onNext: () -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SquareButton(AniIcons.ChevronLeft, canPrev, onPrev)
-        SquareButton(AniIcons.ChevronRight, canNext, onNext)
-    }
-}
-
-@Composable
-private fun SquareButton(icon: ImageVector, enabled: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
-    Box(
-        Modifier.size(width = 58.dp, height = 44.dp).clip(shape)
-            .border(1.dp, if (enabled) Color.White.copy(alpha = 0.7f) else Ani.Border, shape)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = if (enabled) Color.White else Ani.Muted.copy(alpha = 0.5f), modifier = Modifier.size(24.dp)) }
-}
-
-@Composable
 private fun OutlineButton(label: String, enabled: Boolean, onClick: () -> Unit, leading: ImageVector? = null, trailing: ImageVector? = null) {
     val shape = RoundedCornerShape(12.dp)
     val tint = if (enabled) Color.White else Ani.Muted.copy(alpha = 0.6f)
     Row(
-        Modifier.height(54.dp).width(if (leading != null || trailing != null) 150.dp else 110.dp).clip(shape)
+        Modifier.height(42.dp).width(if (leading != null || trailing != null) 116.dp else 90.dp).clip(shape)
             .border(1.dp, if (enabled) Color.White.copy(alpha = 0.75f) else Ani.Border, shape)
             .clickable(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        if (leading != null) Icon(leading, null, tint = tint, modifier = Modifier.size(22.dp))
-        Text(label, style = inter(17f, FontWeight.Medium), color = tint, modifier = Modifier.padding(horizontal = 6.dp))
-        if (trailing != null) Icon(trailing, null, tint = tint, modifier = Modifier.size(22.dp))
+        if (leading != null) Icon(leading, null, tint = tint, modifier = Modifier.size(18.dp))
+        Text(label, style = inter(14f, FontWeight.Medium), color = tint, modifier = Modifier.padding(horizontal = 4.dp))
+        if (trailing != null) Icon(trailing, null, tint = tint, modifier = Modifier.size(18.dp))
     }
 }
