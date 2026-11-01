@@ -51,7 +51,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -135,16 +135,16 @@ private fun HomeContent(
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 
     val listState = rememberLazyListState()
-    // The card showing its play/+ buttons after a long press; clears after 5s, on scroll, or on any other tap.
+    // The card showing its play/+ buttons after a long press; clears after 5s or on any other tap.
     var armedId by remember { mutableStateOf<Int?>(null) }
+    // list index of Latest Episodes / Top Airing / Upcoming, filled while the list is composed (used by the menu)
+    val sectionIndex = remember { IntArray(3) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     LaunchedEffect(armedId) {
         if (armedId != null) {
             delay(5000)
             armedId = null
         }
-    }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }.collect { if (it) armedId = null }
     }
     val scrolled by remember {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 200 }
@@ -207,6 +207,9 @@ private fun HomeContent(
                 val pageCount = pages.size.coerceAtLeast(1)
                 val page = latestPage.coerceIn(0, pageCount - 1)
                 val rows = pages.getOrNull(page).orEmpty().chunked(columns)
+                sectionIndex[0] = (if (state.hero.isNotEmpty()) 1 else 0) + (if (state.history.isNotEmpty()) 1 else 0)
+                sectionIndex[1] = sectionIndex[0] + 1 + (if (dubMode) 1 else rows.size)
+                sectionIndex[2] = sectionIndex[1] + (if (state.topAiring.isNotEmpty()) 1 else 0)
 
                 LazyColumn(
                     state = listState,
@@ -302,7 +305,16 @@ private fun HomeContent(
             }
         }
 
-        AniTopBar(scrolled = scrolled, onSearch = comingSoon, onMenu = comingSoon)
+        AniTopBar(
+            scrolled = scrolled,
+            onSearch = comingSoon,
+            menu = listOf(
+                "Home" to { scope.launch { listState.animateScrollToItem(0) }; Unit },
+                "Latest Episodes" to { scope.launch { listState.animateScrollToItem(sectionIndex[0]) }; Unit },
+                "Top Airing" to { scope.launch { listState.animateScrollToItem(sectionIndex[1]) }; Unit },
+                "Upcoming" to { scope.launch { listState.animateScrollToItem(sectionIndex[2]) }; Unit },
+            ),
+        )
     }
 }
 
@@ -312,7 +324,7 @@ private fun HomeContent(
 internal fun AniTopBar(
     scrolled: Boolean,
     onSearch: () -> Unit,
-    onMenu: () -> Unit,
+    menu: List<Pair<String, () -> Unit>>,
     onLogo: (() -> Unit)? = null,
 ) {
     val background by animateColorAsState(
@@ -342,12 +354,28 @@ internal fun AniTopBar(
                 modifier = Modifier.size(28.dp).clickable(onClick = onSearch),
             )
             Spacer(Modifier.width(22.dp))
-            Icon(
-                imageVector = AniIcons.Menu,
-                contentDescription = "Menu",
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(28.dp).clickable(onClick = onMenu),
-            )
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                Icon(
+                    imageVector = AniIcons.Menu,
+                    contentDescription = "Menu",
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(28.dp).clickable { menuOpen = true },
+                )
+                androidx.compose.material3.DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    offset = androidx.compose.ui.unit.DpOffset(0.dp, 12.dp),
+                    modifier = Modifier.background(Ani.Panel).border(1.dp, Ani.Border, RoundedCornerShape(10.dp)),
+                ) {
+                    menu.forEach { (label, action) ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(label, style = inter(14.5f, FontWeight.Medium), color = Color.White) },
+                            onClick = { menuOpen = false; action() },
+                        )
+                    }
+                }
+            }
         }
         if (scrolled) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))

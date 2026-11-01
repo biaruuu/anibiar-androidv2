@@ -271,7 +271,7 @@ fun DetailsScreen(
         }
 
         Box(Modifier.onSizeChanged { topBarPx = it.height }) {
-            AniTopBar(scrolled = scrolled, onSearch = comingSoon, onMenu = comingSoon, onLogo = onHome)
+            AniTopBar(scrolled = scrolled, onSearch = comingSoon, menu = listOf("Home" to onHome), onLogo = onHome)
         }
 
         fullscreenTrailer?.let { t -> TrailerFullscreen(t) { fullscreenTrailer = null } }
