@@ -5,7 +5,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -58,23 +60,46 @@ internal fun CardHover.active(): Boolean {
     return pressed || hovered
 }
 
-/** tap = open, hold = [onLongPress]; while held (or hovered) the card shows its accent state. */
+/**
+ * Quick tap = open. Holding ~0.2s "hovers" the card ([onArm], when given) and the release then does NOT open it,
+ * so the play / + buttons stay available. Scrolling that starts on the card cancels the gesture.
+ */
 internal fun Modifier.hoverCard(
     state: CardHover,
     onClick: () -> Unit,
-    onLongPress: (() -> Unit)? = null,
+    onArm: (() -> Unit)? = null,
 ): Modifier = this
     .hoverable(state.source)
-    .pointerInput(onClick, onLongPress) {
-        detectTapGestures(
-            onPress = {
-                state.pressed = true
-                try { tryAwaitRelease() } finally { state.pressed = false }
-            },
-            onLongPress = onLongPress?.let { { it() } },
-            onTap = { onClick() },
-        )
+    .pointerInput(onClick, onArm) {
+        awaitEachGesture {
+            awaitFirstDown()
+            state.pressed = true
+            try {
+                var released = false
+                val quick = withTimeoutOrNull(HOLD_MS) {
+                    val up = waitForUpOrCancellation()
+                    released = true
+                    up
+                }
+                when {
+                    quick != null -> { quick.consume(); onClick() }
+                    released -> Unit // cancelled by a scroll/drag
+                    else -> {
+                        if (onArm != null) {
+                            onArm()
+                            waitForUpOrCancellation()
+                        } else {
+                            waitForUpOrCancellation()?.let { it.consume(); onClick() }
+                        }
+                    }
+                }
+            } finally {
+                state.pressed = false
+            }
+        }
     }
+
+private const val HOLD_MS = 200L
 
 @Composable
 internal fun accentColor(active: Boolean, accent: Color, normal: Color): State<Color> =

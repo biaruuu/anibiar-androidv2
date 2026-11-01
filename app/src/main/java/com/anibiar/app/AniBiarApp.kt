@@ -37,6 +37,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         ImageLoader.Builder(this)
             .okHttpClient { Http.client }
             .crossfade(150)
+            .allowRgb565(false)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.30)

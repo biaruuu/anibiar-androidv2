@@ -338,6 +338,7 @@ internal fun AniTopBar(
                 painter = painterResource(R.drawable.kiro_wordmark),
                 contentDescription = "Kiro",
                 contentScale = ContentScale.Fit,
+                filterQuality = FilterQuality.High,
                 alignment = Alignment.CenterStart,
                 modifier = Modifier.height(18.dp).width(51.dp).then(if (onLogo != null) Modifier.clickable(onClick = onLogo) else Modifier),
             )
@@ -800,7 +801,7 @@ private fun EpisodeCard(
     val chipText by accentColor(active, accent, Ani.Muted)
     val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
     val titleColor by accentColor(active, accent, Color.White)
-    BoxWithConstraints(modifier.hoverCard(hover, onClick, onLongPress = onArm)) {
+    BoxWithConstraints(modifier.hoverCard(hover, onClick, onArm = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
         val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
         val badgeText = 9.5f * fit
