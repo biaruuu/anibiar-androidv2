@@ -110,7 +110,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -131,6 +131,7 @@ fun HomeScreen(onOpen: (Int) -> Unit, viewModel: HomeViewModel = viewModel()) {
         saved = saved,
         onToggleSaved = app.watchlist::toggle,
         onOpen = onOpen,
+        onSearch = onSearch,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -142,6 +143,7 @@ private fun HomeContent(
     saved: Set<Int>,
     onToggleSaved: (Int) -> Unit,
     onOpen: (Int) -> Unit,
+    onSearch: () -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -451,7 +453,7 @@ private fun HomeContent(
             }
         }
 
-        AniTopBar(scrolled = scrolled, onSearch = comingSoon)
+        AniTopBar(scrolled = scrolled, onSearch = onSearch)
     }
 }
 
@@ -868,7 +870,7 @@ private fun ToggleSegment(label: String, selected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-private fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () -> Unit) {
+internal fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Row(
         modifier = Modifier
@@ -961,10 +963,11 @@ private fun EpisodeCard(
 
 /** The Latest-Episodes card style, reused by Most Popular (left/right overlay texts differ). */
 @Composable
-private fun MediaGridCard(
+internal fun MediaGridCard(
     media: Media,
     leftText: String,
     rightText: String,
+    overlay: Boolean = true,
     ccText: String?,
     rating: Float? = null,
     onClick: () -> Unit,
@@ -1001,14 +1004,14 @@ private fun MediaGridCard(
                     modifier = Modifier.fillMaxSize(),
                 )
                 HoverOverlay(active, saved = saved, showAdd = true, accent = accent, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt())
-                Box(
+                if (overlay) Box(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(72.dp)
                         .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))),
                 )
-                Row(
+                if (overlay) Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()

@@ -209,6 +209,33 @@ object Queries {
         }
     """.trimIndent()
 
+    val SEARCH = """
+        query (${'$'}page: Int, ${'$'}perPage: Int, ${'$'}search: String, ${'$'}sort: [MediaSort],
+               ${'$'}genres: [String], ${'$'}formats: [MediaFormat], ${'$'}status: MediaStatus,
+               ${'$'}year: Int, ${'$'}season: MediaSeason, ${'$'}country: CountryCode,
+               ${'$'}source: MediaSource, ${'$'}adult: Boolean, ${'$'}score: Int) {
+          Page(page: ${'$'}page, perPage: ${'$'}perPage) {
+            pageInfo { total currentPage lastPage hasNextPage }
+            media(type: ANIME, search: ${'$'}search, sort: ${'$'}sort, genre_in: ${'$'}genres,
+                  format_in: ${'$'}formats, status: ${'$'}status, seasonYear: ${'$'}year, season: ${'$'}season,
+                  countryOfOrigin: ${'$'}country, source: ${'$'}source, isAdult: ${'$'}adult,
+                  averageScore_greater: ${'$'}score) {
+              id
+              title { romaji english }
+              episodes
+              format
+              status
+              seasonYear
+              startDate { year }
+              averageScore
+              popularity
+              coverImage { extraLarge large color }
+              nextAiringEpisode { episode airingAt }
+            }
+          }
+        }
+    """.trimIndent()
+
     val TRENDING = POPULAR.replace("popular: Page", "trending: Page").replace("sort: POPULARITY_DESC", "sort: TRENDING_DESC, status_not: NOT_YET_RELEASED")
 
     val LATEST = """
@@ -252,6 +279,24 @@ class AniListApi(private val client: OkHttpClient) {
                 .post(payload.toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw IOException("AniList error ${response.code}")
+                body
+            }
+        }
+
+    suspend fun executeVars(query: String, variables: kotlinx.serialization.json.JsonObject): String =
+        withContext(Dispatchers.IO) {
+            val payload = buildJsonObject {
+                put("query", query)
+                put("variables", variables)
+            }.toString()
+            val request = Request.Builder()
+                .url(ENDPOINT)
+                .header("Accept", "application/json")
+                .post(payload.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw IOException("AniList error ${response.code}")

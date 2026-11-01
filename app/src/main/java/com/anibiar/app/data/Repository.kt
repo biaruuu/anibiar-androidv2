@@ -90,6 +90,15 @@ class AnimeRepository(context: Context) {
         null
     }
 
+    // ---- Advanced search ----
+
+    suspend fun search(variables: kotlinx.serialization.json.JsonObject): SearchPage {
+        val body = api.executeVars(Queries.SEARCH, variables)
+        return withContext(Dispatchers.Default) {
+            json.decodeFromString<GraphQlResponse<SearchData>>(body).data?.page
+        } ?: throw IOException("Unexpected AniList response")
+    }
+
     // ---- Trending (AniList trending score, top 60) ----
 
     suspend fun cachedTrending(): List<Media> = withContext(Dispatchers.IO) {

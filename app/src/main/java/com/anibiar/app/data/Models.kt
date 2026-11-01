@@ -107,7 +107,7 @@ data class Recommendation(val mediaRecommendation: Media? = null)
 data class RecommendationConn(val nodes: List<Recommendation> = emptyList())
 
 @Serializable
-data class PageInfo(val total: Int? = null)
+data class PageInfo(val total: Int? = null, val currentPage: Int? = null, val lastPage: Int? = null, val hasNextPage: Boolean? = null)
 
 @Serializable
 data class PersonName(val full: String? = null)
@@ -303,3 +303,10 @@ data class EpisodeInfo(
     val runtime: Int?,
     val image: String?,
 )
+
+
+@Serializable
+data class SearchPage(val pageInfo: PageInfo = PageInfo(), val media: List<Media> = emptyList())
+
+@Serializable
+data class SearchData(@kotlinx.serialization.SerialName("Page") val page: SearchPage = SearchPage())

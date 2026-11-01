@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -59,11 +60,19 @@ private fun AppNavigation() {
         saver = listSaver<SnapshotStateList<Int>, Int>(save = { it.toList() }, restore = { saved -> mutableStateListOf<Int>().apply { addAll(saved) } }),
     ) { mutableStateListOf() }
 
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
+    BackHandler(enabled = stack.isEmpty() && searchOpen) { searchOpen = false }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { searchOpen = true })
+
+        if (searchOpen) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                com.anibiar.app.ui.search.SearchScreen(onOpen = { id -> stack.add(id) }, onBack = { searchOpen = false })
+            }
+        }
 
         AnimatedContent(
             targetState = stack.lastOrNull(),
@@ -100,9 +109,11 @@ private fun AppNavigation() {
         ) {
             val context = androidx.compose.ui.platform.LocalContext.current
             com.anibiar.app.ui.nav.BottomNavBar(
-                selected = com.anibiar.app.ui.nav.NavTab.Home,
+                selected = if (searchOpen) com.anibiar.app.ui.nav.NavTab.Search else com.anibiar.app.ui.nav.NavTab.Home,
                 onSelect = { tab ->
-                    if (tab != com.anibiar.app.ui.nav.NavTab.Home) {
+                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) searchOpen = false
+                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) searchOpen = true
+                    else {
                         android.widget.Toast.makeText(context, "${tab.label} is coming soon", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 },

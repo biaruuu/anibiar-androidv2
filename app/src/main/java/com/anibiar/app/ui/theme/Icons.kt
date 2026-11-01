@@ -20,6 +20,14 @@ object AniIcons {
             fill = SolidColor(Color.Black),
         ).build()
 
+    val ArrowBack: ImageVector by lazy { icon("ArrowBack", "M20,11H7.83l5.59,-5.59L12,4l-8,8 8,8 1.41,-1.41L7.83,13H20v-2z") }
+    val ArrowUp: ImageVector by lazy { icon("ArrowUp", "M7.41,15.41L12,10.83l4.59,4.58L18,14l-6,-6 -6,6z") }
+    val Refresh: ImageVector by lazy {
+        icon("Refresh", "M17.65,6.35A7.958,7.958 0 0,0 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.73,0 6.84,-2.55 7.73,-6h-2.08A5.99,5.99 0 0,1 12,18c-3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z")
+    }
+    val Checklist: ImageVector by lazy {
+        icon("Checklist", "M22,7h-9v2h9V7zM22,15h-9v2h9V15zM5.54,11L2,7.46l1.41,-1.41 2.12,2.12 4.24,-4.24 1.41,1.41L5.54,11zM5.54,19L2,15.46l1.41,-1.41 2.12,2.12 4.24,-4.24 1.41,1.41L5.54,19z")
+    }
     val Home: ImageVector by lazy { icon("Home", "M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z") }
     val Person: ImageVector by lazy {
         icon("Person", "M12,12c2.21,0 4,-1.79 4,-4s-1.79,-4 -4,-4 -4,1.79 -4,4 1.79,4 4,4zM12,14c-2.67,0 -8,1.34 -8,4v2h16v-2c0,-2.66 -5.33,-4 -8,-4z")
