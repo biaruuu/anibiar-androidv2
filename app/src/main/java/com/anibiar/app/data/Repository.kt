@@ -122,7 +122,8 @@ class AnimeRepository(context: Context) {
             val arr = runCatching { org.json.JSONArray(body) }.getOrNull() ?: continue
             for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
-                val route = o.optString("route").ifBlank { continue }
+                val route = o.optString("route")
+                if (route.isBlank()) continue
                 val at = parseTime(o.optString("episodeDate")) ?: continue
                 if (at > now) continue // not out yet
                 val episode = o.optInt("episodeNumber", 0)
