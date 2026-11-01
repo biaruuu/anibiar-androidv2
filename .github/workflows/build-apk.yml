@@ -65,7 +65,6 @@ jobs:
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           MAL_CLIENT_ID: ${{ secrets.MAL_CLIENT_ID }}
-          ANIMESCHEDULE_TOKEN: ${{ secrets.ANIMESCHEDULE_TOKEN }}
         run: |
           chmod +x gradlew
           set -o pipefail

@@ -22,8 +22,6 @@ data class HomeUiState(
     val upcoming: List<Media> = emptyList(),
     val latest: List<LatestEpisode> = emptyList(),
     val popular: List<Media> = emptyList(),
-    val dub: List<com.anibiar.app.data.DubEntry> = emptyList(),
-    val dubConfigured: Boolean = true,
     val history: List<HistoryItem> = emptyList(),
     val art: Map<Int, TmdbArt> = emptyMap(),
     val loading: Boolean = true,
@@ -40,7 +38,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     init {
-        _state.update { it.copy(dubConfigured = repository.dubConfigured) }
         load()
     }
 
@@ -62,20 +59,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             repository.cachedPopular().takeIf { it.isNotEmpty() }?.let { c -> _state.update { it.copy(popular = c) } }
 
-            repository.cachedDub().takeIf { it.isNotEmpty() }?.let { c -> _state.update { it.copy(dub = c) } }
-
             // 2) Refresh from AniList in parallel.
-            val dubJob = async { runCatching { repository.fetchDub() } }
             val popularJob = async { runCatching { repository.fetchPopular() } }
             val discoverJob = async { runCatching { repository.fetchDiscover() } }
             val latestJob = async { runCatching { repository.fetchLatest() } }
 
             val discover = discoverJob.await()
             val latest = latestJob.await()
-            dubJob.await().getOrNull()?.let { list ->
-                _state.update { it.copy(dub = list) }
-                repository.preloadImages(list.take(12).map { it.media.posterUrl })
-            }
             popularJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(popular = list) }
                 repository.preloadImages(list.take(12).map { it.posterUrl })

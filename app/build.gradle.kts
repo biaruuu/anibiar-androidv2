@@ -13,7 +13,6 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 val tmdbKey: String = (System.getenv("TMDB_API_KEY") ?: localProps.getProperty("TMDB_API_KEY") ?: "").trim()
-val animeScheduleToken: String = (System.getenv("ANIMESCHEDULE_TOKEN") ?: localProps.getProperty("ANIMESCHEDULE_TOKEN") ?: "").trim()
 val malClientId: String = (System.getenv("MAL_CLIENT_ID") ?: localProps.getProperty("MAL_CLIENT_ID") ?: "").trim()
 
 android {
@@ -29,7 +28,6 @@ android {
         versionName = "0.3.$run"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
         buildConfigField("String", "MAL_CLIENT_ID", "\"$malClientId\"")
-        buildConfigField("String", "ANIMESCHEDULE_TOKEN", "\"$animeScheduleToken\"")
     }
 
     signingConfigs {

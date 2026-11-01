@@ -71,128 +71,6 @@ class AnimeRepository(context: Context) {
 
     // ---- Latest episodes (airing schedule, newest first, de-duplicated per anime) ----
 
-    // ---- Dub: AnimeSchedule.net dub timetable (episodes that have actually aired), matched to AniList ----
-
-    val dubConfigured: Boolean get() = BuildConfig.ANIMESCHEDULE_TOKEN.isNotBlank()
-    private var dubFetchedAt = 0L
-
-    suspend fun cachedDub(): List<DubEntry> = withContext(Dispatchers.IO) {
-        cache.read(KEY_DUB)?.let { text ->
-            runCatching {
-                json.decodeFromString(kotlinx.serialization.builtins.ListSerializer(DubEntry.serializer()), text)
-            }.getOrNull()
-        }.orEmpty()
-    }
-
-    /** Null = nothing new (not configured, or refreshed less than 5 minutes ago). Throws on network/API errors. */
-    suspend fun fetchDub(force: Boolean = false): List<DubEntry>? = withContext(Dispatchers.IO) {
-        if (!dubConfigured) return@withContext null
-        if (!force && System.currentTimeMillis() - dubFetchedAt < 5 * 60_000L) return@withContext null
-
-        class Aired(val route: String, val names: List<String>, var episode: Int, var at: Long)
-        val byRoute = LinkedHashMap<String, Aired>()
-        val now = System.currentTimeMillis()
-        val dateParsers = listOf("yyyy-MM-dd'T'HH:mm:ssXXX", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-        fun parseTime(raw: String): Long? {
-            val clean = raw.replace(Regex("""(\.\d{3})\d+"""), "$1")
-            for (pattern in dateParsers) {
-                val t = runCatching {
-                    java.text.SimpleDateFormat(pattern, java.util.Locale.US).parse(clean)?.time
-                }.getOrNull()
-                if (t != null) return t
-            }
-            return null
-        }
-
-        // This week and the two before it: everything that has aired recently.
-        for (back in 0..2) {
-            val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
-                firstDayOfWeek = java.util.Calendar.MONDAY
-                minimalDaysInFirstWeek = 4
-                add(java.util.Calendar.WEEK_OF_YEAR, -back)
-            }
-            val url = "https://animeschedule.net/api/v3/timetables/dub?year=${cal.weekYear}&week=${cal.get(java.util.Calendar.WEEK_OF_YEAR)}&tz=UTC"
-            val request = okhttp3.Request.Builder().url(url)
-                .header("Authorization", "Bearer ${BuildConfig.ANIMESCHEDULE_TOKEN}")
-                .header("Accept", "application/json").build()
-            val body = Http.plain.newCall(request).execute().use { r ->
-                if (!r.isSuccessful) throw IOException("AnimeSchedule HTTP ${r.code}")
-                r.body?.string().orEmpty()
-            }
-            val arr = runCatching { org.json.JSONArray(body) }.getOrNull() ?: continue
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                val route = o.optString("route").ifBlank { continue }
-                val at = parseTime(o.optString("episodeDate")) ?: continue
-                if (at > now) continue // not out yet
-                val episode = o.optInt("episodeNumber", 0)
-                if (episode <= 0) continue
-                val names = listOf("romaji", "english", "title").map { o.optString(it) }.filter { it.isNotBlank() && it != "null" }.distinct()
-                val cur = byRoute[route]
-                if (cur == null) byRoute[route] = Aired(route, names, episode, at)
-                else if (episode > cur.episode) { cur.episode = episode; cur.at = at }
-            }
-        }
-        if (byRoute.isEmpty()) {
-            dubFetchedAt = System.currentTimeMillis()
-            cache.write(KEY_DUB, "[]")
-            return@withContext emptyList()
-        }
-
-        // route -> AniList id (remembered between runs so each show is searched only once)
-        val idsJson = runCatching { org.json.JSONObject(cache.read(KEY_DUB_IDS).orEmpty()) }.getOrElse { org.json.JSONObject() }
-        fun norm(t: String) = t.lowercase().replace(Regex("[^a-z0-9 ]"), " ").trim().replace(Regex("\\s+"), " ")
-        fun score(cands: List<String>, media: org.json.JSONObject): Double {
-            val t = media.optJSONObject("title")
-            val names = listOf("romaji", "english", "native").mapNotNull { t?.optString(it)?.takeIf { s -> s.isNotBlank() && s != "null" } }.map(::norm)
-            var best = 0.0
-            for (c in cands.map(::norm)) for (n in names) {
-                if (c == n) return 1.0
-                val a = c.split(" ").toSet(); val b = n.split(" ").toSet()
-                val j = a.intersect(b).size.toDouble() / a.union(b).size.coerceAtLeast(1)
-                if (j > best) best = j
-            }
-            return best
-        }
-        val unknown = byRoute.values.filter { !idsJson.has(it.route) }
-        for (chunk in unknown.chunked(8)) {
-            val queryText = Queries.searchMany(chunk.map { it.names.firstOrNull().orEmpty() })
-            val resp = runCatching { api.execute(queryText) }.getOrNull() ?: continue
-            val data = runCatching { org.json.JSONObject(resp).optJSONObject("data") }.getOrNull() ?: continue
-            chunk.forEachIndexed { i, item ->
-                val list = data.optJSONObject("m$i")?.optJSONArray("media") ?: return@forEachIndexed
-                var bestId = 0; var bestScore = 0.0
-                for (j in 0 until list.length()) {
-                    val m = list.optJSONObject(j) ?: continue
-                    val sc = score(item.names, m)
-                    if (sc > bestScore) { bestScore = sc; bestId = m.optInt("id") }
-                }
-                if (bestId != 0 && bestScore >= 0.6) idsJson.put(item.route, bestId)
-            }
-        }
-        cache.write(KEY_DUB_IDS, idsJson.toString())
-
-        val wanted = byRoute.values.mapNotNull { a -> idsJson.optInt(a.route, 0).takeIf { it != 0 }?.let { it to a } }
-        val medias = HashMap<Int, Media>()
-        for (chunk in wanted.map { it.first }.distinct().chunked(50)) {
-            val resp = runCatching { api.execute(Queries.byIds(chunk)) }.getOrNull() ?: continue
-            runCatching {
-                json.decodeFromString<GraphQlResponse<ByIdsData>>(resp).data?.page?.media.orEmpty()
-            }.getOrNull()?.forEach { medias[it.id] = it }
-        }
-        // One entry per anime (a show can map from two routes; keep the furthest episode).
-        val entries = HashMap<Int, DubEntry>()
-        for ((id, a) in wanted) {
-            val media = medias[id] ?: continue
-            val cur = entries[id]
-            if (cur == null || a.episode > cur.episode) entries[id] = DubEntry(media, a.episode, a.at / 1000)
-        }
-        val list = entries.values.sortedByDescending { it.airingAt }
-        dubFetchedAt = System.currentTimeMillis()
-        cache.write(KEY_DUB, json.encodeToString(kotlinx.serialization.builtins.ListSerializer(DubEntry.serializer()), list))
-        list
-    }
-
     // ---- Most Popular (AniList all-time popularity, top 60) ----
 
     suspend fun cachedPopular(): List<Media> = withContext(Dispatchers.IO) {
@@ -572,8 +450,6 @@ class AnimeRepository(context: Context) {
         const val UA = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
         const val KEY_DISCOVER = "discover.json"
         const val KEY_POPULAR = "popular.json"
-        const val KEY_DUB = "dub.json"
-        const val KEY_DUB_IDS = "dub_ids.json"
         const val KEY_LATEST_1 = "latest_1.json"
         const val KEY_LATEST_2 = "latest_2.json"
     }
