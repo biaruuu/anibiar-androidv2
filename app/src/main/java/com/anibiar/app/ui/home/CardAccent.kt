@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.composed
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,13 +70,19 @@ internal fun Modifier.hoverCard(
     state: CardHover,
     onClick: () -> Unit,
     onArm: (() -> Unit)? = null,
-): Modifier = this
+): Modifier = composed {
+    // Latest callbacks, read at call time: arming recomposes the card with fresh lambdas, and keying
+    // pointerInput on them would restart the gesture mid-tap and swallow the click.
+    val clickNow by rememberUpdatedState(onClick)
+    val armNow by rememberUpdatedState(onArm)
+    val hasArm = onArm != null
+    this
     .hoverable(state.source)
-    .pointerInput(onClick, onArm) {
+    .pointerInput(hasArm) {
         awaitEachGesture {
             awaitFirstDown()
             state.pressed = true
-            onArm?.invoke() // the touched card lights up at once and stays lit (even if the finger starts scrolling)
+            armNow?.invoke() // the touched card lights up at once and stays lit (even if the finger starts scrolling)
             try {
                 var released = false
                 val quick = withTimeoutOrNull(HOLD_MS) {
@@ -83,12 +91,12 @@ internal fun Modifier.hoverCard(
                     up
                 }
                 when {
-                    quick != null -> { quick.consume(); onClick() }
+                    quick != null -> { quick.consume(); clickNow() }
                     released -> Unit // cancelled by a scroll/drag
                     else -> {
                         // Held: with hover-arming the release only keeps the card lit; otherwise it is a normal tap.
                         val up = waitForUpOrCancellation()
-                        if (onArm == null && up != null) { up.consume(); onClick() }
+                        if (!hasArm && up != null) { up.consume(); clickNow() }
                     }
                 }
             } finally {
@@ -96,6 +104,7 @@ internal fun Modifier.hoverCard(
             }
         }
     }
+}
 
 private const val HOLD_MS = 200L
 

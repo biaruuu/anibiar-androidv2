@@ -531,9 +531,6 @@ private fun About(
             else -> null
         }
         episodesText?.let { AboutRow("Episodes", it) }
-        media.nextAiringEpisode?.takeIf { media.status == "RELEASING" && it.airingAt != null }?.let { next ->
-            AboutRow("Next episode", "EP ${next.episode} · ${countdownLabel(next.airingAt ?: 0L)}", Ani.Lime)
-        }
         media.duration?.takeIf { it > 0 }?.let { AboutRow("Duration", "$it min per ep") }
         media.averageScore?.let {
             AboutRow("AniList score", media.score10.orEmpty(), ratingColor(it / 10f), AniIcons.Star)
@@ -1637,16 +1634,3 @@ private fun countryName(code: String) = when (code.uppercase()) {
 
 private fun titleCase(raw: String) =
     raw.lowercase().split('_').joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }
-
-/** "in 2d 5h" / "in 3h 12m" / "in 14m" for an AniList airingAt epoch (seconds). */
-private fun countdownLabel(airingAt: Long): String {
-    val diff = (airingAt - System.currentTimeMillis() / 1000).coerceAtLeast(0)
-    val d = diff / 86400
-    val h = (diff % 86400) / 3600
-    val m = (diff % 3600) / 60
-    return when {
-        d > 0 -> "in ${d}d ${h}h"
-        h > 0 -> "in ${h}h ${m}m"
-        else -> "in ${m.coerceAtLeast(1)}m"
-    }
-}
