@@ -102,6 +102,8 @@ import com.anibiar.app.data.year
 import com.anibiar.app.ui.home.AniTopBar
 import com.anibiar.app.ui.home.ErrorState
 import com.anibiar.app.ui.home.InfoBadge
+import com.anibiar.app.ui.home.active
+import com.anibiar.app.ui.home.hoverCard
 import com.anibiar.app.ui.home.PosterImage
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
@@ -197,7 +199,7 @@ fun DetailsScreen(
                 val episodeCount = media.airedEpisodes ?: media.episodes ?: media.streamingEpisodes.size
                 if (episodeCount > 0) {
                     item(key = "episodes") {
-                        Episodes(media, episodeCount, side, epW, onClick = comingSoon)
+                        Episodes(media, episodeCount, state.episodes, side, epW, onClick = comingSoon)
                     }
                 }
 
@@ -575,14 +577,22 @@ private fun About(
         }
 
         // Link tiles with each site's real logo (AniList supplies icons for its external links).
+        fun fav(domain: String) = "https://www.google.com/s2/favicons?domain=$domain&sz=128"
         val links = buildList {
-            media.siteUrl?.let { add(LinkTile("AniList", "https://www.google.com/s2/favicons?domain=anilist.co&sz=128", null, it)) }
-            media.idMal?.let { add(LinkTile("MyAnimeList", "https://www.google.com/s2/favicons?domain=myanimelist.net&sz=128", null, "https://myanimelist.net/anime/$it")) }
+            media.siteUrl?.let { add(LinkTile("AniList", fav("anilist.co"), null, it)) }
+            media.idMal?.let { add(LinkTile("MyAnimeList", fav("myanimelist.net"), null, "https://myanimelist.net/anime/$it")) }
             media.externalLinks
                 .filter { (it.type == "INFO" || it.type == "SOCIAL") && !it.url.isNullOrBlank() && !it.site.isNullOrBlank() }
-                .forEach { link -> add(LinkTile(link.site.orEmpty(), link.icon, link.color, link.url.orEmpty())) }
-            imdbId?.let { add(LinkTile("IMDb", "https://www.google.com/s2/favicons?domain=imdb.com&sz=128", null, "https://www.imdb.com/title/$it")) }
-            tvdbId?.let { add(LinkTile("TheTVDB", "https://www.google.com/s2/favicons?domain=thetvdb.com&sz=128", null, "https://thetvdb.com/dereferrer/series/$it")) }
+                .forEach { link ->
+                    val host = runCatching { android.net.Uri.parse(link.url).host }.getOrNull()
+                    add(LinkTile(link.site.orEmpty(), link.icon ?: host?.let { fav(it) }, link.color, link.url.orEmpty()))
+                }
+            media.idMal?.let { add(LinkTile("AniDB", fav("anidb.net"), null, "https://anidb.net/search/anime/?adb.search=${android.net.Uri.encode(media.displayTitle)}")) }
+            media.idMal?.let { add(LinkTile("Anime-Planet", fav("anime-planet.com"), null, "https://www.anime-planet.com/anime/all?name=${android.net.Uri.encode(media.displayTitle)}")) }
+            media.idMal?.let { add(LinkTile("Kitsu", fav("kitsu.app"), null, "https://kitsu.app/anime?text=${android.net.Uri.encode(media.displayTitle)}")) }
+            imdbId?.let { add(LinkTile("IMDb", fav("imdb.com"), null, "https://www.imdb.com/title/$it")) }
+            tvdbId?.let { add(LinkTile("TheTVDB", fav("thetvdb.com"), null, "https://thetvdb.com/dereferrer/series/$it")) }
+            add(LinkTile("Simkl", fav("simkl.com"), null, "https://simkl.com/search/?type=anime&q=${android.net.Uri.encode(media.displayTitle)}"))
         }.distinctBy { it.name.lowercase() }
         if (links.isNotEmpty()) {
             Spacer(Modifier.height(18.dp))
@@ -973,8 +983,15 @@ private fun TrailerFullscreen(trailer: FsTrailer, onClose: () -> Unit) {
 // ------------------------------------------------------------------ episodes
 
 @Composable
-private fun Episodes(media: Media, count: Int, side: Dp, cardWidth: Dp, onClick: () -> Unit) {
-    // AniList lists streaming titles as "Episode 5 - Name"; use them when present.
+private fun Episodes(
+    media: Media,
+    count: Int,
+    episodes: List<com.anibiar.app.data.EpisodeInfo>?,
+    side: Dp,
+    cardWidth: Dp,
+    onClick: () -> Unit,
+) {
+    // Real titles / dates / thumbnails (ani.zip + MAL); AniList's streaming titles fill any gap.
     val streaming = remember(media.id) {
         val regex = Regex("""(?i)episode\s+(\d+)\s*[-:–]?\s*(.*)""")
         media.streamingEpisodes.mapNotNull { ep ->
@@ -984,25 +1001,37 @@ private fun Episodes(media: Media, count: Int, side: Dp, cardWidth: Dp, onClick:
         }.toMap()
     }
     val fallbackArt = media.bannerImage ?: media.posterUrl
-    val numbers = remember(count) { (1..count).toList() }
+    val byNumber = remember(episodes) { episodes.orEmpty().associateBy { it.number } }
+    val numbers = remember(count, byNumber) {
+        val maxKnown = byNumber.keys.filter { it <= maxOf(count, 1) * 2 }.maxOrNull() ?: 0
+        (1..maxOf(count, maxKnown)).toList()
+    }
 
     Column(Modifier.fillMaxWidth().padding(top = 36.dp)) {
-        SectionHeader("Episodes", null, "$count episodes", Modifier.padding(horizontal = side))
+        SectionHeader("Episodes", null, "${numbers.size} episodes", Modifier.padding(horizontal = side))
         Spacer(Modifier.height(14.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = side),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(numbers, key = { it }) { number ->
-                val info = streaming[number]
+                val info = byNumber[number]
+                val stream = streaming[number]
+                val title = info?.title?.takeIf { it.isNotBlank() }
+                    ?: stream?.first?.takeIf { it.isNotBlank() }
+                    ?: "Episode $number"
                 val shape = RoundedCornerShape(12.dp)
-                Column(Modifier.width(cardWidth).clickable(onClick = onClick)) {
+                val hover = com.anibiar.app.ui.home.rememberCardHover()
+                val active = hover.active()
+                val titleColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender, Color.White)
+                val borderColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender.copy(alpha = 0.7f), Ani.Border)
+                Column(Modifier.width(cardWidth).hoverCard(hover, onClick)) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape)
-                            .border(1.dp, Ani.Border, shape).background(Ani.Item),
+                            .border(1.dp, borderColor, shape).background(Ani.Item),
                     ) {
                         PosterImage(
-                            url = info?.second ?: fallbackArt,
+                            url = info?.image ?: stream?.second ?: fallbackArt,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -1011,21 +1040,36 @@ private fun Episodes(media: Media, count: Int, side: Dp, cardWidth: Dp, onClick:
                                 Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f)),
                             ),
                         )
+                        com.anibiar.app.ui.home.HoverOverlay(active, playSize = 46)
                         InfoBadge(
                             text = "EP $number",
                             background = Color.Black.copy(alpha = 0.6f),
+                            textColor = Color.White,
                             textSize = 11f,
                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
                         )
+                        (info?.runtime ?: media.duration)?.takeIf { it > 0 }?.let { mins ->
+                            InfoBadge(
+                                text = "${mins}m",
+                                background = Color.Black.copy(alpha = 0.6f),
+                                textColor = Color.White,
+                                textSize = 11f,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                            )
+                        }
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = info?.first?.takeIf { it.isNotBlank() } ?: "Episode $number",
-                        style = inter(13.5f, FontWeight.Medium, lineHeight = 18f),
-                        color = Ani.Soft,
-                        maxLines = 2,
+                        text = title,
+                        style = inter(14f, FontWeight.Medium, lineHeight = 19f),
+                        color = titleColor,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    info?.date?.let { date ->
+                        Spacer(Modifier.height(3.dp))
+                        Text(date, style = inter(12.5f), color = Ani.Muted, maxLines = 1)
+                    }
                 }
             }
         }
@@ -1150,13 +1194,20 @@ private fun MediaCard(
     labelColor: Color = Ani.Amber,
 ) {
     val shape = RoundedCornerShape(14.dp)
-    Column(Modifier.width(width).clickable(onClick = onClick)) {
+    val hover = com.anibiar.app.ui.home.rememberCardHover()
+    val active = hover.active()
+    val accent = remember(media.coverImage.color) { com.anibiar.app.ui.home.accentOf(media.coverImage.color) }
+    val chipText by com.anibiar.app.ui.home.accentColor(active, accent, Ani.Muted)
+    val chipBg by com.anibiar.app.ui.home.accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
+    val titleColor by com.anibiar.app.ui.home.accentColor(active, accent, Color.White)
+    Column(Modifier.width(width).hoverCard(hover, onClick)) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(shape).background(Ani.Item)) {
             PosterImage(
                 url = media.posterUrl,
                 contentDescription = media.displayTitle,
                 modifier = Modifier.fillMaxSize(),
             )
+            com.anibiar.app.ui.home.HoverOverlay(active, playSize = 40)
             if (badge != null) {
                 Row(
                     modifier = Modifier
@@ -1186,10 +1237,10 @@ private fun MediaCard(
         val badgeText = (available / (chars.coerceAtLeast(1) * 0.70f)).coerceIn(8.5f, 11.5f)
         Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             eps?.let {
-                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = badgeText, iconSize = (badgeText + 1f).dp, hPad = 6.dp, vPad = 4.dp)
+                InfoBadge(it.toString(), icon = AniIcons.ClosedCaption, textSize = badgeText, iconSize = (badgeText + 1f).dp, hPad = 6.dp, vPad = 4.dp, background = chipBg, textColor = chipText)
             }
-            InfoBadge(formatText, textSize = badgeText, hPad = 6.dp, vPad = 4.dp)
-            yearText?.let { InfoBadge(it, textSize = badgeText, hPad = 6.dp, vPad = 4.dp) }
+            InfoBadge(formatText, textSize = badgeText, hPad = 6.dp, vPad = 4.dp, background = chipBg, textColor = chipText)
+            yearText?.let { InfoBadge(it, textSize = badgeText, hPad = 6.dp, vPad = 4.dp, background = chipBg, textColor = chipText) }
         }
         Spacer(Modifier.height(6.dp))
         if (label != null) {
@@ -1199,6 +1250,7 @@ private fun MediaCard(
         Text(
             text = media.displayTitle,
             style = inter(13.5f, FontWeight.SemiBold, lineHeight = 18f),
+            color = titleColor,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )

@@ -135,7 +135,7 @@ object Queries {
     private const val MINI_MEDIA = """
         id type format status episodes seasonYear
         title { romaji english }
-        coverImage { extraLarge large }
+        coverImage { extraLarge large color }
         startDate { year month day }
         nextAiringEpisode { episode }
     """

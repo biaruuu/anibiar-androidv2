@@ -248,7 +248,7 @@ private fun HomeContent(
                         }
                     } else {
                         items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], columns, onClick = { onOpen(it.media.id) })
+                            EpisodeRow(rows[index], columns, saved, onToggleSaved, onClick = { onOpen(it.media.id) })
                             Spacer(Modifier.height(16.dp))
                         }
                     }
@@ -732,13 +732,25 @@ private fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: () 
 }
 
 @Composable
-private fun EpisodeRow(rowItems: List<LatestEpisode>, columns: Int, onClick: (LatestEpisode) -> Unit) {
+private fun EpisodeRow(
+    rowItems: List<LatestEpisode>,
+    columns: Int,
+    saved: Set<Int>,
+    onToggleSaved: (Int) -> Unit,
+    onClick: (LatestEpisode) -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         rowItems.forEach { episode ->
-            EpisodeCard(episode, { onClick(episode) }, Modifier.weight(1f))
+            EpisodeCard(
+                episode,
+                { onClick(episode) },
+                saved = episode.media.id in saved,
+                onToggleSaved = { onToggleSaved(episode.media.id) },
+                modifier = Modifier.weight(1f),
+            )
         }
         repeat((columns - rowItems.size).coerceAtLeast(0)) {
             Spacer(Modifier.weight(1f))
@@ -747,9 +759,21 @@ private fun EpisodeRow(rowItems: List<LatestEpisode>, columns: Int, onClick: (La
 }
 
 @Composable
-private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun EpisodeCard(
+    item: LatestEpisode,
+    onClick: () -> Unit,
+    saved: Boolean,
+    onToggleSaved: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val media = item.media
-    BoxWithConstraints(modifier.clickable(onClick = onClick)) {
+    val hover = rememberCardHover()
+    val active = hover.active()
+    val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
+    val chipText by accentColor(active, accent, Ani.Muted)
+    val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
+    val titleColor by accentColor(active, accent, Color.White)
+    BoxWithConstraints(modifier.hoverCard(hover, onClick, onLongPress = onToggleSaved)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
         val fit = (maxWidth / 106.dp).coerceIn(0.9f, 1.5f)
         val badgeText = 9.5f * fit
@@ -769,6 +793,7 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
                     contentDescription = media.displayTitle,
                     modifier = Modifier.fillMaxSize(),
                 )
+                HoverOverlay(active, saved = saved, showAdd = true, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt())
                 Box(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -812,10 +837,12 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
                     iconSize = badgeIcon,
                     hPad = badgePad,
                     vPad = 4.dp,
+                    background = chipBg,
+                    textColor = chipText,
                 )
-                InfoBadge(text = media.formatLabel, textSize = badgeText, hPad = badgePad, vPad = 4.dp)
+                InfoBadge(text = media.formatLabel, textSize = badgeText, hPad = badgePad, vPad = 4.dp, background = chipBg, textColor = chipText)
                 media.year?.let {
-                    InfoBadge(text = it.toString(), textSize = badgeText, hPad = badgePad, vPad = 4.dp)
+                    InfoBadge(text = it.toString(), textSize = badgeText, hPad = badgePad, vPad = 4.dp, background = chipBg, textColor = chipText)
                 }
             }
 
@@ -824,6 +851,7 @@ private fun EpisodeCard(item: LatestEpisode, onClick: () -> Unit, modifier: Modi
             Text(
                 text = media.displayTitle,
                 style = inter(13.5f, FontWeight.Medium, lineHeight = 18f),
+                color = titleColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -837,6 +865,7 @@ internal fun InfoBadge(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     background: Color = Ani.Chip,
+    textColor: Color = Ani.Muted,
     textSize: Float = 12f,
     iconSize: Dp = 13.dp,
     hPad: Dp = 8.dp,
@@ -850,13 +879,13 @@ internal fun InfoBadge(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(iconSize))
+            Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(iconSize))
             Spacer(Modifier.width(3.dp))
         }
         Text(
             text = text,
             style = inter(textSize, FontWeight.Medium),
-            color = Ani.Muted,
+            color = textColor,
             maxLines = 1,
             softWrap = false,
         )

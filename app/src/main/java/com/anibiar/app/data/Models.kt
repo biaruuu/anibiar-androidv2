@@ -286,3 +286,12 @@ val Media.studioNames: List<Pair<String, Boolean>>
         .sortedByDescending { it.second }
 
 val Person.displayName: String get() = name?.full ?: ""
+
+/** One episode row for the Details page (title, thumbnail, release date and runtime when known). */
+data class EpisodeInfo(
+    val number: Int,
+    val title: String?,
+    val date: String?,
+    val runtime: Int?,
+    val image: String?,
+)

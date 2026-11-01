@@ -171,6 +171,101 @@ class AnimeRepository(context: Context) {
         null
     }
 
+    // ---- Episode list: titles, thumbnails, release dates, runtime ----
+
+    suspend fun cachedEpisodes(id: Int): List<EpisodeInfo>? = withContext(Dispatchers.IO) {
+        cache.read("eps_$id.json")?.let { parseEpisodeCache(it) }
+    }
+
+    /** ani.zip (thumbnails, titles, air dates) first, Jikan/MAL fills any gap. Never throws. */
+    suspend fun fetchEpisodes(id: Int, idMal: Int?): List<EpisodeInfo> = withContext(Dispatchers.IO) {
+        val byNumber = sortedMapOf<Int, EpisodeInfo>()
+        runCatching { aniZipEpisodes(id) }.getOrNull()?.forEach { byNumber[it.number] = it }
+        val needsMore = byNumber.isEmpty() || byNumber.values.any { it.title.isNullOrBlank() || it.date == null }
+        if (idMal != null && needsMore) {
+            runCatching { jikanEpisodes(idMal) }.getOrNull()?.forEach { jk ->
+                val cur = byNumber[jk.number]
+                byNumber[jk.number] = if (cur == null) jk else cur.copy(
+                    title = cur.title?.takeIf { it.isNotBlank() } ?: jk.title,
+                    date = cur.date ?: jk.date,
+                )
+            }
+        }
+        val list = byNumber.values.toList()
+        if (list.isNotEmpty()) {
+            val arr = org.json.JSONArray()
+            list.forEach {
+                arr.put(
+                    org.json.JSONObject().put("n", it.number).put("t", it.title ?: "").put("d", it.date ?: "")
+                        .put("r", it.runtime ?: 0).put("i", it.image ?: ""),
+                )
+            }
+            cache.write("eps_$id.json", arr.toString())
+        }
+        list
+    }
+
+    private fun parseEpisodeCache(text: String): List<EpisodeInfo>? = try {
+        val arr = org.json.JSONArray(text)
+        List(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            EpisodeInfo(
+                o.getInt("n"), o.optString("t").ifBlank { null }, o.optString("d").ifBlank { null },
+                o.optInt("r", 0).takeIf { it > 0 }, o.optString("i").ifBlank { null },
+            )
+        }.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun getText(url: String): String? {
+        val request = okhttp3.Request.Builder().url(url).header("Accept", "application/json").build()
+        return Http.plain.newCall(request).execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
+    }
+
+    private fun prettyDate(iso: String?): String? {
+        val m = Regex("""(\d{4})-(\d{2})-(\d{2})""").find(iso.orEmpty()) ?: return null
+        val months = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        val month = m.groupValues[2].toIntOrNull()?.let { months.getOrNull(it - 1) } ?: return null
+        return "$month ${m.groupValues[3].toInt()}, ${m.groupValues[1]}"
+    }
+
+    private fun aniZipEpisodes(id: Int): List<EpisodeInfo>? {
+        val root = org.json.JSONObject(getText("https://api.ani.zip/mappings?anilist_id=$id") ?: return null)
+        val eps = root.optJSONObject("episodes") ?: return null
+        val out = mutableListOf<EpisodeInfo>()
+        for (key in eps.keys()) {
+            val n = key.toIntOrNull() ?: continue
+            val e = eps.optJSONObject(key) ?: continue
+            val t = e.optJSONObject("title")
+            val title = listOf("en", "x-jat", "ja").firstNotNullOfOrNull { k -> t?.optString(k)?.takeIf { it.isNotBlank() && it != "null" } }
+            val date = prettyDate(e.optString("airdate")) ?: prettyDate(e.optString("airDateUtc"))
+            val runtime = e.optInt("runtime", 0).takeIf { it > 0 } ?: e.optInt("length", 0).takeIf { it > 0 }
+            val image = e.optString("image").takeIf { it.startsWith("http") }
+            out += EpisodeInfo(n, title, date, runtime, image)
+        }
+        return out.sortedBy { it.number }.takeIf { it.isNotEmpty() }
+    }
+
+    private fun jikanEpisodes(mal: Int): List<EpisodeInfo>? {
+        val out = mutableListOf<EpisodeInfo>()
+        for (page in 1..4) {
+            val body = getText("https://api.jikan.moe/v4/anime/$mal/episodes?page=$page") ?: break
+            val root = org.json.JSONObject(body)
+            val data = root.optJSONArray("data") ?: break
+            for (i in 0 until data.length()) {
+                val e = data.getJSONObject(i)
+                out += EpisodeInfo(
+                    e.optInt("mal_id"), e.optString("title").takeIf { it.isNotBlank() && it != "null" },
+                    prettyDate(e.optString("aired")), null, null,
+                )
+            }
+            if (root.optJSONObject("pagination")?.optBoolean("has_next_page") != true) break
+            Thread.sleep(400)
+        }
+        return out.takeIf { it.isNotEmpty() }
+    }
+
     /** MyAnimeList score (what Miruro lists next to the AniList score): Jikan first, then MAL's own page. */
     suspend fun malScore(idMal: Int): String? = withContext(Dispatchers.IO) {
         val key = "mal_$idMal.txt"

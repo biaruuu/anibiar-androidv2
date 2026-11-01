@@ -22,6 +22,7 @@ data class DetailsUiState(
     val malScore: String? = null,
     val images: TmdbImages? = null,
     val franchise: List<Media>? = null,
+    val episodes: List<com.anibiar.app.data.EpisodeInfo>? = null,
     val imdbId: String? = null,
     val tvdbId: String? = null,
     val loading: Boolean = true,
@@ -85,6 +86,11 @@ class DetailsViewModel(application: Application, private val id: Int) : AndroidV
         }
         viewModelScope.launch {
             repository.externalIds(media)?.let { (imdb, tvdb) -> _state.update { it.copy(imdbId = imdb, tvdbId = tvdb) } }
+        }
+        viewModelScope.launch {
+            repository.cachedEpisodes(media.id)?.let { c -> _state.update { it.copy(episodes = c) } }
+            val fresh = repository.fetchEpisodes(media.id, media.idMal)
+            if (fresh.isNotEmpty()) _state.update { it.copy(episodes = fresh) }
         }
         viewModelScope.launch {
             runCatching { repository.fetchFranchise(media) }.getOrNull()
