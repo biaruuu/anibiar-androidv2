@@ -184,7 +184,6 @@ private fun SentStep(email: String, onBack: () -> Unit) {
     LaunchedEffect(cooldown) { if (cooldown > 0) { delay(1000); cooldown-- } }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-        val logo = min(maxWidth * 0.55f, maxHeight * 0.28f).coerceAtLeast(110.dp)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp)) { BackArrow(onBack) }
             // "Email sent" notice
@@ -201,9 +200,9 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                     Text("Kindly check your email for the sign-in link.", style = inter(15f, FontWeight.SemiBold, lineHeight = 21f), color = Color.White)
                 }
             }
+            Spacer(Modifier.weight(1f).height(8.dp))
+            ApngImage("reze.apng", Modifier.height(min(maxHeight * 0.40f, 340.dp)).fillMaxWidth(), "Reze chibi")
             Spacer(Modifier.weight(1f).height(12.dp))
-            KiroLogo(logo)
-            Spacer(Modifier.weight(1f).height(20.dp))
             Column(
                 Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
