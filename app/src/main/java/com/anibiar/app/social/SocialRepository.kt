@@ -239,6 +239,25 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         if (o["access_token"] != null) { store(decodeSession(o)); SignUpResult.SignedIn } else SignUpResult.ConfirmEmail
     }
 
+    /** Passwordless: emails a one-tap sign-in link. Creates the account on first use. */
+    suspend fun sendSignInLink(email: String) = net {
+        val (code, text) = raw(
+            "POST", "/auth/v1/otp?redirect_to=${encode(REDIRECT)}",
+            buildJsonObject { put("email", email); put("create_user", true) }.toString().toByteArray(), authed = false,
+        )
+        if (code !in 200..299) fail(code, text)
+    }
+
+    suspend fun setUsername(name: String) = net {
+        val me = session?.uid ?: return@net
+        val (c0, t0) = raw("POST", "/rest/v1/rpc/username_available", buildJsonObject { put("u", name) }.toString().toByteArray())
+        if (c0 in 200..299 && t0.trim() == "false") throw ApiError("username_taken", "That username is already taken")
+        val (code, text) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("username", name) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (code == 409) throw ApiError("username_taken", "That username is already taken")
+        if (code !in 200..299) fail(code, text)
+        refreshSoon()
+    }
+
     suspend fun signIn(email: String, password: String) = net {
         val (code, text) = raw(
             "POST", "/auth/v1/token?grant_type=password",

@@ -206,6 +206,37 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
         }
     }
 
+    // First login: accounts start with a placeholder name; ask for a real one.
+    val needsName = isMe && profile?.username?.matches(Regex("^user[0-9a-f]{8}$")) == true
+    if (needsName) {
+        var name by remember { mutableStateOf("") }
+        var err by remember { mutableStateOf<String?>(null) }
+        var saving by remember { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = {},
+            containerColor = Ani.Panel,
+            title = { Text("Choose your username", style = inter(18f, FontWeight.SemiBold), color = Color.White) },
+            text = {
+                Column {
+                    Text("This is how friends find you. 3-20 letters, numbers, _ or .", style = inter(13.5f, lineHeight = 19f), color = Ani.Muted)
+                    Spacer(Modifier.height(10.dp))
+                    Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Ani.Border, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                        if (name.isEmpty()) Text("username", style = inter(15f), color = Ani.Muted)
+                        BasicTextField(name, { name = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '.' }.take(20) }, singleLine = true, textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lavender), modifier = Modifier.fillMaxWidth())
+                    }
+                    err?.let { Spacer(Modifier.height(6.dp)); Text(it, style = inter(12.5f), color = Color(0xFFFF8A80)) }
+                }
+            },
+            confirmButton = {
+                Text(if (saving) "Saving…" else "Continue", style = inter(15f, FontWeight.SemiBold), color = if (name.length >= 3) Ani.Lavender else Ani.Muted,
+                    modifier = Modifier.clickable(enabled = name.length >= 3 && !saving) {
+                        saving = true; err = null
+                        scope.launch { try { social.setUsername(name) } catch (e: Exception) { err = e.message }; saving = false }
+                    }.padding(10.dp))
+            },
+        )
+    }
+
     if (editBio) {
         var text by remember { mutableStateOf(profile?.bio.orEmpty()) }
         AlertDialog(
