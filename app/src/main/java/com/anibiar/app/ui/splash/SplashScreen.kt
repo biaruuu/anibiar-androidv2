@@ -197,3 +197,23 @@ private fun DrawScope.drawLogo(l: LogoLayers, ms: Float) {
         }
     }
 }
+
+
+/** The animated Kiro mark on a loop (ears flick, eyes blink and glance, lavender shimmer) for use on other screens. */
+@Composable
+fun KiroLogo(size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val layers by produceState<LogoLayers?>(null) {
+        value = withContext(Dispatchers.Default) { runCatching { loadLayers(context) }.getOrNull() }
+    }
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "kiroLoop")
+    val ms by t.animateFloat(
+        initialValue = 400f,
+        targetValue = 3400f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(tween(3000, easing = LinearEasing)),
+        label = "kiroMs",
+    )
+    Canvas(modifier.size(size).graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+        layers?.let { drawLogo(it, ms) }
+    }
+}

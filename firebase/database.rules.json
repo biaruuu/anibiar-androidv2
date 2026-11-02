@@ -1,0 +1,31 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".indexOn": ["usernameLower"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['username', 'usernameLower'])"
+      }
+    },
+    "usernames": {
+      ".read": true,
+      "$name": {
+        ".write": "auth != null && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || newData.val() === auth.uid)"
+      }
+    },
+    "images": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "follows": {
+      "$uid": {
+        ".read": "auth != null",
+        "following": { "$target": { ".write": "auth != null && auth.uid === $uid" } },
+        "followers": { "$follower": { ".write": "auth != null && auth.uid === $follower" } }
+      }
+    }
+  }
+}

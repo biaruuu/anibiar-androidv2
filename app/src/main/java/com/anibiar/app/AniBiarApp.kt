@@ -21,10 +21,13 @@ class AniBiarApp : Application(), ImageLoaderFactory {
     val repository: AnimeRepository by lazy { AnimeRepository(this) }
     val history: WatchHistory by lazy { WatchHistory(this) }
     val watchlist: Watchlist by lazy { Watchlist(this) }
+    val social: com.anibiar.app.social.SocialRepository by lazy { com.anibiar.app.social.SocialRepository() }
 
     override fun onCreate() {
         super.onCreate()
         Http.init(this)
+        com.anibiar.app.social.FirebaseConfig.init(this)
+        social.start()
         // Build the network stack and warm image caches off the main thread while the UI starts.
         appScope.launch {
             Http.client
@@ -36,6 +39,9 @@ class AniBiarApp : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .okHttpClient { Http.client }
+            .components {
+                if (android.os.Build.VERSION.SDK_INT >= 28) add(coil.decode.ImageDecoderDecoder.Factory()) else add(coil.decode.GifDecoder.Factory())
+            }
             .crossfade(150)
             .allowRgb565(false)
             .memoryCache {

@@ -103,7 +103,19 @@ private val SCORES = listOf(90, 80, 70, 60, 50).map { it.toString() to "$it+" }
 private val SEASONS = listOf("WINTER" to "Winter", "SPRING" to "Spring", "SUMMER" to "Summer", "FALL" to "Fall")
 
 @Composable
-fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchViewModel = viewModel()) {
+fun SearchScreen(
+    onOpen: (Int) -> Unit,
+    onBack: () -> Unit,
+    mode: String,
+    onModeChange: (String) -> Unit,
+    onOpenUser: (String) -> Unit,
+) {
+    if (mode == "users") UserSearchScreen(onBack, onModeChange, onOpenUser)
+    else AnimeSearchScreen(onOpen, onBack, mode, onModeChange)
+}
+
+@Composable
+private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: String, onModeChange: (String) -> Unit, viewModel: SearchViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -159,10 +171,13 @@ fun SearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, viewModel: SearchVie
                     )
                 }
                 Spacer(Modifier.height(14.dp))
-                Column(Modifier.padding(horizontal = 12.dp)) {
-                    Text("Search", style = inter(24f, FontWeight.Bold), color = Color.White)
-                    Spacer(Modifier.height(2.dp))
-                    Text("Simple when you want it, extremely specific when you need it.", style = inter(13f, lineHeight = 18f), color = Ani.Muted)
+                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text("Search", style = inter(24f, FontWeight.Bold), color = Color.White)
+                        Spacer(Modifier.height(2.dp))
+                        Text("Simple when you want it, extremely specific when you need it.", style = inter(13f, lineHeight = 18f), color = Ani.Muted)
+                    }
+                    ModeDropdown(mode, onModeChange)
                 }
                 Spacer(Modifier.height(14.dp))
             }

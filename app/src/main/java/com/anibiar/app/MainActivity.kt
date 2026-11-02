@@ -22,8 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.anibiar.app.AniBiarApp
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -61,16 +63,58 @@ private fun AppNavigation() {
     ) { mutableStateListOf() }
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
+    var searchMode by rememberSaveable { mutableStateOf("anime") }
+    val userStack = rememberSaveable(
+        saver = androidx.compose.runtime.saveable.listSaver<SnapshotStateList<String>, String>(
+            save = { it.toList() },
+            restore = { mutableStateListOf<String>().apply { addAll(it) } },
+        ),
+    ) { mutableStateListOf<String>() }
+    val context0 = androidx.compose.ui.platform.LocalContext.current
+    val social = (context0.applicationContext as AniBiarApp).social
+    val authState by social.authState.collectAsStateWithLifecycle()
+    BackHandler(enabled = profileOpen) { profileOpen = false }
+    BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
-    BackHandler(enabled = stack.isEmpty() && searchOpen) { searchOpen = false }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { searchOpen = true })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; searchOpen = true })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.search.SearchScreen(onOpen = { id -> stack.add(id) }, onBack = { searchOpen = false })
+                com.anibiar.app.ui.search.SearchScreen(
+                    onOpen = { id -> stack.add(id) },
+                    onBack = { searchOpen = false },
+                    mode = searchMode,
+                    onModeChange = { searchMode = it },
+                    onOpenUser = { userStack.add(it) },
+                )
+            }
+        }
+
+        if (profileOpen) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                val a = authState
+                if (a != null && a.verified) {
+                    com.anibiar.app.ui.profile.ProfileScreen(uid = null, onBack = null, onOpenUser = { userStack.add(it) })
+                } else {
+                    com.anibiar.app.ui.auth.AuthScreen(onClose = { profileOpen = false })
+                }
+            }
+        }
+
+        userStack.lastOrNull()?.let { uid ->
+            androidx.compose.runtime.key(userStack.size, uid) {
+                Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                    com.anibiar.app.ui.profile.ProfileScreen(
+                        uid = uid,
+                        onBack = { if (userStack.isNotEmpty()) userStack.removeAt(userStack.lastIndex) },
+                        onOpenUser = { userStack.add(it) },
+                    )
+                }
             }
         }
 
@@ -109,10 +153,15 @@ private fun AppNavigation() {
         ) {
             val context = androidx.compose.ui.platform.LocalContext.current
             com.anibiar.app.ui.nav.BottomNavBar(
-                selected = if (searchOpen) com.anibiar.app.ui.nav.NavTab.Search else com.anibiar.app.ui.nav.NavTab.Home,
+                selected = when {
+                    profileOpen -> com.anibiar.app.ui.nav.NavTab.Profile
+                    searchOpen -> com.anibiar.app.ui.nav.NavTab.Search
+                    else -> com.anibiar.app.ui.nav.NavTab.Home
+                },
                 onSelect = { tab ->
-                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) searchOpen = false
-                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) searchOpen = true
+                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) { searchOpen = false; profileOpen = false; userStack.clear() }
+                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) { profileOpen = false; userStack.clear(); searchOpen = true }
+                    else if (tab == com.anibiar.app.ui.nav.NavTab.Profile) { searchOpen = false; userStack.clear(); profileOpen = true }
                     else {
                         android.widget.Toast.makeText(context, "${tab.label} is coming soon", android.widget.Toast.LENGTH_SHORT).show()
                     }
