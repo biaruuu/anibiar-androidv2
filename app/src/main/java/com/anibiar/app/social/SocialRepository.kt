@@ -85,8 +85,8 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 val me = session?.uid
                 if (me == null) { _myFollowing.value = emptySet(); _myFollowers.value = emptySet() }
                 else runCatching {
-                    _myFollowing.value = ids(me, "following")
-                    _myFollowers.value = ids(me, "followers")
+                    _myFollowing.value = fetchIds(me, "following")
+                    _myFollowers.value = fetchIds(me, "followers")
                 }
             }
         }
@@ -282,9 +282,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     fun profile(uid: String): Flow<UserProfile?> = live { fetchProfile(uid) }
 
-    fun ids(uid: String, kind: String): Flow<Set<String>> = live { ids(uid, kind) }
+    fun ids(uid: String, kind: String): Flow<Set<String>> = live { fetchIds(uid, kind) }
 
-    private suspend fun ids(uid: String, kind: String): Set<String> =
+    private suspend fun fetchIds(uid: String, kind: String): Set<String> =
         if (kind == "followers") getRows("/rest/v1/follows?following_id=eq.$uid&select=follower_id").map { it.jsonObject["follower_id"]!!.jsonPrimitive.content }.toSet()
         else getRows("/rest/v1/follows?follower_id=eq.$uid&select=following_id").map { it.jsonObject["following_id"]!!.jsonPrimitive.content }.toSet()
 
