@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -134,35 +135,35 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
             Spacer(Modifier.weight(1f).height(16.dp))
             KiroLogo(logo)
             Spacer(Modifier.height(6.dp))
-            Text("Kiro", style = inter(34f, FontWeight.Bold), color = Color.White)
+            Text("Kiro", style = inter(28f, FontWeight.Bold), color = Color.White)
             Spacer(Modifier.weight(1f).height(24.dp))
             Column(
                 Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Enter your email to log in or sign up", style = inter(15f, FontWeight.Medium), color = Color.White, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(14.dp))
+                Text("Enter your email to log in or sign up", style = inter(14f, FontWeight.Medium), color = Color.White, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(12.dp))
                 EmailField(email, onEmail, ::submit)
                 error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = inter(13f, lineHeight = 18f), color = Color(0xFFFF8A80), textAlign = TextAlign.Center) }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
                 val shape = RoundedCornerShape(50)
                 Box(
-                    Modifier.fillMaxWidth().height(52.dp).clip(shape)
-                        .background(if (ok) Ani.Lavender else Ani.ButtonDark)
+                    Modifier.fillMaxWidth().height(44.dp).clip(shape)
+                        .background(if (ok) Color.White else Ani.ButtonDark)
                         .clickable(enabled = ok && !busy, onClick = ::submit),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (busy) "Sending…" else "Continue", style = inter(16f, FontWeight.SemiBold), color = if (ok) Color(0xFF121214) else Ani.Muted)
+                    Text(if (busy) "Sending…" else "Continue", style = inter(14f, FontWeight.Medium), color = if (ok) Color.Black else Ani.Muted, maxLines = 1)
                 }
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).height(1.dp).background(Ani.Border))
-                    Text("  OR  ", style = inter(12.5f, FontWeight.Medium), color = Ani.Muted)
+                    Text("  OR  ", style = inter(12f, FontWeight.Medium), color = Ani.Muted)
                     Box(Modifier.weight(1f).height(1.dp).background(Ani.Border))
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 SocialButton("Continue with Google", BrandIcons.Google) { Toast.makeText(context, "Google sign-in is coming soon", Toast.LENGTH_SHORT).show() }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 SocialButton("Continue with Discord", BrandIcons.Discord) { Toast.makeText(context, "Discord sign-in is coming soon", Toast.LENGTH_SHORT).show() }
                 Spacer(Modifier.height(18.dp))
                 Terms()
@@ -220,7 +221,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 val pill = RoundedCornerShape(50)
                 val canResend = cooldown == 0 && !busy
                 Box(
-                    Modifier.fillMaxWidth().height(52.dp).clip(pill).background(Ani.ButtonDark)
+                    Modifier.fillMaxWidth().height(44.dp).clip(pill).background(Ani.ButtonDark)
                         .clickable(enabled = canResend) {
                             busy = true; note = null
                             scope.launch {
@@ -232,12 +233,12 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 ) {
                     Text(
                         if (cooldown > 0) "Didn't receive it? Resend in ${cooldown}s" else if (busy) "Sending…" else "Didn't receive it? Resend Email",
-                        style = inter(15f, FontWeight.Medium), color = if (canResend) Color.White else Ani.Muted,
+                        style = inter(14f, FontWeight.Medium), color = if (canResend) Color.White else Ani.Muted, maxLines = 1,
                     )
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(52.dp).clip(pill).background(Color(0xFFEDEBF0)).clickable {
+                    Modifier.fillMaxWidth().height(44.dp).clip(pill).background(Color.White).clickable {
                         try {
                             context.startActivity(
                                 Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -247,7 +248,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                         }
                     },
                     contentAlignment = Alignment.Center,
-                ) { Text("Open Email", style = inter(16f, FontWeight.SemiBold), color = Color(0xFF121214)) }
+                ) { Text("Open Email", style = inter(14f, FontWeight.Medium), color = Color.Black, maxLines = 1) }
                 Spacer(Modifier.height(18.dp))
             }
         }
@@ -257,23 +258,25 @@ private fun SentStep(email: String, onBack: () -> Unit) {
 @Composable
 private fun EmailField(value: String, onValue: (String) -> Unit, onDone: () -> Unit) {
     val shape = RoundedCornerShape(50)
+    var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().height(52.dp).clip(shape).background(Ani.Item).border(1.dp, Ani.Border, shape).padding(horizontal = 18.dp),
+        Modifier.fillMaxWidth().height(44.dp).clip(shape).background(Ani.Item)
+            .border(1.dp, if (focused) Ani.Lavender else Color.Transparent, shape).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(AniIcons.Mail, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.size(12.dp))
+        Icon(AniIcons.Mail, null, tint = Ani.Muted, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.size(10.dp))
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text("Enter your email", style = inter(15.5f), color = Ani.Muted)
+            if (value.isEmpty()) Text("Enter your email", style = inter(14f), color = Ani.Muted, maxLines = 1)
             BasicTextField(
                 value = value,
                 onValueChange = { onValue(it.replace(" ", "")) },
                 singleLine = true,
-                textStyle = inter(15.5f).copy(color = Color.White),
+                textStyle = inter(14f).copy(color = Color.White),
                 cursorBrush = SolidColor(Ani.Lavender),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Go),
                 keyboardActions = KeyboardActions(onGo = { onDone() }),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
             )
         }
     }
@@ -283,13 +286,13 @@ private fun EmailField(value: String, onValue: (String) -> Unit, onDone: () -> U
 private fun SocialButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Row(
-        Modifier.fillMaxWidth().height(52.dp).clip(shape).border(1.dp, Ani.Border, shape).clickable(onClick = onClick),
+        Modifier.fillMaxWidth().height(44.dp).clip(shape).border(1.dp, Ani.Border, shape).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        Image(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+        Image(icon, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.size(10.dp))
-        Text(label, style = inter(15.5f, FontWeight.Medium), color = Color.White)
+        Text(label, style = inter(14f, FontWeight.Medium), color = Color.White)
     }
 }
 
@@ -305,7 +308,7 @@ private fun Terms() {
         append(".")
     }
     Text(
-        text, style = inter(12.5f, lineHeight = 18f), color = Ani.Muted, textAlign = TextAlign.Center,
+        text, style = inter(11.5f, lineHeight = 16f), color = Ani.Muted, textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth().clickable { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
     )
 }
