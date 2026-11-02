@@ -145,7 +145,7 @@ private fun Backdrop(app: AniBiarApp) {
 private fun validEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
 
 @Composable
-private fun GlassCard(content: @Composable () -> Unit) {
+private fun GlassCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(24.dp)
     Column(
         Modifier
