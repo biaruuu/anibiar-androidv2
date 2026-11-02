@@ -362,3 +362,53 @@ private fun VerifyBanner(email: String) {
         }
     }
 }
+
+
+/** Discord-style name card: banner, avatar, name, bio, join date and follow counts. */
+@Composable
+internal fun UserCard(
+    user: UserProfile,
+    myUid: String?,
+    myFollowing: Set<String>,
+    myFollowers: Set<String>,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clip(shape)
+            .background(Ani.Panel).border(1.dp, Ani.Border, shape).clickable(onClick = onOpen),
+    ) {
+        Box(Modifier.fillMaxWidth().height(76.dp)) {
+            if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1B1B20), Color(0xFF1F2A2E)))))
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.Top) {
+            Avatar(user.avatarUrl, user.username, 64.dp, Modifier.offset(y = (-26).dp).border(4.dp, Ani.Panel, CircleShape))
+            Spacer(Modifier.weight(1f))
+            if (myUid != null && user.uid != myUid) {
+                Box(Modifier.padding(top = 10.dp)) { FollowButton(user.uid, myFollowing, myFollowers, onToggle) }
+            }
+        }
+        Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp).offset(y = (-18).dp)) {
+            Text(user.username, style = inter(18f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (user.bio.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(user.bio, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (user.createdAt > 0) Text(
+                    "Member since ${SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(user.createdAt))}",
+                    style = inter(12f), color = Ani.Muted,
+                )
+                user.followers?.let { Text("$it followers", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
+                user.following?.let { Text("$it following", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
+            }
+            if (user.uid in myFollowing && user.uid in myFollowers) {
+                Spacer(Modifier.height(8.dp))
+                Text("Friends", style = inter(12f, FontWeight.SemiBold), color = Ani.Lime)
+            }
+        }
+    }
+}

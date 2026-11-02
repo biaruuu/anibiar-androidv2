@@ -47,6 +47,8 @@ data class UserProfile(
     val createdAt: Long = 0L,
     val avatarUrl: String? = null,
     val bannerUrl: String? = null,
+    val followers: Int? = null,
+    val following: Int? = null,
 )
 
 enum class SignUpResult { SignedIn, ConfirmEmail }
@@ -72,6 +74,38 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     private val _myFollowers = MutableStateFlow<Set<String>>(emptySet())
     val myFollowers: StateFlow<Set<String>> = _myFollowers.asStateFlow()
     private val tick = MutableStateFlow(0)
+
+    /** Bumped when a confirmation link signs the user in, so the UI can jump to the profile. */
+    private val _linkLogins = MutableStateFlow(0)
+    val linkLogins: StateFlow<Int> = _linkLogins.asStateFlow()
+
+    private val REDIRECT = "kiro://auth"
+
+    /**
+     * Handles `kiro://auth#access_token=...&refresh_token=...` from the confirmation email.
+     * Returns an error message to show, or null when the user is now signed in.
+     */
+    suspend fun handleAuthLink(uri: android.net.Uri): String? {
+        val frag = uri.encodedFragment ?: uri.encodedQuery ?: return null
+        val params = frag.split("&").mapNotNull { kv -> kv.split("=", limit = 2).takeIf { it.size == 2 }?.let { it[0] to android.net.Uri.decode(it[1]) } }.toMap()
+        params["error_description"]?.let { return it.replace('+', ' ') }
+        val access = params["access_token"] ?: return null
+        val refresh = params["refresh_token"] ?: return "That link is incomplete. Try logging in instead."
+        val expires = params["expires_at"]?.toLongOrNull() ?: (System.currentTimeMillis() / 1000 + (params["expires_in"]?.toLongOrNull() ?: 3600))
+        return try {
+            val (code, text) = withContext(Dispatchers.IO) {
+                http.newCall(
+                    Request.Builder().url("${SupabaseConfig.URL}/auth/v1/user").header("apikey", SupabaseConfig.PUBLISHABLE_KEY)
+                        .header("Authorization", "Bearer $access").get().build(),
+                ).execute().use { it.code to it.body?.string().orEmpty() }
+            }
+            if (code !in 200..299) return "That link has expired. Log in to request a new one."
+            val u = json.parseToJsonElement(text).jsonObject
+            store(Session(access, refresh, expires, u["id"]!!.jsonPrimitive.content, u["email"]?.jsonPrimitive?.contentOrNull.orEmpty(), true))
+            _linkLogins.value++
+            null
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { "Couldn't finish signing in. Try logging in." }
+    }
 
     private class ApiError(val code: String, override val message: String) : Exception(message)
 
@@ -196,7 +230,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val (c0, t0) = raw("POST", "/rest/v1/rpc/username_available", buildJsonObject { put("u", username) }.toString().toByteArray(), authed = false)
         if (c0 in 200..299 && t0.trim() == "false") throw ApiError("username_taken", "That username is already taken")
         val (code, text) = raw(
-            "POST", "/auth/v1/signup",
+            "POST", "/auth/v1/signup?redirect_to=${encode(REDIRECT)}",
             buildJsonObject { put("email", email); put("password", password); put("data", buildJsonObject { put("username", username) }) }.toString().toByteArray(),
             authed = false,
         )
@@ -216,7 +250,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     suspend fun resendVerification(email: String? = null) = net {
         val target = email ?: session?.email ?: error("No email to send to")
-        val (code, text) = raw("POST", "/auth/v1/resend", buildJsonObject { put("type", "signup"); put("email", target) }.toString().toByteArray(), authed = false)
+        val (code, text) = raw("POST", "/auth/v1/resend?redirect_to=${encode(REDIRECT)}", buildJsonObject { put("type", "signup"); put("email", target); put("options", buildJsonObject { put("email_redirect_to", REDIRECT) }) }.toString().toByteArray(), authed = false)
         if (code !in 200..299) fail(code, text)
     }
 
@@ -258,7 +292,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
         avatarUrl = o["avatar_url"]?.jsonPrimitive?.contentOrNull,
         bannerUrl = o["banner_url"]?.jsonPrimitive?.contentOrNull,
+        followers = count(o["followers"]),
+        following = count(o["following"]),
     )
+
+    private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
 
     private suspend fun getRows(path: String): JsonArray {
         val (code, text) = raw("GET", path)
@@ -277,6 +315,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         }.distinctUntilChanged()
 
     private val cols = "id,username,bio,avatar_url,banner_url,created_at"
+    private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
 
@@ -298,7 +337,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     suspend fun search(prefix: String): List<UserProfile> = net {
         val q = prefix.trim().filter { it.isLetterOrDigit() || it == '_' || it == '.' }.replace("_", "\\_")
         if (q.isEmpty()) return@net emptyList()
-        getRows("/rest/v1/profiles?username=ilike.${encode("$q*")}&select=$cols&order=username.asc&limit=25").map { parseProfile(it.jsonObject) }
+        getRows("/rest/v1/profiles?username=ilike.${encode("$q*")}&select=${encode(cardCols)}&order=username.asc&limit=25").map { parseProfile(it.jsonObject) }
     }
 
     // ---------------------------------------------------------------- writes

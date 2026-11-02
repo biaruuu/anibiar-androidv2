@@ -52,7 +52,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.social.UserProfile
-import com.anibiar.app.ui.profile.UserRow
+import com.anibiar.app.ui.profile.UserCard
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
@@ -154,7 +154,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
             loading && results.isEmpty() -> item { Hint("Searching…") }
             results.isEmpty() -> item { Hint("No users found.") }
             else -> items(results, key = { it.uid }) { u ->
-                UserRow(
+                UserCard(
                     u, me?.uid, myFollowing, myFollowers,
                     onOpen = { onOpenUser(u.uid) },
                     onToggle = { scope.launch { runCatching { if (u.uid in myFollowing) social.unfollow(u.uid) else social.follow(u.uid) } } },

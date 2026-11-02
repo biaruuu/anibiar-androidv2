@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.anibiar.app.AniBiarApp
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        handleLink(intent)
         setContent {
             AniBiarTheme {
                 var splash by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
@@ -52,6 +54,27 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLink(intent)
+    }
+
+    /** `kiro://auth#access_token=...` from the confirmation email: sign in and land on the profile. */
+    private fun handleLink(intent: android.content.Intent?) {
+        val uri = intent?.data ?: return
+        if (uri.scheme != "kiro") return
+        val app = application as AniBiarApp
+        androidx.lifecycle.lifecycleScope.launch {
+            val error = app.social.handleAuthLink(uri)
+            android.widget.Toast.makeText(
+                this@MainActivity,
+                error ?: "Email confirmed. You're signed in!",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 }
 
@@ -74,6 +97,10 @@ private fun AppNavigation() {
     val context0 = androidx.compose.ui.platform.LocalContext.current
     val social = (context0.applicationContext as AniBiarApp).social
     val authState by social.authState.collectAsStateWithLifecycle()
+    val linkLogins by social.linkLogins.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(linkLogins) {
+        if (linkLogins > 0) { searchOpen = false; userStack.clear(); profileOpen = true }
+    }
     BackHandler(enabled = profileOpen) { profileOpen = false }
     BackHandler(enabled = searchOpen) { searchOpen = false }
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
