@@ -12,7 +12,7 @@ object FirebaseConfig {
     private const val API_KEY = "AIzaSyB4v23J2UbauJPfJ4joxpYW28rcarETr8Y"
     private const val APP_ID = "1:888661303175:android:cf1025f3468d8ec2af7d22"
     private const val PROJECT_ID = "kiro-c0fae"
-    const val DB_URL = "https://kiro-c0fae-default-rtdb.firebaseio.com"
+    const val DB_URL = "https://kiro-c0fae-default-rtdb.asia-southeast1.firebasedatabase.app"
 
     fun init(context: Context) {
         if (FirebaseApp.getApps(context).isNotEmpty()) return
