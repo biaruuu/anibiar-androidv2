@@ -98,7 +98,7 @@ private fun AppNavigation() {
         if (profileOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                 val a = authState
-                if (a != null && a.verified) {
+                if (a != null) {
                     com.anibiar.app.ui.profile.ProfileScreen(uid = null, onBack = null, onOpenUser = { userStack.add(it) })
                 } else {
                     com.anibiar.app.ui.auth.AuthScreen(onClose = { profileOpen = false })

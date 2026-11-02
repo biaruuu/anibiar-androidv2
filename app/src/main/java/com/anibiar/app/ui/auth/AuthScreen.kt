@@ -76,10 +76,13 @@ fun AuthScreen(onClose: () -> Unit) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     val auth by app.social.authState.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        Backdrop(app)
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xB3121214), Color(0x99121214), Color(0xF2121214))),
+                Brush.radialGradient(
+                    listOf(Color(0x33B9A1DF), Color.Transparent),
+                    center = androidx.compose.ui.geometry.Offset(540f, 260f),
+                    radius = 900f,
+                ),
             ),
         )
         Column(
@@ -99,45 +102,16 @@ fun AuthScreen(onClose: () -> Unit) {
                 )
             }
             Spacer(Modifier.height(8.dp))
-            KiroLogo(124.dp)
-            Spacer(Modifier.height(6.dp))
+            KiroLogo(112.dp)
+            Spacer(Modifier.height(4.dp))
             Text("Kiro", style = inter(30f, FontWeight.Bold), color = Color.White)
-            Spacer(Modifier.height(22.dp))
-            val a = auth
-            if (a != null && !a.verified) VerifyCard(a.email, onClose) else FormCard()
+            Spacer(Modifier.height(4.dp))
+            Text("Track anime, follow friends, watch together.", style = inter(14f), color = Ani.Muted, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(24.dp))
+            FormCard()
+            Spacer(Modifier.height(18.dp))
+            Terms()
             Spacer(Modifier.height(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun Backdrop(app: AniBiarApp) {
-    val urls by produceState(emptyList<String>()) {
-        val cached = app.repository.cachedTrending()
-        value = cached.mapNotNull { it.backdropUrl }.take(6)
-        runCatching { app.repository.fetchTrending() }.getOrNull()?.let { fresh ->
-            val u = fresh.mapNotNull { it.bannerImage ?: it.backdropUrl }.take(6)
-            if (u.isNotEmpty()) value = u
-        }
-    }
-    var index by remember { mutableStateOf(0) }
-    LaunchedEffect(urls) {
-        while (urls.size > 1) {
-            delay(5500)
-            index = (index + 1) % urls.size
-        }
-    }
-    val drift = rememberInfiniteTransition(label = "drift")
-    val zoom by drift.animateFloat(1.05f, 1.22f, infiniteRepeatable(tween(11000, easing = LinearEasing), RepeatMode.Reverse), label = "zoom")
-    val pan by drift.animateFloat(-18f, 18f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "pan")
-    if (urls.isNotEmpty()) {
-        Crossfade(urls[index.coerceIn(0, urls.lastIndex)], animationSpec = tween(1400), label = "bg") { url ->
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = pan },
-            )
         }
     }
 }
@@ -152,9 +126,8 @@ private fun GlassCard(content: @Composable androidx.compose.foundation.layout.Co
             .widthIn(max = 420.dp)
             .fillMaxWidth()
             .clip(shape)
-            .background(Color(0xD9121214))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.08f), Color.White.copy(alpha = 0.02f))))
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.08f))), shape)
+            .background(Ani.Panel)
+            .border(1.dp, Ani.Border, shape)
             .padding(20.dp),
     ) { content() }
 }
@@ -223,7 +196,7 @@ private fun FormCard() {
         PrimaryButton(if (busy) "Please wait…" else if (signUp) "Create account" else "Log in", enabled = !busy, onClick = ::submit)
         if (signUp) {
             Spacer(Modifier.height(8.dp))
-            Text("We'll email you a verification link.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Text("We'll email you a link to verify your address.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
         }
         Spacer(Modifier.height(18.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -243,47 +216,6 @@ private fun FormCard() {
 }
 
 @Composable
-private fun VerifyCard(email: String, onClose: () -> Unit) {
-    val app = LocalContext.current.applicationContext as AniBiarApp
-    val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
-    var msg by remember { mutableStateOf<String?>(null) }
-    // Poll quietly so the screen moves on by itself once the link is tapped.
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(4000)
-            if (app.social.refreshVerification()) break
-        }
-    }
-    GlassCard {
-        Text("Verify your email", style = inter(20f, FontWeight.Bold), color = Color.White)
-        Spacer(Modifier.height(8.dp))
-        Text("We sent a verification link to $email. Tap it, then come back here.", style = inter(14f, lineHeight = 20f), color = Ani.Soft)
-        msg?.let { Spacer(Modifier.height(8.dp)); Text(it, style = inter(13f), color = Ani.Lavender) }
-        Spacer(Modifier.height(16.dp))
-        PrimaryButton(if (busy) "Checking…" else "I've verified", enabled = !busy) {
-            busy = true
-            scope.launch {
-                val ok = app.social.refreshVerification()
-                msg = if (ok) null else "Not verified yet. Check your inbox (and spam)."
-                busy = false
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        SocialButton("Resend email", null) {
-            scope.launch {
-                msg = try { app.social.resendVerification(); "Verification email sent" } catch (e: Exception) { e.message }
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(
-            "Use a different account", style = inter(13.5f, FontWeight.Medium), color = Ani.Muted,
-            modifier = Modifier.align(Alignment.CenterHorizontally).clickable { app.social.signOut() }.padding(8.dp),
-        )
-    }
-}
-
-@Composable
 private fun AuthField(
     value: String,
     onValue: (String) -> Unit,
@@ -294,7 +226,7 @@ private fun AuthField(
 ) {
     val shape = RoundedCornerShape(12.dp)
     Row(
-        Modifier.fillMaxWidth().height(48.dp).clip(shape).border(1.dp, Ani.Border, shape).background(Color(0x66000000)),
+        Modifier.fillMaxWidth().height(48.dp).clip(shape).background(Ani.Item).border(1.dp, Ani.Border, shape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
@@ -339,4 +271,26 @@ private fun SocialButton(label: String, icon: androidx.compose.ui.graphics.vecto
         }
         Text(label, style = inter(14.5f, FontWeight.Medium), color = Color.White)
     }
+}
+
+
+@Composable
+private fun Terms() {
+    val context = LocalContext.current
+    val soon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        append("By continuing, you agree to our ")
+        pushStyle(androidx.compose.ui.text.SpanStyle(color = Ani.Soft, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline))
+        append("Terms of Service")
+        pop()
+        append(" and ")
+        pushStyle(androidx.compose.ui.text.SpanStyle(color = Ani.Soft, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline))
+        append("Privacy Policy")
+        pop()
+        append(".")
+    }
+    Text(
+        text, style = inter(12.5f, lineHeight = 18f), color = Ani.Muted, textAlign = TextAlign.Center,
+        modifier = Modifier.widthIn(max = 420.dp).padding(horizontal = 8.dp).clickable(onClick = soon),
+    )
 }

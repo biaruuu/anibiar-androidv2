@@ -177,6 +177,9 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                     }
                 }
             }
+            if (isMe && me?.verified == false) item(key = "verify") {
+                VerifyBanner(me?.email.orEmpty())
+            }
             val list = when (tab) { "following" -> following; "friends" -> friends; else -> followers }
             if (list.isEmpty()) {
                 item(key = "empty-$tab") {
@@ -327,5 +330,47 @@ internal fun UserRow(
         Spacer(Modifier.width(12.dp))
         Text(user.username, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (myUid != null && user.uid != myUid) FollowButton(user.uid, myFollowing, myFollowers, onToggle)
+    }
+}
+
+
+@Composable
+private fun VerifyBanner(email: String) {
+    val app = LocalContext.current.applicationContext as AniBiarApp
+    val scope = rememberCoroutineScope()
+    var msg by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    // Notice the tapped link by itself.
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5000)
+            if (app.social.refreshVerification()) break
+        }
+    }
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clip(shape)
+            .background(Color(0x1FFEA500)).border(1.dp, Color(0x66FEA500), shape).padding(14.dp),
+    ) {
+        Text("Verify your email", style = inter(15f, FontWeight.SemiBold), color = Ani.Amber)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "We sent a link to $email. Check your inbox and spam folder, then tap it.",
+            style = inter(13f, lineHeight = 18f), color = Ani.Soft,
+        )
+        msg?.let { Spacer(Modifier.height(6.dp)); Text(it, style = inter(12.5f), color = Ani.Lavender) }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlineChip(if (busy) "Sending…" else "Resend email") {
+                if (!busy) scope.launch {
+                    busy = true
+                    msg = try { app.social.resendVerification(); "Sent. It can take a minute to arrive." } catch (e: Exception) { e.message }
+                    busy = false
+                }
+            }
+            OutlineChip("I've verified") {
+                scope.launch { msg = if (app.social.refreshVerification()) "Verified!" else "Not verified yet." }
+            }
+        }
     }
 }

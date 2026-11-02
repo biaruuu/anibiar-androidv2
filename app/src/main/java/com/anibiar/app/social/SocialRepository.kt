@@ -101,8 +101,19 @@ class SocialRepository {
                 runCatching { user.delete().await() }
                 throw e
             }
-            user.sendEmailVerification().await()
             publish()
+        }
+        // The account exists now; a failed email must not undo it (the profile offers "Resend").
+        runCatching { sendVerification() }
+    }
+
+    suspend fun sendVerification() {
+        val user = auth.currentUser ?: return
+        auth.useAppLanguage()
+        try {
+            user.sendEmailVerification().await()
+        } catch (e: Exception) {
+            throw IllegalStateException(friendly(e), e)
         }
     }
 
@@ -111,7 +122,7 @@ class SocialRepository {
         publish()
     }
 
-    suspend fun resendVerification() = guard { auth.currentUser?.sendEmailVerification()?.await() }
+    suspend fun resendVerification() = sendVerification()
 
     /** Re-reads the account so a freshly clicked verification link is noticed. */
     suspend fun refreshVerification(): Boolean {
@@ -133,6 +144,7 @@ class SocialRepository {
         is FirebaseAuthWeakPasswordException -> "Password is too weak (use 6+ characters)"
         is FirebaseAuthInvalidCredentialsException -> "Wrong email or password"
         is FirebaseAuthInvalidUserException -> "No account found for that email"
+        is com.google.firebase.auth.FirebaseAuthException -> if (e.errorCode == "ERROR_TOO_MANY_REQUESTS") "Too many attempts. Wait a few minutes and try again" else e.message ?: "Something went wrong"
         is FirebaseNetworkException -> "No connection. Check your internet"
         else -> e.message ?: "Something went wrong"
     }
