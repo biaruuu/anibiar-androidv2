@@ -57,7 +57,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.social.ImageProc
-import com.anibiar.app.social.ProfileImages
 import com.anibiar.app.social.UserProfile
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
@@ -82,7 +81,6 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
     val scope = rememberCoroutineScope()
 
     val profile by remember(targetUid) { social.profile(targetUid) }.collectAsStateWithLifecycle(null)
-    val images by remember(targetUid) { social.images(targetUid) }.collectAsStateWithLifecycle(ProfileImages())
     val followerIds by remember(targetUid) { social.ids(targetUid, "followers") }.collectAsStateWithLifecycle(emptySet())
     val followingIds by remember(targetUid) { social.ids(targetUid, "following") }.collectAsStateWithLifecycle(emptySet())
     val followers by produceState(emptyList<UserProfile>(), followerIds) { value = social.profiles(followerIds) }
@@ -100,8 +98,8 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
         if (uri != null) scope.launch {
             busy = true
             try {
-                val (full, thumb) = withContext(Dispatchers.Default) { ImageProc.avatar(context, uri) }
-                social.setAvatar(full, thumb)
+                val full = withContext(Dispatchers.Default) { ImageProc.avatar(context, uri) }
+                social.setAvatar(full)
             } catch (e: Exception) { toast(e.message ?: "Couldn't upload") }
             busy = false
         }
@@ -124,7 +122,7 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
         ) {
             item(key = "header") {
                 Box(Modifier.fillMaxWidth().height(150.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding())) {
-                    Banner(images, targetUid, Modifier.fillMaxSize())
+                    Banner(profile?.bannerUrl, Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0xFF121214)))))
                     if (isMe) {
                         Chip("Edit banner", Modifier.align(Alignment.BottomEnd).padding(12.dp)) { pickBanner.launch("image/*") }
@@ -133,7 +131,7 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                 Column(Modifier.padding(horizontal = 16.dp).padding(top = 0.dp)) {
                     Row(Modifier.offset(y = (-36).dp), verticalAlignment = Alignment.Bottom) {
                         Box {
-                            Avatar(images.avatar, profile?.thumb, profile?.username, 88.dp, Modifier.border(4.dp, Ani.Onyx, CircleShape))
+                            Avatar(profile?.avatarUrl, profile?.username, 88.dp, Modifier.border(4.dp, Ani.Onyx, CircleShape))
                             if (isMe) {
                                 Box(
                                     Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(Ani.Lavender)
@@ -237,29 +235,19 @@ private suspend fun toggle(social: com.anibiar.app.social.SocialRepository, uid:
 }
 
 @Composable
-private fun Banner(images: ProfileImages, uid: String, modifier: Modifier) {
-    val context = LocalContext.current
-    val bytes = images.banner
-    if (bytes == null) {
+private fun Banner(url: String?, modifier: Modifier) {
+    if (url == null) {
         Box(modifier.background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF15151A), Color(0xFF1F2A2E)))))
     } else {
-        val request = remember(bytes) {
-            ImageRequest.Builder(context).data(ByteBuffer.wrap(bytes)).memoryCacheKey("banner-$uid-${bytes.size}-${bytes.contentHashCode()}").build()
-        }
-        AsyncImage(request, null, contentScale = ContentScale.Crop, modifier = modifier)
+        AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = modifier)
     }
 }
 
 @Composable
-fun Avatar(full: ByteArray?, thumb: ByteArray?, name: String?, size: Dp, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val bytes = full ?: thumb
+fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(CircleShape).background(Ani.Item), contentAlignment = Alignment.Center) {
-        if (bytes != null) {
-            val request = remember(bytes) {
-                ImageRequest.Builder(context).data(ByteBuffer.wrap(bytes)).memoryCacheKey("avatar-${bytes.size}-${bytes.contentHashCode()}").build()
-            }
-            AsyncImage(request, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        if (url != null) {
+            AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Text((name?.firstOrNull() ?: '?').uppercase(), style = inter((size.value * 0.42f), FontWeight.Bold), color = Ani.Lavender)
         }
@@ -326,7 +314,7 @@ internal fun UserRow(
         Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(null, user.thumb, user.username, 44.dp)
+        Avatar(user.avatarUrl, user.username, 44.dp)
         Spacer(Modifier.width(12.dp))
         Text(user.username, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (myUid != null && user.uid != myUid) FollowButton(user.uid, myFollowing, myFollowers, onToggle)

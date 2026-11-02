@@ -6,9 +6,9 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 
-/** Shrinks picked images so they fit comfortably in the Realtime Database (no Storage plan needed). */
+/** Shrinks picked images so they upload quickly (uploaded to Supabase Storage). */
 object ImageProc {
-    const val MAX_GIF_BYTES = 900 * 1024
+    const val MAX_GIF_BYTES = 4 * 1024 * 1024
 
     class Banner(val bytes: ByteArray, val gif: Boolean)
 
@@ -33,10 +33,10 @@ object ImageProc {
         return Bitmap.createScaledBitmap(cropped, side, side, true)
     }
 
-    /** Returns (320px avatar, 96px thumbnail), both JPEG. */
-    fun avatar(context: Context, uri: Uri): Pair<ByteArray, ByteArray> {
-        val src = decode(read(context, uri), 320)
-        return jpeg(squareCrop(src, 320), 88) to jpeg(squareCrop(src, 96), 82)
+    /** A square 400px JPEG. */
+    fun avatar(context: Context, uri: Uri): ByteArray {
+        val src = decode(read(context, uri), 400)
+        return jpeg(squareCrop(src, 400), 88)
     }
 
     fun banner(context: Context, uri: Uri): Banner {
@@ -44,14 +44,14 @@ object ImageProc {
         val isGif = context.contentResolver.getType(uri) == "image/gif" ||
             (bytes.size > 6 && String(bytes, 0, 3, Charsets.US_ASCII) == "GIF")
         if (isGif) {
-            if (bytes.size > MAX_GIF_BYTES) error("That GIF is too large. Pick one under 900 KB.")
+            if (bytes.size > MAX_GIF_BYTES) error("That GIF is too large. Pick one under 4 MB.")
             return Banner(bytes, true)
         }
         var bmp = decode(bytes, 1080)
         if (bmp.width > 1080) bmp = Bitmap.createScaledBitmap(bmp, 1080, (bmp.height * 1080f / bmp.width).toInt(), true)
         var q = 82
         var out = jpeg(bmp, q)
-        while (out.size > 700 * 1024 && q > 40) { q -= 10; out = jpeg(bmp, q) }
+        while (out.size > 1500 * 1024 && q > 40) { q -= 10; out = jpeg(bmp, q) }
         return Banner(out, false)
     }
 }

@@ -83,10 +83,6 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-gif:2.7.0")
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-database")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     // HTTP/3 (QUIC) through Cronet; falls back to OkHttp when unavailable.
     implementation("com.google.android.gms:play-services-cronet:18.0.1")
     implementation("com.google.net.cronet:cronet-okhttp:0.1.0")

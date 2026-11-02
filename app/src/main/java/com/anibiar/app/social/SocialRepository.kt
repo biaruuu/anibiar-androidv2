@@ -1,31 +1,42 @@
 package com.anibiar.app.social
 
-import android.util.Base64
-import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.FirebaseAuthWeakPasswordException
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ServerValue
-import com.google.firebase.database.ValueEventListener
+import android.content.Context
+import com.anibiar.app.data.Http
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
@@ -34,14 +45,25 @@ data class UserProfile(
     val username: String,
     val bio: String = "",
     val createdAt: Long = 0L,
-    val thumb: ByteArray? = null,
+    val avatarUrl: String? = null,
+    val bannerUrl: String? = null,
 )
 
-class ProfileImages(val avatar: ByteArray? = null, val banner: ByteArray? = null, val bannerGif: Boolean = false, val version: Long = 0L)
+enum class SignUpResult { SignedIn, ConfirmEmail }
 
-class SocialRepository {
-    private val auth get() = FirebaseAuth.getInstance()
-    private val db get() = FirebaseDatabase.getInstance(FirebaseConfig.DB_URL)
+private data class Session(val access: String, val refresh: String, val expiresAt: Long, val uid: String, val email: String, val verified: Boolean)
+
+/**
+ * Supabase over plain REST (GoTrue for accounts, PostgREST for data, Storage for images).
+ * "Live" data is refreshed every few seconds while a screen is showing it, and immediately after any write.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+class SocialRepository(context: Context, private val scope: CoroutineScope) {
+    private val http get() = Http.plain
+    private val json = Json { ignoreUnknownKeys = true }
+    private val prefs = context.getSharedPreferences("kiro_session", Context.MODE_PRIVATE)
+    private val refreshLock = Mutex()
+    private var session: Session? = null
 
     private val _auth = MutableStateFlow<AuthState?>(null)
     val authState: StateFlow<AuthState?> = _auth.asStateFlow()
@@ -49,192 +71,287 @@ class SocialRepository {
     val myFollowing: StateFlow<Set<String>> = _myFollowing.asStateFlow()
     private val _myFollowers = MutableStateFlow<Set<String>>(emptySet())
     val myFollowers: StateFlow<Set<String>> = _myFollowers.asStateFlow()
+    private val tick = MutableStateFlow(0)
 
-    private var bound: String? = null
-    private val bindings = ArrayList<Pair<com.google.firebase.database.DatabaseReference, ValueEventListener>>()
+    private class ApiError(val code: String, override val message: String) : Exception(message)
 
     fun start() {
-        auth.addAuthStateListener { publish() }
+        session = prefs.getString("session", null)?.let { runCatching { decodeSession(json.parseToJsonElement(it).jsonObject) }.getOrNull() }
+        publish()
+        scope.launch {
+            if (session != null) refreshVerification()
+            // Keep my own follow sets current for the Follow / Follow back buttons.
+            tick.flatMapLatest { flow { while (true) { emit(Unit); delay(6000) } } }.collect {
+                val me = session?.uid
+                if (me == null) { _myFollowing.value = emptySet(); _myFollowers.value = emptySet() }
+                else runCatching {
+                    _myFollowing.value = ids(me, "following")
+                    _myFollowers.value = ids(me, "followers")
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- plumbing
+
+    private fun encode(s: String) = URLEncoder.encode(s, "UTF-8")
+
+    private fun decodeSession(o: JsonObject): Session {
+        val user = o["user"]?.jsonObject
+        return Session(
+            access = o["access_token"]!!.jsonPrimitive.content,
+            refresh = o["refresh_token"]!!.jsonPrimitive.content,
+            expiresAt = o["expires_at"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                ?: (System.currentTimeMillis() / 1000 + (o["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600)),
+            uid = (user?.get("id") ?: o["uid"])!!.jsonPrimitive.content,
+            email = (user?.get("email") ?: o["email"])?.jsonPrimitive?.contentOrNull.orEmpty(),
+            verified = user?.get("email_confirmed_at")?.let { it !is JsonNull } ?: (o["verified"]?.jsonPrimitive?.contentOrNull == "true"),
+        )
+    }
+
+    private fun store(s: Session?) {
+        session = s
+        prefs.edit().apply {
+            if (s == null) remove("session") else putString(
+                "session",
+                buildJsonObject {
+                    put("access_token", s.access); put("refresh_token", s.refresh); put("expires_at", s.expiresAt.toString())
+                    put("uid", s.uid); put("email", s.email); put("verified", s.verified.toString())
+                }.toString(),
+            )
+        }.apply()
         publish()
     }
 
     private fun publish() {
-        val u = auth.currentUser
-        _auth.value = u?.let { AuthState(it.uid, it.email.orEmpty(), it.isEmailVerified) }
-        bind(u?.uid)
+        _auth.value = session?.let { AuthState(it.uid, it.email, it.verified) }
+        tick.value++
     }
 
-    private fun bind(uid: String?) {
-        if (uid == bound) return
-        bindings.forEach { (ref, l) -> ref.removeEventListener(l) }
-        bindings.clear()
-        bound = uid
-        _myFollowing.value = emptySet()
-        _myFollowers.value = emptySet()
-        if (uid == null) return
-        fun watch(path: String, target: MutableStateFlow<Set<String>>) {
-            val ref = db.getReference(path)
-            val l = object : ValueEventListener {
-                override fun onDataChange(s: DataSnapshot) { target.value = s.children.mapNotNull { it.key }.toSet() }
-                override fun onCancelled(e: DatabaseError) {}
-            }
-            ref.addValueEventListener(l)
-            bindings += ref to l
+    private suspend fun raw(
+        method: String,
+        path: String,
+        body: ByteArray? = null,
+        contentType: String = "application/json",
+        authed: Boolean = true,
+        extra: Map<String, String> = emptyMap(),
+    ): Pair<Int, String> = withContext(Dispatchers.IO) {
+        if (authed) ensureFresh()
+        val b = Request.Builder().url(SupabaseConfig.URL + path).header("apikey", SupabaseConfig.PUBLISHABLE_KEY)
+        session?.takeIf { authed }?.let { b.header("Authorization", "Bearer ${it.access}") }
+        extra.forEach { (k, v) -> b.header(k, v) }
+        val rb = body?.toRequestBody(contentType.toMediaType())
+        b.method(method, rb ?: if (method == "GET" || method == "HEAD") null else ByteArray(0).toRequestBody(null))
+        http.newCall(b.build()).execute().use { it.code to it.body?.string().orEmpty() }
+    }
+
+    private suspend fun ensureFresh() = refreshLock.withLock {
+        val s = session ?: return@withLock
+        if (s.expiresAt - System.currentTimeMillis() / 1000 > 60) return@withLock
+        val (code, text) = withContext(Dispatchers.IO) {
+            val req = Request.Builder().url("${SupabaseConfig.URL}/auth/v1/token?grant_type=refresh_token")
+                .header("apikey", SupabaseConfig.PUBLISHABLE_KEY)
+                .post(buildJsonObject { put("refresh_token", s.refresh) }.toString().toRequestBody("application/json".toMediaType())).build()
+            http.newCall(req).execute().use { it.code to it.body?.string().orEmpty() }
         }
-        watch("follows/$uid/following", _myFollowing)
-        watch("follows/$uid/followers", _myFollowers)
+        if (code in 200..299) {
+            val fresh = decodeSession(json.parseToJsonElement(text).jsonObject)
+            store(fresh.copy(verified = fresh.verified || s.verified))
+        } else if (code == 400 || code == 401) store(null)
+    }
+
+    private fun fail(code: Int, text: String): Nothing {
+        val o = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull()
+        val errCode = o?.get("error_code")?.jsonPrimitive?.contentOrNull ?: o?.get("code")?.jsonPrimitive?.contentOrNull ?: ""
+        val msg = o?.get("msg")?.jsonPrimitive?.contentOrNull ?: o?.get("message")?.jsonPrimitive?.contentOrNull
+            ?: o?.get("error_description")?.jsonPrimitive?.contentOrNull ?: "Something went wrong ($code)"
+        throw ApiError(errCode, friendly(errCode, msg, code))
+    }
+
+    private fun friendly(code: String, msg: String, http: Int): String = when {
+        code == "user_already_exists" || code == "email_exists" -> "That email already has an account"
+        code == "weak_password" -> "Password is too weak (use 6+ characters)"
+        code == "invalid_credentials" -> "Wrong email or password"
+        code == "email_not_confirmed" -> "Confirm your email first. Check your inbox and spam folder"
+        code.contains("rate_limit") || http == 429 -> "Too many attempts. Wait a few minutes and try again"
+        code == "email_address_invalid" -> "That email address isn't accepted"
+        code == "email_address_not_authorized" -> "Email sending is limited for this project. Try again later"
+        msg.contains("Database error saving new user", true) -> "That username is already taken"
+        else -> msg
+    }
+
+    private inline fun <T> net(block: () -> T): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: ApiError) {
+        throw IllegalStateException(e.message, e)
+    } catch (e: java.io.IOException) {
+        throw IllegalStateException("No connection. Check your internet", e)
     }
 
     // ---------------------------------------------------------------- auth
 
-    suspend fun signUp(email: String, username: String, password: String) {
-        val lower = username.lowercase()
-        guard {
-            if (db.getReference("usernames/$lower").get().await().exists()) error("That username is already taken")
-            val user = auth.createUserWithEmailAndPassword(email, password).await().user ?: error("Sign-up failed")
-            try {
-                db.getReference("usernames/$lower").setValue(user.uid).await()
-                db.getReference("users/${user.uid}").setValue(
-                    mapOf("username" to username, "usernameLower" to lower, "bio" to "", "createdAt" to ServerValue.TIMESTAMP),
-                ).await()
-            } catch (e: Exception) {
-                runCatching { user.delete().await() }
-                throw e
-            }
-            publish()
-        }
-        // The account exists now; a failed email must not undo it (the profile offers "Resend").
-        runCatching { sendVerification() }
-    }
-
-    suspend fun sendVerification() {
-        val user = auth.currentUser ?: return
-        auth.useAppLanguage()
-        try {
-            user.sendEmailVerification().await()
-        } catch (e: Exception) {
-            throw IllegalStateException(friendly(e), e)
-        }
-    }
-
-    suspend fun signIn(email: String, password: String) = guard {
-        auth.signInWithEmailAndPassword(email, password).await()
-        publish()
-    }
-
-    suspend fun resendVerification() = sendVerification()
-
-    /** Re-reads the account so a freshly clicked verification link is noticed. */
-    suspend fun refreshVerification(): Boolean {
-        runCatching { auth.currentUser?.reload()?.await() }
-        publish()
-        return auth.currentUser?.isEmailVerified == true
-    }
-
-    fun signOut() { auth.signOut(); publish() }
-
-    private suspend fun <T> guard(block: suspend () -> T): T = try {
-        block()
-    } catch (e: Exception) {
-        throw IllegalStateException(friendly(e), e)
-    }
-
-    private fun friendly(e: Exception): String = when (e) {
-        is FirebaseAuthUserCollisionException -> "That email already has an account"
-        is FirebaseAuthWeakPasswordException -> "Password is too weak (use 6+ characters)"
-        is FirebaseAuthInvalidCredentialsException -> "Wrong email or password"
-        is FirebaseAuthInvalidUserException -> "No account found for that email"
-        is com.google.firebase.auth.FirebaseAuthException -> if (e.errorCode == "ERROR_TOO_MANY_REQUESTS") "Too many attempts. Wait a few minutes and try again" else e.message ?: "Something went wrong"
-        is FirebaseNetworkException -> "No connection. Check your internet"
-        else -> e.message ?: "Something went wrong"
-    }
-
-    // ---------------------------------------------------------------- profiles
-
-    private fun parse(uid: String, s: DataSnapshot): UserProfile? {
-        val name = s.child("username").getValue(String::class.java) ?: return null
-        return UserProfile(
-            uid = uid,
-            username = name,
-            bio = s.child("bio").getValue(String::class.java).orEmpty(),
-            createdAt = s.child("createdAt").getValue(Long::class.java) ?: 0L,
-            thumb = s.child("thumb").getValue(String::class.java)?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() },
+    suspend fun signUp(email: String, username: String, password: String): SignUpResult = net {
+        val (c0, t0) = raw("POST", "/rest/v1/rpc/username_available", buildJsonObject { put("u", username) }.toString().toByteArray(), authed = false)
+        if (c0 in 200..299 && t0.trim() == "false") throw ApiError("username_taken", "That username is already taken")
+        val (code, text) = raw(
+            "POST", "/auth/v1/signup",
+            buildJsonObject { put("email", email); put("password", password); put("data", buildJsonObject { put("username", username) }) }.toString().toByteArray(),
+            authed = false,
         )
+        if (code !in 200..299) fail(code, text)
+        val o = json.parseToJsonElement(text).jsonObject
+        if (o["access_token"] != null) { store(decodeSession(o)); SignUpResult.SignedIn } else SignUpResult.ConfirmEmail
     }
 
-    private fun <T> listen(path: String, map: (DataSnapshot) -> T): Flow<T> = callbackFlow {
-        val ref = db.getReference(path)
-        val l = object : ValueEventListener {
-            override fun onDataChange(s: DataSnapshot) { trySend(map(s)) }
-            override fun onCancelled(e: DatabaseError) { close() }
+    suspend fun signIn(email: String, password: String) = net {
+        val (code, text) = raw(
+            "POST", "/auth/v1/token?grant_type=password",
+            buildJsonObject { put("email", email); put("password", password) }.toString().toByteArray(), authed = false,
+        )
+        if (code !in 200..299) fail(code, text)
+        store(decodeSession(json.parseToJsonElement(text).jsonObject))
+    }
+
+    suspend fun resendVerification(email: String? = null) = net {
+        val target = email ?: session?.email ?: error("No email to send to")
+        val (code, text) = raw("POST", "/auth/v1/resend", buildJsonObject { put("type", "signup"); put("email", target) }.toString().toByteArray(), authed = false)
+        if (code !in 200..299) fail(code, text)
+    }
+
+    /** Re-reads the account so a freshly confirmed email is noticed. */
+    suspend fun refreshVerification(): Boolean {
+        val s = session ?: return false
+        return try {
+            val (code, text) = raw("GET", "/auth/v1/user")
+            if (code == 401) { store(null); return false }
+            val confirmed = json.parseToJsonElement(text).jsonObject["email_confirmed_at"]?.let { it !is JsonNull } == true
+            if (confirmed != s.verified) session?.let { store(it.copy(verified = confirmed)) }
+            confirmed
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { s.verified }
+    }
+
+    fun signOut() {
+        val s = session
+        store(null)
+        if (s != null) scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    http.newCall(Request.Builder().url("${SupabaseConfig.URL}/auth/v1/logout").header("apikey", SupabaseConfig.PUBLISHABLE_KEY)
+                        .header("Authorization", "Bearer ${s.access}").post(ByteArray(0).toRequestBody(null)).build()).execute().close()
+                }
+            }
         }
-        ref.addValueEventListener(l)
-        awaitClose { ref.removeEventListener(l) }
     }
 
-    fun profile(uid: String): Flow<UserProfile?> = listen("users/$uid") { parse(uid, it) }
+    // ---------------------------------------------------------------- reads
 
-    fun images(uid: String): Flow<ProfileImages> =
-        listen("images/$uid") { s ->
-            fun bytes(k: String) = s.child(k).getValue(String::class.java)?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
-            ProfileImages(
-                avatar = bytes("avatar"),
-                banner = bytes("banner"),
-                bannerGif = s.child("bannerMime").getValue(String::class.java) == "image/gif",
-                version = System.nanoTime(),
-            )
-        }.flowOn(Dispatchers.Default)
+    private fun parseDate(s: String?): Long = runCatching {
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.parse(s!!.take(19))!!.time
+    }.getOrDefault(0L)
 
-    fun ids(uid: String, kind: String): Flow<Set<String>> =
-        listen("follows/$uid/$kind") { s -> s.children.mapNotNull { it.key }.toSet() }
+    private fun parseProfile(o: JsonObject) = UserProfile(
+        uid = o["id"]!!.jsonPrimitive.content,
+        username = o["username"]!!.jsonPrimitive.content,
+        bio = o["bio"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
+        avatarUrl = o["avatar_url"]?.jsonPrimitive?.contentOrNull,
+        bannerUrl = o["banner_url"]?.jsonPrimitive?.contentOrNull,
+    )
 
-    suspend fun profiles(ids: Collection<String>): List<UserProfile> = coroutineScope {
-        ids.map { id ->
-            async { runCatching { parse(id, db.getReference("users/$id").get().await()) }.getOrNull() }
-        }.awaitAll().filterNotNull().sortedBy { it.username.lowercase() }
+    private suspend fun getRows(path: String): JsonArray {
+        val (code, text) = raw("GET", path)
+        if (code !in 200..299) fail(code, text)
+        return json.parseToJsonElement(text).jsonArray
     }
 
-    suspend fun search(prefix: String): List<UserProfile> {
-        val q = prefix.trim().lowercase()
-        if (q.isEmpty()) return emptyList()
-        val snap = db.getReference("users").orderByChild("usernameLower").startAt(q).endAt(q + "").limitToFirst(25).get().await()
-        return withContext(Dispatchers.Default) { snap.children.mapNotNull { c -> c.key?.let { parse(it, c) } } }
+    private fun <T> live(fetch: suspend () -> T): Flow<T> =
+        tick.flatMapLatest {
+            flow {
+                while (true) {
+                    try { emit(fetch()) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                    delay(5000)
+                }
+            }
+        }.distinctUntilChanged()
+
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at"
+
+    suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
+
+    fun profile(uid: String): Flow<UserProfile?> = live { fetchProfile(uid) }
+
+    fun ids(uid: String, kind: String): Flow<Set<String>> = live { ids(uid, kind) }
+
+    private suspend fun ids(uid: String, kind: String): Set<String> =
+        if (kind == "followers") getRows("/rest/v1/follows?following_id=eq.$uid&select=follower_id").map { it.jsonObject["follower_id"]!!.jsonPrimitive.content }.toSet()
+        else getRows("/rest/v1/follows?follower_id=eq.$uid&select=following_id").map { it.jsonObject["following_id"]!!.jsonPrimitive.content }.toSet()
+
+    suspend fun profiles(ids: Collection<String>): List<UserProfile> {
+        if (ids.isEmpty()) return emptyList()
+        return try {
+            getRows("/rest/v1/profiles?id=in.(${ids.joinToString(",")})&select=$cols&order=username.asc").map { parseProfile(it.jsonObject) }
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun search(prefix: String): List<UserProfile> = net {
+        val q = prefix.trim().filter { it.isLetterOrDigit() || it == '_' || it == '.' }.replace("_", "\\_")
+        if (q.isEmpty()) return@net emptyList()
+        getRows("/rest/v1/profiles?username=ilike.${encode("$q*")}&select=$cols&order=username.asc&limit=25").map { parseProfile(it.jsonObject) }
     }
 
     // ---------------------------------------------------------------- writes
 
+    private fun refreshSoon() { tick.value++ }
+
     suspend fun follow(target: String) {
-        val me = auth.currentUser?.uid ?: return
-        db.reference.updateChildren(mapOf("follows/$me/following/$target" to true, "follows/$target/followers/$me" to true)).await()
+        val me = session?.uid ?: return
+        val (code, text) = raw(
+            "POST", "/rest/v1/follows",
+            buildJsonObject { put("follower_id", me); put("following_id", target) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal"),
+        )
+        if (code !in 200..299 && code != 409) fail(code, text)
+        _myFollowing.value = _myFollowing.value + target
+        refreshSoon()
     }
 
     suspend fun unfollow(target: String) {
-        val me = auth.currentUser?.uid ?: return
-        db.reference.updateChildren(mapOf("follows/$me/following/$target" to null, "follows/$target/followers/$me" to null)).await()
+        val me = session?.uid ?: return
+        val (code, text) = raw("DELETE", "/rest/v1/follows?follower_id=eq.$me&following_id=eq.$target")
+        if (code !in 200..299) fail(code, text)
+        _myFollowing.value = _myFollowing.value - target
+        refreshSoon()
     }
 
-    suspend fun setBio(bio: String) = guard {
-        val me = auth.currentUser?.uid ?: return@guard
-        db.getReference("users/$me/bio").setValue(bio.take(200)).await()
+    suspend fun setBio(bio: String) = net {
+        val me = session?.uid ?: return@net
+        val (code, text) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("bio", bio.take(200)) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (code !in 200..299) fail(code, text)
+        refreshSoon()
     }
 
-    suspend fun setAvatar(full: ByteArray, thumb: ByteArray) = guard {
-        val me = auth.currentUser?.uid ?: return@guard
-        db.reference.updateChildren(
-            mapOf(
-                "images/$me/avatar" to Base64.encodeToString(full, Base64.NO_WRAP),
-                "users/$me/thumb" to Base64.encodeToString(thumb, Base64.NO_WRAP),
-            ),
-        ).await()
+    private suspend fun uploadImage(bucket: String, bytes: ByteArray, mime: String, ext: String, column: String, old: String?) {
+        val me = session?.uid ?: return
+        val path = "$me/${System.currentTimeMillis()}.$ext"
+        val (c1, t1) = raw("POST", "/storage/v1/object/$bucket/$path", bytes, contentType = mime, extra = mapOf("cache-control" to "max-age=31536000"))
+        if (c1 !in 200..299) fail(c1, t1)
+        val url = "${SupabaseConfig.URL}/storage/v1/object/public/$bucket/$path"
+        val (c2, t2) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put(column, url) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (c2 !in 200..299) fail(c2, t2)
+        // Best-effort cleanup of the previous file.
+        old?.substringAfter("/object/public/$bucket/", "")?.takeIf { it.isNotEmpty() && it.startsWith("$me/") }?.let { runCatching { raw("DELETE", "/storage/v1/object/$bucket/$it") } }
+        refreshSoon()
     }
 
-    suspend fun setBanner(bytes: ByteArray, gif: Boolean) = guard {
-        val me = auth.currentUser?.uid ?: return@guard
-        db.reference.updateChildren(
-            mapOf(
-                "images/$me/banner" to Base64.encodeToString(bytes, Base64.NO_WRAP),
-                "images/$me/bannerMime" to if (gif) "image/gif" else "image/jpeg",
-            ),
-        ).await()
+    suspend fun setAvatar(bytes: ByteArray) = net {
+        val old = session?.uid?.let { fetchProfile(it)?.avatarUrl }
+        uploadImage("avatars", bytes, "image/jpeg", "jpg", "avatar_url", old)
+    }
+
+    suspend fun setBanner(bytes: ByteArray, gif: Boolean) = net {
+        val old = session?.uid?.let { fetchProfile(it)?.bannerUrl }
+        uploadImage("banners", bytes, if (gif) "image/gif" else "image/jpeg", if (gif) "gif" else "jpg", "banner_url", old)
     }
 }

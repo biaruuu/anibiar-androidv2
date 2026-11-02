@@ -144,6 +144,8 @@ private fun FormCard() {
     var show by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pending by rememberSaveable { mutableStateOf(false) }
+    var info by remember { mutableStateOf<String?>(null) }
 
     fun submit() {
         error = null
@@ -156,7 +158,9 @@ private fun FormCard() {
         busy = true
         scope.launch {
             try {
-                if (signUp) app.social.signUp(e, username.trim(), password) else app.social.signIn(e, password)
+                if (signUp) {
+                    if (app.social.signUp(e, username.trim(), password) == com.anibiar.app.social.SignUpResult.ConfirmEmail) pending = true
+                } else app.social.signIn(e, password)
             } catch (ex: Exception) {
                 error = ex.message
             } finally {
@@ -165,6 +169,38 @@ private fun FormCard() {
         }
     }
 
+    if (pending) {
+        GlassCard {
+            Text("Check your email", style = inter(20f, FontWeight.Bold), color = Color.White)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "We sent a confirmation link to ${email.trim()}. Tap it (check spam too), then log in here.",
+                style = inter(14f, lineHeight = 20f), color = Ani.Soft,
+            )
+            (info ?: error)?.let { Spacer(Modifier.height(8.dp)); Text(it, style = inter(13f), color = if (error != null) Color(0xFFFF8A80) else Ani.Lavender) }
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(if (busy) "Checking…" else "I've confirmed, log in", enabled = !busy) {
+                error = null; info = null; busy = true
+                scope.launch {
+                    try { app.social.signIn(email.trim(), password) } catch (ex: Exception) { error = ex.message }
+                    busy = false
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            SocialButton("Resend email", null) {
+                error = null
+                scope.launch {
+                    try { app.social.resendVerification(email.trim()); info = "Sent. It can take a minute to arrive." } catch (ex: Exception) { error = ex.message }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Use a different email", style = inter(13.5f, FontWeight.Medium), color = Ani.Muted,
+                modifier = Modifier.align(Alignment.CenterHorizontally).clickable { pending = false; error = null; info = null }.padding(8.dp),
+            )
+        }
+        return
+    }
     GlassCard {
         // Log in / Sign up switch
         val shape = RoundedCornerShape(50)
