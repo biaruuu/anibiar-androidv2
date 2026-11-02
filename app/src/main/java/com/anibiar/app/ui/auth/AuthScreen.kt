@@ -184,6 +184,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
     LaunchedEffect(cooldown) { if (cooldown > 0) { delay(1000); cooldown-- } }
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        val chibiH = min(maxHeight * 0.40f, 340.dp)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp)) { BackArrow(onBack) }
             // "Email sent" notice
@@ -201,7 +202,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 }
             }
             Spacer(Modifier.weight(1f).height(8.dp))
-            ApngImage("reze.apng", Modifier.height(min(maxHeight * 0.40f, 340.dp)).fillMaxWidth(), "Reze chibi")
+            ApngImage("reze.apng", Modifier.height(chibiH).fillMaxWidth(), "Reze chibi")
             Spacer(Modifier.weight(1f).height(12.dp))
             Column(
                 Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 18.dp),
