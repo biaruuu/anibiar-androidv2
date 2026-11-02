@@ -207,7 +207,8 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         code == "weak_password" -> "Password is too weak (use 6+ characters)"
         code == "invalid_credentials" -> "Wrong email or password"
         code == "email_not_confirmed" -> "Confirm your email first. Check your inbox and spam folder"
-        code.contains("rate_limit") || http == 429 -> "Too many attempts. Wait a few minutes and try again"
+        code.contains("rate_limit") || http == 429 ->
+            "RATE_LIMIT:" + (Regex("(\\d+)\\s*second").find(msg)?.groupValues?.get(1)?.toIntOrNull() ?: 60)
         code == "email_address_invalid" -> "That email address isn't accepted"
         code == "email_address_not_authorized" -> "Email sending is limited for this project. Try again later"
         msg.contains("Database error saving new user", true) -> "That username is already taken"

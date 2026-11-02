@@ -71,6 +71,30 @@ import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/** Survives screen changes: when sending another link is allowed again (epoch ms). */
+private object SendGate {
+    var until by mutableStateOf(0L)
+    /** Returns seconds left if [msg] is a rate-limit error (and starts the cooldown), else null. */
+    fun fromError(msg: String?): Int? {
+        val n = msg?.takeIf { it.startsWith("RATE_LIMIT:") }?.removePrefix("RATE_LIMIT:")?.toIntOrNull() ?: return null
+        until = System.currentTimeMillis() + n * 1000L
+        return n
+    }
+}
+
+@Composable
+private fun rememberCooldown(): Int {
+    var left by remember { mutableStateOf(((SendGate.until - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)) }
+    LaunchedEffect(SendGate.until) {
+        while (true) {
+            left = ((SendGate.until - System.currentTimeMillis() + 999) / 1000).toInt().coerceAtLeast(0)
+            if (left == 0) break
+            delay(500)
+        }
+    }
+    return left
+}
+
 /** Passwordless sign-in: enter an email, get a link, tap it and you're in. No form, no password. */
 @Composable
 fun AuthScreen(onClose: () -> Unit) {
@@ -117,13 +141,14 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val ok = validEmail(email)
+    val wait = rememberCooldown()
+    val ok = validEmail(email) && wait == 0
 
     fun submit() {
         if (!ok || busy) return
         busy = true; error = null
         scope.launch {
-            try { app.social.sendSignInLink(email.trim()); onSent(email.trim()) } catch (e: Exception) { error = e.message }
+            try { app.social.sendSignInLink(email.trim()); onSent(email.trim()) } catch (e: Exception) { if (SendGate.fromError(e.message) == null) error = e.message }
             busy = false
         }
     }
@@ -153,7 +178,7 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
                         .clickable(enabled = ok && !busy, onClick = ::submit),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (busy) "Sending…" else "Continue", style = inter(14f, FontWeight.Medium), color = if (ok) Color.Black else Ani.Muted, maxLines = 1)
+                    Text(if (busy) "Sending…" else if (wait > 0) "Try again in ${wait}s" else "Continue", style = inter(14f, FontWeight.Medium), color = if (ok) Color.Black else Ani.Muted, maxLines = 1)
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -182,6 +207,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(cooldown) { if (cooldown > 0) { delay(1000); cooldown-- } }
+    val gate = rememberCooldown()
 
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         val chibiH = min(maxHeight * 0.40f, 340.dp)
@@ -219,20 +245,20 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 note?.let { Spacer(Modifier.height(8.dp)); Text(it, style = inter(13f), color = Ani.Lavender, textAlign = TextAlign.Center) }
                 Spacer(Modifier.height(18.dp))
                 val pill = RoundedCornerShape(50)
-                val canResend = cooldown == 0 && !busy
+                val canResend = cooldown == 0 && gate == 0 && !busy
                 Box(
                     Modifier.fillMaxWidth().height(44.dp).clip(pill).background(Ani.ButtonDark)
                         .clickable(enabled = canResend) {
                             busy = true; note = null
                             scope.launch {
-                                note = try { app.social.sendSignInLink(email); cooldown = 45; "Sent again. It can take a minute." } catch (e: Exception) { e.message }
+                                note = try { app.social.sendSignInLink(email); cooldown = 45; "Sent again. It can take a minute." } catch (e: Exception) { if (SendGate.fromError(e.message) != null) null else e.message }
                                 busy = false
                             }
                         },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        if (cooldown > 0) "Didn't receive it? Resend in ${cooldown}s" else if (busy) "Sending…" else "Didn't receive it? Resend Email",
+                        if (gate > 0) "Try again in ${gate}s" else if (cooldown > 0) "Didn't receive it? Resend in ${cooldown}s" else if (busy) "Sending…" else "Didn't receive it? Resend Email",
                         style = inter(14f, FontWeight.Medium), color = if (canResend) Color.White else Ani.Muted, maxLines = 1,
                     )
                 }
