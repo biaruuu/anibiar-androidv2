@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.lifecycle.lifecycleScope
 import com.anibiar.app.AniBiarApp
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
@@ -67,7 +68,7 @@ class MainActivity : ComponentActivity() {
         val uri = intent?.data ?: return
         if (uri.scheme != "kiro") return
         val app = application as AniBiarApp
-        androidx.lifecycle.lifecycleScope.launch {
+        lifecycleScope.launch {
             val error = app.social.handleAuthLink(uri)
             android.widget.Toast.makeText(
                 this@MainActivity,
