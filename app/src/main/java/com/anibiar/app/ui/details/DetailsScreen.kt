@@ -416,24 +416,17 @@ private fun Header(
                 onClick = onWatch,
                 modifier = Modifier.weight(1f),
             )
-            ActionButton(
-                label = if (inList) "In List" else "Add to List",
-                icon = if (inList) AniIcons.Check else AniIcons.Add,
-                filled = false,
-                onClick = onToggleList,
-                modifier = Modifier.weight(1f),
-            )
             val favShape = RoundedCornerShape(10.dp)
             Box(
                 Modifier.size(40.dp).clip(favShape)
-                    .background(if (isFav) Color.White else Color.White.copy(alpha = 0.10f))
-                    .then(if (isFav) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), favShape))
+                    .background(Color.White.copy(alpha = 0.10f))
+                    .border(1.dp, if (isFav) com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.20f), favShape)
                     .clickable(onClick = onToggleFav),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (isFav) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFav) Color.Black else Color.White, modifier = Modifier.size(20.dp),
+                    tint = if (isFav) com.anibiar.app.ui.home.FavYellow else Color.White, modifier = Modifier.size(20.dp),
                 )
             }
         }
@@ -577,6 +570,9 @@ private fun About(
         }
         media.airedLabel?.let { AboutRow("Aired", it) }
         media.popularity?.let { AboutRow("Popularity", "#" + number.format(it)) }
+        val favFlow = remember(media.id) { (context.applicationContext as com.anibiar.app.AniBiarApp).social.favoriteCount(media.id) }
+        val favCount by favFlow.collectAsStateWithLifecycle(null)
+        favCount?.let { AboutRow("Favorites", number.format(it), com.anibiar.app.ui.home.FavYellow, AniIcons.BookmarkFilled) }
         media.title.native?.takeIf { it.isNotBlank() }?.let { AboutRow("Native", it) }
         media.countryOfOrigin?.takeIf { it.isNotBlank() }?.let { AboutRow("Country", countryName(it)) }
         media.source?.takeIf { it.isNotBlank() }?.let { AboutRow("Source", titleCase(it)) }

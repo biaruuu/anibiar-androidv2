@@ -11,6 +11,9 @@ import com.anibiar.app.data.Media
 import com.anibiar.app.data.displayTitle
 import kotlinx.coroutines.launch
 
+/** TikTok-style yellow for a saved bookmark. */
+internal val FavYellow = androidx.compose.ui.graphics.Color(0xFFFFC400)
+
 /** Whether [media] is in my favourites, plus a toggle that saves / removes it (and toasts on failure, e.g. not logged in). */
 @Composable
 internal fun rememberFav(media: Media): Pair<Boolean, () -> Unit> {

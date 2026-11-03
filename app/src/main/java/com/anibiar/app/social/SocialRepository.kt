@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -593,6 +594,15 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         getRows("/rest/v1/favorites?user_id=eq.$uid&select=anime_id,title,cover&order=created_at.desc&limit=300").map {
             val o = it.jsonObject
             Fav(o["anime_id"]!!.jsonPrimitive.content.toInt(), o["title"]!!.jsonPrimitive.content, o["cover"]?.jsonPrimitive?.contentOrNull)
+        }
+    }
+
+    /** How many people favourited [id], live: re-read on a short timer and right away when I toggle it. */
+    fun favoriteCount(id: Int): Flow<Int> = _myFavs.map { id in it }.distinctUntilChanged().flatMapLatest {
+        live {
+            val (code, text) = raw("POST", "/rest/v1/rpc/favorite_count", buildJsonObject { put("a", id) }.toString().toByteArray())
+            if (code !in 200..299) fail(code, text)
+            text.trim().toInt()
         }
     }
 

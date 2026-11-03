@@ -705,19 +705,7 @@ private fun HeroSlide(
                         .clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
                 ) {
-                    val favTint by animateColorAsState(accentOf(media.coverImage.color), tween(400), label = "heroFav")
-                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = favTint, modifier = Modifier.size(20.dp))
-                }
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Ani.ButtonDark)
-                        .clickable(onClick = onAdd),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val addTint by animateColorAsState(accentOf(media.coverImage.color), tween(400), label = "heroAdd")
-                    Icon(if (inList) AniIcons.Check else AniIcons.Add, contentDescription = "Add to list", tint = addTint, modifier = Modifier.size(22.dp))
+                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -1292,24 +1280,7 @@ private fun RankRow(
                             Icon(
                                 if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark,
                                 contentDescription = "Favorite",
-                                tint = accent,
-                                modifier = Modifier.size(14.dp),
-                            )
-                        }
-                    }
-                    if (active || saved) {
-                        Box(
-                            Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(Color(0xFF1C1C1F))
-                                .clickable(onClick = onToggleSaved)
-                                .padding(horizontal = 7.dp, vertical = 4.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                if (saved) AniIcons.Check else AniIcons.Add,
-                                contentDescription = "Add to list",
-                                tint = accent,
+                                tint = if (isFav) FavYellow else accent,
                                 modifier = Modifier.size(14.dp),
                             )
                         }

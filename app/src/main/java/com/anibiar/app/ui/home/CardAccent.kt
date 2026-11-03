@@ -147,26 +147,7 @@ internal fun HoverOverlay(
                 Icon(
                     if (fav) AniIcons.BookmarkFilled else AniIcons.Bookmark,
                     contentDescription = if (fav) "Remove from favorites" else "Add to favorites",
-                    tint = accent,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-        if (showAdd && active) {
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1C1C1F))
-                    .clickable(onClick = onToggleSaved),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (saved) AniIcons.Check else AniIcons.Add,
-                    contentDescription = "Add to list",
-                    tint = accent,
+                    tint = if (fav) FavYellow else Color.White,
                     modifier = Modifier.size(16.dp),
                 )
             }
