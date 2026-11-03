@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.profile
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.withStyle
@@ -233,8 +234,6 @@ fun ProfileScreen(
                         Icon(AniIcons.Lock, "Who can see my favorites", tint = if (profile?.favoritesVisibility == "everyone" || profile == null) Ani.Muted else Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
-            }
-            if (!canSeeFavs) item(key = "fav-locked")                }
             }
             if (!canSeeFavs) item(key = "fav-locked") {
                 Column(
