@@ -2,6 +2,7 @@
 
 package com.anibiar.app.ui.details
 
+import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -135,6 +136,8 @@ fun DetailsScreen(
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
+    val favIds by app.social.myFavorites.collectAsStateWithLifecycle()
+    val favScope = androidx.compose.runtime.rememberCoroutineScope()
     val listState = rememberLazyListState()
     var topBarPx by remember { mutableStateOf(0) }
     var fullscreenTrailer by remember { mutableStateOf<FsTrailer?>(null) }
@@ -213,6 +216,13 @@ fun DetailsScreen(
                         inList = media.id in saved,
                         onWatch = comingSoon,
                         onToggleList = { app.watchlist.toggle(media.id) },
+                        isFav = media.id in favIds,
+                        onToggleFav = {
+                            favScope.launch {
+                                runCatching { app.social.toggleFavorite(media.id, media.displayTitle, media.coverImage.extraLarge ?: media.coverImage.large) }
+                                    .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't save", android.widget.Toast.LENGTH_SHORT).show() }
+                            }
+                        },
                         modifier = Modifier.padding(horizontal = side),
                     )
                 }
@@ -360,6 +370,8 @@ private fun Header(
     inList: Boolean,
     onWatch: () -> Unit,
     onToggleList: () -> Unit,
+    isFav: Boolean,
+    onToggleFav: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
@@ -411,6 +423,19 @@ private fun Header(
                 onClick = onToggleList,
                 modifier = Modifier.weight(1f),
             )
+            val favShape = RoundedCornerShape(10.dp)
+            Box(
+                Modifier.size(40.dp).clip(favShape)
+                    .background(if (isFav) Color.White else Color.White.copy(alpha = 0.10f))
+                    .then(if (isFav) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), favShape))
+                    .clickable(onClick = onToggleFav),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (isFav) "Remove from favorites" else "Add to favorites",
+                    tint = if (isFav) Color.Black else Color.White, modifier = Modifier.size(20.dp),
+                )
+            }
         }
 
         val description = media.cleanDescription

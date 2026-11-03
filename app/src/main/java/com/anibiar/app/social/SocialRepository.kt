@@ -38,6 +38,9 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
+/** One favourited anime. */
+data class Fav(val animeId: Int, val title: String, val cover: String?)
+
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class UserProfile(
@@ -55,6 +58,12 @@ data class UserProfile(
     /** "everyone", "friends" or "me". */
     val listsVisibility: String = "everyone",
     val displayName: String? = null,
+    /** "online", "idle", "dnd" or "invisible". */
+    val status: String = "online",
+    val statusText: String? = null,
+    val statusEmoji: String? = null,
+    /** "everyone", "friends" or "me". */
+    val favoritesVisibility: String = "everyone",
 ) {
     /** The name people see: the display name if set, otherwise the username. */
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
@@ -85,6 +94,10 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     val myFollowing: StateFlow<Set<String>> = _myFollowing.asStateFlow()
     private val _myFollowers = MutableStateFlow<Set<String>>(emptySet())
     val myFollowers: StateFlow<Set<String>> = _myFollowers.asStateFlow()
+    private val _myFavs = MutableStateFlow<Set<Int>>(emptySet())
+    /** Anime ids I have favourited, for the bookmark button. */
+    val myFavorites: StateFlow<Set<Int>> = _myFavs.asStateFlow()
+
     private val _myFriends = MutableStateFlow<Set<String>>(emptySet())
     val myFriends: StateFlow<Set<String>> = _myFriends.asStateFlow()
     private val _incoming = MutableStateFlow<Set<String>>(emptySet())
@@ -145,7 +158,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 val me = session?.uid
                 if (me == null) {
                     _myFollowing.value = emptySet(); _myFollowers.value = emptySet()
-                    _myFriends.value = emptySet(); _incoming.value = emptySet(); _outgoing.value = emptySet(); _unread.value = 0
+                    _myFriends.value = emptySet(); _incoming.value = emptySet(); _outgoing.value = emptySet(); _unread.value = 0; _myFavs.value = emptySet()
                 } else {
                     runCatching {
                         _myFollowing.value = fetchIds(me, "following")
@@ -162,6 +175,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                         }
                         _myFriends.value = friends; _incoming.value = inc; _outgoing.value = out
                     }
+                    runCatching { _myFavs.value = getRows("/rest/v1/favorites?user_id=eq.$me&select=anime_id").map { it.jsonObject["anime_id"]!!.jsonPrimitive.content.toInt() }.toSet() }
                     runCatching { _unread.value = getRows("/rest/v1/notifications?user_id=eq.$me&read=eq.false&select=id").size }
                 }
             }
@@ -360,6 +374,10 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         friendRequests = o["friend_requests"]?.jsonPrimitive?.contentOrNull ?: "mutuals",
         listsVisibility = o["lists_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
         displayName = o["display_name"]?.jsonPrimitive?.contentOrNull,
+        status = o["status"]?.jsonPrimitive?.contentOrNull ?: "online",
+        statusText = o["status_text"]?.jsonPrimitive?.contentOrNull,
+        statusEmoji = o["status_emoji"]?.jsonPrimitive?.contentOrNull,
+        favoritesVisibility = o["favorites_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -380,7 +398,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -558,6 +576,38 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     suspend fun setDisplayName(name: String) = net {
         val v = name.trim()
         patchProfile(buildJsonObject { put("display_name", if (v.isEmpty()) JsonNull else JsonPrimitive(v)) })
+    }
+
+    suspend fun setStatus(v: String) = net { patchProfile(buildJsonObject { put("status", v) }) }
+    suspend fun setCustomStatus(emoji: String?, text: String?) = net {
+        val t = text?.trim().orEmpty().take(60); val e = emoji?.trim().orEmpty().take(8)
+        patchProfile(buildJsonObject {
+            put("status_text", if (t.isEmpty()) JsonNull else JsonPrimitive(t))
+            put("status_emoji", if (e.isEmpty()) JsonNull else JsonPrimitive(e))
+        })
+    }
+    suspend fun setFavoritesVisibility(v: String) = net { patchProfile(buildJsonObject { put("favorites_visibility", v) }) }
+
+    /** [uid]'s favourites, newest first. The server returns nothing when their privacy setting hides them from me. */
+    fun favorites(uid: String): Flow<List<Fav>> = live {
+        getRows("/rest/v1/favorites?user_id=eq.$uid&select=anime_id,title,cover&order=created_at.desc&limit=300").map {
+            val o = it.jsonObject
+            Fav(o["anime_id"]!!.jsonPrimitive.content.toInt(), o["title"]!!.jsonPrimitive.content, o["cover"]?.jsonPrimitive?.contentOrNull)
+        }
+    }
+
+    suspend fun toggleFavorite(id: Int, title: String, cover: String?) = net {
+        val me = session?.uid ?: throw ApiError("auth", "Log in to save favorites")
+        if (id in _myFavs.value) {
+            val (code, text) = raw("DELETE", "/rest/v1/favorites?user_id=eq.$me&anime_id=eq.$id")
+            if (code !in 200..299) fail(code, text)
+            _myFavs.value = _myFavs.value - id
+        } else {
+            val body = buildJsonObject { put("user_id", me); put("anime_id", id); put("title", title); put("cover", if (cover == null) JsonNull else JsonPrimitive(cover)) }
+            val (code, text) = raw("POST", "/rest/v1/favorites", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"))
+            if (code !in 200..299) fail(code, text)
+            _myFavs.value = _myFavs.value + id
+        }
     }
 
     suspend fun setFriendRequests(v: String) = net { patchProfile(buildJsonObject { put("friend_requests", v) }) }

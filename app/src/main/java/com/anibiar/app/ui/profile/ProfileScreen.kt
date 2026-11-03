@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.profile
 
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -77,7 +78,7 @@ import java.util.Locale
 @Composable
 fun ProfileScreen(
     uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> Unit,
-    onOpenInbox: (() -> Unit)? = null, onOpenSettings: (() -> Unit)? = null,
+    onOpenInbox: (() -> Unit)? = null, onOpenSettings: (() -> Unit)? = null, onOpenAnime: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
@@ -105,6 +106,11 @@ fun ProfileScreen(
 
     var listTab by rememberSaveable(targetUid) { mutableStateOf<String?>(null) }
     var editing by rememberSaveable(targetUid) { mutableStateOf(false) }
+    var showStatus by remember { mutableStateOf(false) }
+    var favPrivacy by remember { mutableStateOf(false) }
+    val favs by remember(targetUid) { social.favorites(targetUid) }.collectAsStateWithLifecycle(emptyList())
+    val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
+    val favCols = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) 5 else 3
     var busy by remember { mutableStateOf(false) }
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
@@ -145,16 +151,12 @@ fun ProfileScreen(
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     // Instagram-style: avatar overlaps the banner, the counts sit to its right.
                     Row(Modifier.fillMaxWidth().height(60.dp)) {
-                        Box(Modifier.offset(y = (-36).dp)) {
-                            Avatar(profile?.avatarUrl, profile?.username, 88.dp, Modifier.requiredSize(88.dp).border(4.dp, Ani.Onyx, CircleShape))
-                            if (isMe) {
-                                Box(
-                                    Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(Ani.Lavender)
-                                        .border(2.dp, Ani.Onyx, CircleShape)
-                                        .clickable { pickAvatar.launch("image/*") },
-                                    contentAlignment = Alignment.Center,
-                                ) { Icon(AniIcons.Add, null, tint = Color(0xFF121214), modifier = Modifier.size(18.dp)) }
-                            }
+                        Box(Modifier.offset(y = (-36).dp).requiredSize(88.dp)) {
+                            Avatar(profile?.avatarUrl, profile?.shownName, 88.dp, Modifier.requiredSize(88.dp).border(4.dp, Ani.Onyx, CircleShape))
+                            StatusDot(
+                                profile?.status, 30.dp, Ani.Onyx,
+                                Modifier.align(Alignment.BottomEnd).then(if (isMe) Modifier.clip(CircleShape).clickable { showStatus = true } else Modifier),
+                            )
                         }
                         Spacer(Modifier.width(8.dp))
                         Row(Modifier.weight(1f).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -167,6 +169,12 @@ fun ProfileScreen(
                     Spacer(Modifier.height(2.dp))
                     Text(profile?.shownName ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     profile?.let { Text("@${it.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    profile?.let { p ->
+                        if (isMe || !p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            StatusChip(p, isMe) { showStatus = true }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     val bio = profile?.bio.orEmpty()
                     if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
@@ -209,8 +217,58 @@ fun ProfileScreen(
                             ProfileButton("Decline request", false, Modifier.fillMaxWidth()) { scope.launch { runCatching { social.removeFriend(targetUid) } } }
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(18.dp))
                     Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(AniIcons.BookmarkFilled, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Favorites", style = inter(17f, FontWeight.Bold), color = Color.White)
+                        if (canSeeFavs && favs.isNotEmpty()) Text("  ${favs.size}", style = inter(14f, FontWeight.Medium), color = Ani.Muted)
+                        Spacer(Modifier.weight(1f))
+                        if (isMe) {
+                            val shape = RoundedCornerShape(50)
+                            Row(
+                                Modifier.clip(shape).background(Ani.Item).border(1.dp, Ani.Border, shape).clickable { favPrivacy = true }.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(AniIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(when (profile?.favoritesVisibility) { "me" -> "Only me"; "friends" -> "Friends"; else -> "Everyone" }, style = inter(12.5f, FontWeight.Medium), color = Ani.Soft)
+                            }
+                        }
+                    }
+                }
+            }
+            if (!canSeeFavs) item(key = "fav-locked") {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(Ani.Panel).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(AniIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text(if (profile?.favoritesVisibility == "friends") "Favorites are friends-only" else "Favorites are private", style = inter(15f, FontWeight.SemiBold), color = Color.White)
+                }
+            } else if (favs.isEmpty()) item(key = "fav-empty") {
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(Ani.Panel).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(AniIcons.Bookmark, null, tint = Ani.Muted, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text(if (isMe) "No favorites yet" else "Nothing here yet", style = inter(15f, FontWeight.SemiBold), color = Color.White)
+                    if (isMe) Text("Tap the bookmark on any anime to save it here.", style = inter(13f, lineHeight = 18f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
+                }
+            } else items(favs.chunked(favCols), key = { row -> "fav-" + row.first().animeId }) { row ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { f ->
+                        Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { onOpenAnime(f.animeId) }) {
+                            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item)) {
+                                if (f.cover != null) AsyncImage(f.cover, f.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            }
+                            Text(f.title, style = inter(12f, FontWeight.Medium, lineHeight = 16f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp))
+                        }
+                    }
+                    repeat(favCols - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
             if (isMe && me?.verified == false) item(key = "verify") {
@@ -248,7 +306,7 @@ fun ProfileScreen(
                 }
             }
         }
-        if (onBack != null && listTab == null) {
+        if (onBack != null && listTab == null && !editing) {
             Box(
                 Modifier.padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, start = 12.dp)
                     .size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = onBack),
@@ -262,6 +320,11 @@ fun ProfileScreen(
         }
     }
 
+    if (showStatus) StatusSheet(profile) { showStatus = false }
+    if (favPrivacy) com.anibiar.app.ui.settings.ChoiceDialog(
+        "Who can see my favorites", profile?.favoritesVisibility ?: "everyone",
+        listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me"), onDismiss = { favPrivacy = false },
+    ) { v -> scope.launch { runCatching { social.setFavoritesVisibility(v) }.onFailure { toast(it.message ?: "Couldn't save") } } }
     if (confirmUnfriend) {
         AlertDialog(
             onDismissRequest = { confirmUnfriend = false },
@@ -477,7 +540,10 @@ internal fun UserCard(
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66151517)))))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.Top) {
-            Avatar(user.avatarUrl, user.shownName, 72.dp, Modifier.requiredSize(72.dp).offset(y = (-34).dp).border(4.dp, Ani.Panel, CircleShape))
+            Box(Modifier.requiredSize(72.dp).offset(y = (-34).dp)) {
+                Avatar(user.avatarUrl, user.shownName, 72.dp, Modifier.requiredSize(72.dp).border(4.dp, Ani.Panel, CircleShape))
+                StatusDot(user.status, 24.dp, Ani.Panel, Modifier.align(Alignment.BottomEnd))
+            }
             Spacer(Modifier.weight(1f))
             if (isOther) Box(Modifier.padding(top = 10.dp)) { FollowButton(user.uid, myFollowing, myFollowers, onToggle) }
         }

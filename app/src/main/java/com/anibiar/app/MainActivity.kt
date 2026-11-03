@@ -154,7 +154,7 @@ private fun AppNavigation() {
                 val a = authState
                 if (a != null) {
                     com.anibiar.app.ui.profile.ProfileScreen(
-                        uid = null, onBack = { profileOpen = false }, onOpenUser = { userStack.add(it) },
+                        uid = null, onBack = { profileOpen = false }, onOpenUser = { userStack.add(it) }, onOpenAnime = { stack.add(it) },
                         onOpenInbox = { inboxOpen = true },
                         onOpenSettings = { profileOpen = false; settingsOpen = true },
                     )
@@ -176,7 +176,7 @@ private fun AppNavigation() {
                     com.anibiar.app.ui.profile.ProfileScreen(
                         uid = uid,
                         onBack = { if (userStack.isNotEmpty()) userStack.removeAt(userStack.lastIndex) },
-                        onOpenUser = { userStack.add(it) },
+                        onOpenUser = { userStack.add(it) }, onOpenAnime = { stack.add(it) },
                     )
                 }
             }

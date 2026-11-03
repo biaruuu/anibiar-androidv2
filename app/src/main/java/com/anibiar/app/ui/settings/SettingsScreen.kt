@@ -65,6 +65,7 @@ private sealed interface Dlg {
     data object Link : Dlg
     data object Requests : Dlg
     data object Lists : Dlg
+    data object Favs : Dlg
     data object Logout : Dlg
 }
 
@@ -163,6 +164,12 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
                 when (profile?.listsVisibility) { "me" -> "Only me"; "friends" -> "Friends"; else -> "Everyone" },
                 onClick = { dlg = Dlg.Lists },
             )
+            Divider()
+            InfoRow(
+                "Who can see my favorites",
+                when (profile?.favoritesVisibility) { "me" -> "Only me"; "friends" -> "Friends"; else -> "Everyone" },
+                onClick = { dlg = Dlg.Favs },
+            )
         }
 
         Section("Notifications") {
@@ -191,6 +198,10 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
             "Followers & following list", profile?.listsVisibility ?: "everyone",
             listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me"), onDismiss = { dlg = null },
         ) { v -> scope.launch { runCatching { social.setListsVisibility(v) }.onFailure { toast(it.message ?: "Couldn't save") } } }
+        Dlg.Favs -> ChoiceDialog(
+            "Who can see my favorites", profile?.favoritesVisibility ?: "everyone",
+            listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me"), onDismiss = { dlg = null },
+        ) { v -> scope.launch { runCatching { social.setFavoritesVisibility(v) }.onFailure { toast(it.message ?: "Couldn't save") } } }
         Dlg.Logout -> AlertDialog(
             onDismissRequest = { dlg = null }, containerColor = Ani.Panel,
             title = { Text("Log out of Kiro?", style = inter(18f, FontWeight.SemiBold), color = Color.White) },
@@ -243,7 +254,7 @@ private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null)
 }
 
 @Composable
-private fun ChoiceDialog(title: String, current: String, options: List<Pair<String, String>>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+internal fun ChoiceDialog(title: String, current: String, options: List<Pair<String, String>>, onDismiss: () -> Unit, onPick: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = Ani.Panel,
         title = { Text(title, style = inter(18f, FontWeight.SemiBold), color = Color.White) },
