@@ -123,6 +123,7 @@ internal fun HoverOverlay(
     accent: Color = Ani.Lavender,
     onToggleSaved: () -> Unit = {},
     playSize: Int = 44,
+    media: com.anibiar.app.data.Media? = null,
 ) {
     val a by animateFloatAsState(if (active) 1f else 0f, tween(180), label = "overlay")
     Box(Modifier.fillMaxSize()) {
@@ -131,6 +132,26 @@ internal fun HoverOverlay(
             AniIcons.Play, contentDescription = null, tint = Color.White,
             modifier = Modifier.align(Alignment.Center).size(playSize.dp).alpha(a),
         )
+        if (media != null && active) {
+            val (fav, toggleFav) = rememberFav(media)
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1C1C1F))
+                    .clickable(onClick = toggleFav),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (fav) AniIcons.BookmarkFilled else AniIcons.Bookmark,
+                    contentDescription = if (fav) "Remove from favorites" else "Add to favorites",
+                    tint = accent,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
         if (showAdd && active) {
             Box(
                 Modifier

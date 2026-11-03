@@ -1301,6 +1301,7 @@ private fun MediaCard(
                 accent = accent,
                 onToggleSaved = { arm?.toggle?.invoke(media.id) },
                 playSize = 40,
+                media = media,
             )
             if (badge != null) {
                 Row(

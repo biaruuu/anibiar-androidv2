@@ -44,6 +44,8 @@ data class SearchUiState(
     val lastPage: Int = 1,
     val hasNext: Boolean = false,
     val results: List<Media> = emptyList(),
+    /** The page [results] actually belong to (can lag behind [page] while a new page loads). */
+    val resultsPage: Int = 1,
     val loading: Boolean = true,
     val error: String? = null,
 )
@@ -85,7 +87,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         job = viewModelScope.launch {
             if (debounceMs > 0) delay(debounceMs)
             val s = _state.value
-            _state.update { it.copy(loading = true, error = null) }
+            // Never keep showing the previous page under the new page number while the next one loads.
+            _state.update { it.copy(loading = true, error = null, results = emptyList()) }
             if (s.filters.language == "DUB") {
                 _state.update { it.copy(results = emptyList(), loading = false, hasNext = false, lastPage = 1) }
                 return@launch
@@ -113,6 +116,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 _state.update {
                     it.copy(
                         results = page.media,
+                        resultsPage = s.page,
                         loading = false,
                         hasNext = page.pageInfo.hasNextPage == true,
                         lastPage = (page.pageInfo.lastPage ?: it.page).coerceAtLeast(1),

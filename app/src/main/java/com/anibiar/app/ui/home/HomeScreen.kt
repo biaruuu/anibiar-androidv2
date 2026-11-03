@@ -669,7 +669,7 @@ private fun HeroSlide(
 
             Spacer(Modifier.height(20.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier
                         .height(40.dp)
@@ -695,6 +695,18 @@ private fun HeroSlide(
                     Icon(AniIcons.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Details", style = inter(13.5f, FontWeight.Medium), maxLines = 1, softWrap = false)
+                }
+                val (heroFav, toggleHeroFav) = rememberFav(media)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Ani.ButtonDark)
+                        .clickable(onClick = toggleHeroFav),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val favTint by animateColorAsState(accentOf(media.coverImage.color), tween(400), label = "heroFav")
+                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = favTint, modifier = Modifier.size(20.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -1003,7 +1015,7 @@ internal fun MediaGridCard(
                     contentDescription = media.displayTitle,
                     modifier = Modifier.fillMaxSize(),
                 )
-                HoverOverlay(active, saved = saved, showAdd = true, accent = accent, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt())
+                HoverOverlay(active, saved = saved, showAdd = true, accent = accent, onToggleSaved = onToggleSaved, playSize = (44f * fit).toInt(), media = media)
                 if (overlay) Box(
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -1267,6 +1279,24 @@ private fun RankRow(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
+                    val (isFav, toggleFav) = rememberFav(media)
+                    if (active || isFav) {
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(Color(0xFF1C1C1F))
+                                .clickable(onClick = toggleFav)
+                                .padding(horizontal = 7.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark,
+                                contentDescription = "Favorite",
+                                tint = accent,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
+                    }
                     if (active || saved) {
                         Box(
                             Modifier

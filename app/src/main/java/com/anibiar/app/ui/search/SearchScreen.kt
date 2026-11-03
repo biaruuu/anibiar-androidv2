@@ -249,13 +249,13 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                 else -> {
                     val rows = state.results.chunked(columns)
                     val ranked = state.query.isBlank() && (filters.sort ?: "POPULARITY_DESC") in RANK_SORTS
-                    items(rows.size, key = { "r${state.page}-$it-${rows[it].first().id}" }) { index ->
+                    items(rows.size, key = { "r${state.resultsPage}-$it-${rows[it].first().id}" }) { index ->
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             rows[index].forEachIndexed { col, media ->
-                                val rank = (state.page - 1) * 30 + index * columns + col + 1
+                                val rank = (state.resultsPage - 1) * 30 + index * columns + col + 1
                                 MediaGridCard(
                                     media = media,
                                     leftText = if (ranked) "#$rank" else "",

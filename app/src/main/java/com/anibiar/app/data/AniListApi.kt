@@ -297,10 +297,21 @@ class AniListApi(private val client: OkHttpClient) {
                 .header("Accept", "application/json")
                 .post(payload.toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) throw IOException("AniList error ${response.code}")
-                body
+            val call = client.newCall(request)
+            // Cancelling the coroutine (e.g. flipping pages quickly) now aborts the HTTP call, so old requests
+            // never pile up and block the page the user is actually waiting for.
+            kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+                cont.invokeOnCancellation { call.cancel() }
+                try {
+                    val body = call.execute().use { response ->
+                        val text = response.body?.string().orEmpty()
+                        if (!response.isSuccessful) throw IOException("AniList error ${response.code}")
+                        text
+                    }
+                    if (cont.isActive) cont.resumeWith(Result.success(body))
+                } catch (e: Throwable) {
+                    if (cont.isActive) cont.resumeWith(Result.failure(e))
+                }
             }
         }
 

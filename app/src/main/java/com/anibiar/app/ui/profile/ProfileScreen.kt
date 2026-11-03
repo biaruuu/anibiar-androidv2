@@ -108,7 +108,6 @@ fun ProfileScreen(
     var listTab by rememberSaveable(targetUid) { mutableStateOf<String?>(null) }
     var editing by rememberSaveable(targetUid) { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
-    var favPrivacy by remember { mutableStateOf(false) }
     val favs by remember(targetUid) { social.favorites(targetUid) }.collectAsStateWithLifecycle(emptyList())
     val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
     val favCols = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.let { if (it >= 900) 6 else if (it >= 600) 4 else 3 }
@@ -145,9 +144,6 @@ fun ProfileScreen(
                 Box(Modifier.fillMaxWidth().height(150.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding())) {
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0xFF121214)))))
-                    if (isMe) {
-                        Chip("Edit banner", Modifier.align(Alignment.BottomEnd).padding(12.dp)) { pickBanner.launch("image/*") }
-                    }
                 }
                 Column(Modifier.padding(horizontal = 16.dp)) {
                     // Instagram-style: avatar overlaps the banner, the counts sit to its right.
@@ -226,12 +222,6 @@ fun ProfileScreen(
                     Box(Modifier.padding(start = 16.dp).width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
                         Icon(AniIcons.Bookmark, "Favorites", tint = Color.White, modifier = Modifier.size(26.dp))
                         Box(Modifier.align(Alignment.BottomCenter).width(34.dp).height(2.dp).background(Color.White))
-                    }
-                    if (isMe) Box(
-                        Modifier.align(Alignment.CenterEnd).padding(end = 10.dp).size(44.dp).clip(CircleShape).clickable { favPrivacy = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(AniIcons.Lock, "Who can see my favorites", tint = if (profile?.favoritesVisibility == "everyone" || profile == null) Ani.Muted else Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
             }
@@ -314,10 +304,6 @@ fun ProfileScreen(
     }
 
     if (showStatus) StatusSheet(profile) { showStatus = false }
-    if (favPrivacy) com.anibiar.app.ui.settings.ChoiceDialog(
-        "Who can see my favorites", profile?.favoritesVisibility ?: "everyone",
-        listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me"), onDismiss = { favPrivacy = false },
-    ) { v -> scope.launch { runCatching { social.setFavoritesVisibility(v) }.onFailure { toast(it.message ?: "Couldn't save") } } }
     if (confirmUnfriend) {
         AlertDialog(
             onDismissRequest = { confirmUnfriend = false },
