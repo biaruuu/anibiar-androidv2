@@ -1,5 +1,8 @@
 package com.anibiar.app.ui.profile
 
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -101,7 +104,7 @@ fun ProfileScreen(
     val myFollowers by social.myFollowers.collectAsStateWithLifecycle()
 
     var listTab by rememberSaveable(targetUid) { mutableStateOf<String?>(null) }
-    var editBio by remember { mutableStateOf(false) }
+    var editing by rememberSaveable(targetUid) { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
@@ -162,15 +165,8 @@ fun ProfileScreen(
                         }
                     }
                     Spacer(Modifier.height(2.dp))
-                    Text(profile?.username ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White)
-                    profile?.createdAt?.takeIf { it > 0 }?.let {
-                        Spacer(Modifier.height(3.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(AniIcons.Calendar, null, tint = Ani.Muted, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Member since ${SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(it))}", style = inter(12.5f), color = Ani.Muted)
-                        }
-                    }
+                    Text(profile?.shownName ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (profile != null) Text("@${profile.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(8.dp))
                     val bio = profile?.bio.orEmpty()
                     if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
@@ -178,7 +174,7 @@ fun ProfileScreen(
                     Spacer(Modifier.height(14.dp))
                     if (isMe) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ActionButton("Edit bio", Modifier.weight(1f)) { editBio = true }
+                            ActionButton("Edit profile", Modifier.weight(1f)) { editing = true }
                             ActionButton("Share profile", Modifier.weight(1f)) {
                                 val slug = profile?.linkSlug
                                 if (slug.isNullOrBlank()) toast("Set your profile link in Settings first")
@@ -230,7 +226,8 @@ fun ProfileScreen(
                 onToggle = { scope.launch { toggle(social, it, myFollowing) } },
             )
         }
-        if (isMe && listTab == null && (onOpenInbox != null || onOpenSettings != null)) {
+        if (editing) EditProfileScreen(profile) { editing = false }
+        if (isMe && listTab == null && !editing && (onOpenInbox != null || onOpenSettings != null)) {
             Row(
                 Modifier.align(Alignment.TopEnd).padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, end = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -307,29 +304,6 @@ fun ProfileScreen(
                         scope.launch { try { social.setUsername(name) } catch (e: Exception) { err = e.message }; saving = false }
                     }.padding(10.dp))
             },
-        )
-    }
-
-    if (editBio) {
-        var text by remember { mutableStateOf(profile?.bio.orEmpty()) }
-        AlertDialog(
-            onDismissRequest = { editBio = false },
-            containerColor = Ani.Panel,
-            title = { Text("Edit bio", style = inter(18f, FontWeight.SemiBold), color = Color.White) },
-            text = {
-                Column {
-                    Box(Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Ani.Border, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                        BasicTextField(text, { if (it.length <= 200) text = it }, textStyle = inter(14.5f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lavender), modifier = Modifier.fillMaxSize())
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text("${text.length}/200", style = inter(12f), color = Ani.Muted)
-                }
-            },
-            confirmButton = {
-                Text("Save", style = inter(15f, FontWeight.SemiBold), color = Ani.Lavender,
-                    modifier = Modifier.clickable { editBio = false; scope.launch { runCatching { social.setBio(text) }.onFailure { toast("Couldn't save") } } }.padding(10.dp))
-            },
-            dismissButton = { Text("Cancel", style = inter(15f), color = Ani.Muted, modifier = Modifier.clickable { editBio = false }.padding(10.dp)) },
         )
     }
 }
@@ -430,9 +404,9 @@ internal fun UserRow(
         Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(user.avatarUrl, user.username, 44.dp)
+        Avatar(user.avatarUrl, user.shownName, 44.dp)
         Spacer(Modifier.width(12.dp))
-        Text(user.username, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(user.shownName, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (myUid != null && user.uid != myUid) FollowButton(user.uid, myFollowing, myFollowers, onToggle)
     }
 }
@@ -480,7 +454,7 @@ private fun VerifyBanner(email: String) {
 }
 
 
-/** Discord-style name card: banner, avatar, name, bio, join date and follow counts. */
+/** Name card: banner, avatar ring, display name + @username, bio, stats and relationship chips. */
 @Composable
 internal fun UserCard(
     user: UserProfile,
@@ -491,40 +465,44 @@ internal fun UserCard(
     onToggle: () -> Unit,
     myFriends: Set<String> = emptySet(),
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(20.dp)
+    val isOther = myUid != null && user.uid != myUid
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clip(shape)
             .background(Ani.Panel).border(1.dp, Ani.Border, shape).clickable(onClick = onOpen),
     ) {
-        Box(Modifier.fillMaxWidth().height(76.dp)) {
+        Box(Modifier.fillMaxWidth().height(92.dp)) {
             if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1B1B20), Color(0xFF1F2A2E)))))
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66151517)))))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.Top) {
-            Avatar(user.avatarUrl, user.username, 64.dp, Modifier.offset(y = (-26).dp).border(4.dp, Ani.Panel, CircleShape))
+            Avatar(user.avatarUrl, user.shownName, 72.dp, Modifier.requiredSize(72.dp).offset(y = (-34).dp).border(4.dp, Ani.Panel, CircleShape))
             Spacer(Modifier.weight(1f))
-            if (myUid != null && user.uid != myUid) {
-                Box(Modifier.padding(top = 10.dp)) { FollowButton(user.uid, myFollowing, myFollowers, onToggle) }
-            }
+            if (isOther) Box(Modifier.padding(top = 10.dp)) { FollowButton(user.uid, myFollowing, myFollowers, onToggle) }
         }
-        Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp).offset(y = (-18).dp)) {
-            Text(user.username, style = inter(18f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp).offset(y = (-24).dp)) {
+            Text(user.shownName, style = inter(18.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("@${user.username}", style = inter(13f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (user.bio.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(user.bio, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (user.createdAt > 0) Text(
-                    "Member since ${SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(user.createdAt))}",
-                    style = inter(12f), color = Ani.Muted,
-                )
-                user.followers?.let { Text("$it followers", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
-                user.following?.let { Text("$it following", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                user.followers?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" followers") }, style = inter(12.5f), color = Ani.Muted) }
+                user.following?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" following") }, style = inter(12.5f), color = Ani.Muted) }
             }
-            if (user.uid in myFriends) {
-                Spacer(Modifier.height(8.dp))
-                Text("Friends", style = inter(12f, FontWeight.SemiBold), color = Ani.Lime)
+            val isFriend = user.uid in myFriends
+            val followsYou = isOther && user.uid in myFollowers
+            if (isFriend || followsYou) {
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isFriend) Text("Friends", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Lime,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x22AAFF01)).padding(horizontal = 10.dp, vertical = 4.dp))
+                    if (followsYou) Text("Follows you", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Soft,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.ButtonDark).padding(horizontal = 10.dp, vertical = 4.dp))
+                }
             }
         }
     }

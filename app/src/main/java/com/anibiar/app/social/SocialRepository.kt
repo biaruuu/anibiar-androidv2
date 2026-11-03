@@ -54,7 +54,11 @@ data class UserProfile(
     val friendRequests: String = "mutuals",
     /** "everyone", "friends" or "me". */
     val listsVisibility: String = "everyone",
-)
+    val displayName: String? = null,
+) {
+    /** The name people see: the display name if set, otherwise the username. */
+    val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
+}
 
 /** One inbox entry. [type] is follow, friend_request or friend_accepted. */
 data class Notice(val id: Long, val type: String, val actor: UserProfile?, val actorId: String, val read: Boolean, val createdAt: Long)
@@ -355,6 +359,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         linkSlug = o["link_slug"]?.jsonPrimitive?.contentOrNull,
         friendRequests = o["friend_requests"]?.jsonPrimitive?.contentOrNull ?: "mutuals",
         listsVisibility = o["lists_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
+        displayName = o["display_name"]?.jsonPrimitive?.contentOrNull,
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -375,7 +380,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -548,6 +553,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             if (c0 in 200..299 && t0.trim() == "false" && !v.equals(mine, ignoreCase = true)) throw ApiError("taken", "That link is already taken")
         }
         patchProfile(buildJsonObject { put("link_slug", if (v.isEmpty()) JsonNull else JsonPrimitive(v)) })
+    }
+
+    suspend fun setDisplayName(name: String) = net {
+        val v = name.trim()
+        patchProfile(buildJsonObject { put("display_name", if (v.isEmpty()) JsonNull else JsonPrimitive(v)) })
     }
 
     suspend fun setFriendRequests(v: String) = net { patchProfile(buildJsonObject { put("friend_requests", v) }) }
