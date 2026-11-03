@@ -110,7 +110,7 @@ fun ProfileScreen(
     var favPrivacy by remember { mutableStateOf(false) }
     val favs by remember(targetUid) { social.favorites(targetUid) }.collectAsStateWithLifecycle(emptyList())
     val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
-    val favCols = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 600) 5 else 3
+    val favCols = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.let { if (it >= 900) 6 else if (it >= 600) 4 else 3 }
     var busy by remember { mutableStateOf(false) }
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
@@ -170,7 +170,7 @@ fun ProfileScreen(
                     Text(profile?.shownName ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     profile?.let { Text("@${it.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     profile?.let { p ->
-                        if (isMe || !p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()) {
+                        if (!p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()) {
                             Spacer(Modifier.height(8.dp))
                             StatusChip(p, isMe) { showStatus = true }
                         }
@@ -178,7 +178,6 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                     val bio = profile?.bio.orEmpty()
                     if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
-                    else if (isMe) Text("Add a bio so people know who you are.", style = inter(14f), color = Ani.Muted)
                     Spacer(Modifier.height(14.dp))
                     if (isMe) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -218,26 +217,24 @@ fun ProfileScreen(
                         }
                     }
                     Spacer(Modifier.height(18.dp))
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
-                    Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(AniIcons.BookmarkFilled, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Favorites", style = inter(17f, FontWeight.Bold), color = Color.White)
-                        if (canSeeFavs && favs.isNotEmpty()) Text("  ${favs.size}", style = inter(14f, FontWeight.Medium), color = Ani.Muted)
-                        Spacer(Modifier.weight(1f))
-                        if (isMe) {
-                            val shape = RoundedCornerShape(50)
-                            Row(
-                                Modifier.clip(shape).background(Ani.Item).border(1.dp, Ani.Border, shape).clickable { favPrivacy = true }.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(AniIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text(when (profile?.favoritesVisibility) { "me" -> "Only me"; "friends" -> "Friends"; else -> "Everyone" }, style = inter(12.5f, FontWeight.Medium), color = Ani.Soft)
-                            }
-                        }
+                }
+            }
+            item(key = "fav-tabs") {
+                Box(Modifier.fillMaxWidth().height(50.dp)) {
+                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Ani.Border))
+                    Box(Modifier.padding(start = 16.dp).width(64.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        Icon(AniIcons.Bookmark, "Favorites", tint = Color.White, modifier = Modifier.size(26.dp))
+                        Box(Modifier.align(Alignment.BottomCenter).width(34.dp).height(2.dp).background(Color.White))
+                    }
+                    if (isMe) Box(
+                        Modifier.align(Alignment.CenterEnd).padding(end = 10.dp).size(44.dp).clip(CircleShape).clickable { favPrivacy = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(AniIcons.Lock, "Who can see my favorites", tint = if (profile?.favoritesVisibility == "everyone" || profile == null) Ani.Muted else Color.White, modifier = Modifier.size(22.dp))
                     }
                 }
+            }
+            if (!canSeeFavs) item(key = "fav-locked")                }
             }
             if (!canSeeFavs) item(key = "fav-locked") {
                 Column(
@@ -259,20 +256,17 @@ fun ProfileScreen(
                     if (isMe) Text("Tap the bookmark on any anime to save it here.", style = inter(13f, lineHeight = 18f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
                 }
             } else items(favs.chunked(favCols), key = { row -> "fav-" + row.first().animeId }) { row ->
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 2.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     row.forEach { f ->
-                        Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { onOpenAnime(f.animeId) }) {
-                            Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item)) {
-                                if (f.cover != null) AsyncImage(f.cover, f.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        Box(Modifier.weight(1f).aspectRatio(3f / 4f).background(Ani.Item).clickable { onOpenAnime(f.animeId) }) {
+                            if (f.cover != null) AsyncImage(f.cover, f.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))) {
+                                Text(f.title, style = inter(11.5f, FontWeight.SemiBold, lineHeight = 14f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 7.dp, end = 7.dp, top = 18.dp, bottom = 7.dp))
                             }
-                            Text(f.title, style = inter(12f, FontWeight.Medium, lineHeight = 16f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp))
                         }
                     }
                     repeat(favCols - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-            }
-            if (isMe && me?.verified == false) item(key = "verify") {
-                VerifyBanner(me?.email.orEmpty())
             }
         }
         listTab?.let { t ->

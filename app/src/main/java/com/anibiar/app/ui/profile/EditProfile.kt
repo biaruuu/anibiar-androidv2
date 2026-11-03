@@ -73,6 +73,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf("main") }
     var busy by remember { mutableStateOf(false) }
+    var showStatus by remember { mutableStateOf(false) }
     BackHandler { if (page != "main") page = "main" else onBack() }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
 
@@ -91,6 +92,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
         }
     }
 
+    if (showStatus) StatusSheet(profile) { showStatus = false }
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
         when (page) {
             "name" -> FieldPage(
@@ -160,6 +162,12 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                     FormRow(
                         "Bio", profile?.bio?.takeIf { it.isNotBlank() } ?: "Write a short description about who you are or what your account is about",
                         muted = profile?.bio.isNullOrBlank(), maxLines = 4, onClick = { page = "bio" },
+                    )
+                    FormRow(
+                        "Status",
+                        listOfNotNull(profile?.statusEmoji?.takeIf { it.isNotBlank() }, profile?.statusText?.takeIf { it.isNotBlank() }).joinToString(" ").ifBlank { com.anibiar.app.ui.profile.statusLabel(profile?.status) },
+                        onClick = { showStatus = true },
+                        trailing = { com.anibiar.app.ui.profile.StatusDot(profile?.status, 22.dp, Ani.Item) },
                     )
                     FormRow(
                         "Banner", "", onClick = { pickBanner.launch("image/*") },
