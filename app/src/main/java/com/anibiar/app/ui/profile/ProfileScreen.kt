@@ -72,7 +72,10 @@ import java.util.Locale
 
 /** Your own profile (uid == null) or someone else's. Everything is live from Realtime Database. */
 @Composable
-fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> Unit) {
+fun ProfileScreen(
+    uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> Unit,
+    onOpenInbox: (() -> Unit)? = null, onOpenSettings: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val social = app.social
@@ -86,7 +89,14 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
     val followingIds by remember(targetUid) { social.ids(targetUid, "following") }.collectAsStateWithLifecycle(emptySet())
     val followers by produceState(emptyList<UserProfile>(), followerIds) { value = social.profiles(followerIds) }
     val following by produceState(emptyList<UserProfile>(), followingIds) { value = social.profiles(followingIds) }
-    val friends = remember(following, followerIds) { following.filter { it.uid in followerIds } }
+    val friendIds by remember(targetUid) { social.friendIds(targetUid) }.collectAsStateWithLifecycle(emptySet())
+    val friends by produceState(emptyList<UserProfile>(), friendIds) { value = social.profiles(friendIds) }
+    val myFriends by social.myFriends.collectAsStateWithLifecycle()
+    val incoming by social.incomingRequests.collectAsStateWithLifecycle()
+    val outgoing by social.outgoingRequests.collectAsStateWithLifecycle()
+    val unread by social.unread.collectAsStateWithLifecycle()
+    var confirmUnfriend by remember { mutableStateOf(false) }
+    val canSeeLists = isMe || when (profile?.listsVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
     val myFollowing by social.myFollowing.collectAsStateWithLifecycle()
     val myFollowers by social.myFollowers.collectAsStateWithLifecycle()
 
@@ -145,9 +155,10 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                         }
                         Spacer(Modifier.width(8.dp))
                         Row(Modifier.weight(1f).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            Stat("Followers", followerIds.size) { listTab = "followers" }
-                            Stat("Following", followingIds.size) { listTab = "following" }
-                            Stat("Friends", friends.size) { listTab = "friends" }
+                            val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
+                            Stat("Followers", followerIds.size) { open("followers") }
+                            Stat("Following", followingIds.size) { open("following") }
+                            Stat("Friends", friendIds.size) { open("friends") }
                         }
                     }
                     Spacer(Modifier.height(2.dp))
@@ -168,10 +179,39 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                     if (isMe) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ActionButton("Edit bio", Modifier.weight(1f)) { editBio = true }
-                            ActionButton("Log out", Modifier.weight(1f)) { social.signOut() }
+                            ActionButton("Share profile", Modifier.weight(1f)) {
+                                val slug = profile?.linkSlug
+                                if (slug.isNullOrBlank()) toast("Set your profile link in Settings first")
+                                else context.startActivity(
+                                    android.content.Intent.createChooser(
+                                        android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                            .putExtra(android.content.Intent.EXTRA_TEXT, "Add me on Kiro: kiro://u/$slug"),
+                                        "Share profile",
+                                    ),
+                                )
+                            }
                         }
                     } else if (me != null) {
-                        FollowButton(targetUid, myFollowing, myFollowers) { scope.launch { toggle(social, targetUid, myFollowing) } }
+                        val iFollow = targetUid in myFollowing
+                        val theyFollow = targetUid in myFollowers
+                        val friendAction: Pair<String, () -> Unit>? = when {
+                            targetUid in myFriends -> "Friends" to { confirmUnfriend = true }
+                            targetUid in incoming -> "Accept request" to { scope.launch { runCatching { social.acceptFriend(targetUid) }.onFailure { toast(it.message ?: "Couldn't accept") } } }
+                            targetUid in outgoing -> "Request sent" to { scope.launch { runCatching { social.removeFriend(targetUid) } } }
+                            iFollow && theyFollow && profile?.friendRequests != "nobody" ->
+                                "Add friend" to { scope.launch { runCatching { social.sendFriendRequest(targetUid) }.onFailure { toast(it.message ?: "Couldn't send") } } }
+                            else -> null
+                        }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProfileButton(
+                                if (iFollow) "Following" else if (theyFollow) "Follow back" else "Follow", !iFollow, Modifier.weight(1f),
+                            ) { scope.launch { toggle(social, targetUid, myFollowing) } }
+                            friendAction?.let { (label, act) -> ProfileButton(label, label == "Accept request" || label == "Add friend", Modifier.weight(1f), act) }
+                        }
+                        if (targetUid in incoming) {
+                            Spacer(Modifier.height(8.dp))
+                            ProfileButton("Decline request", false, Modifier.fillMaxWidth()) { scope.launch { runCatching { social.removeFriend(targetUid) } } }
+                        }
                     }
                     Spacer(Modifier.height(14.dp))
                     Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
@@ -185,10 +225,31 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
             FollowListScreen(
                 username = profile?.username.orEmpty(), initialTab = t,
                 followers = followers, following = following, friends = friends,
-                myUid = me?.uid, myFollowing = myFollowing, myFollowers = myFollowers,
+                myUid = me?.uid, myFollowing = myFollowing, myFollowers = myFollowers, myFriends = myFriends,
                 onBack = { listTab = null }, onOpenUser = { onOpenUser(it) },
                 onToggle = { scope.launch { toggle(social, it, myFollowing) } },
             )
+        }
+        if (isMe && listTab == null && (onOpenInbox != null || onOpenSettings != null)) {
+            Row(
+                Modifier.align(Alignment.TopEnd).padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, end = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                onOpenInbox?.let { open ->
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = open), contentAlignment = Alignment.Center) {
+                        Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(21.dp))
+                        if (unread > 0) Box(
+                            Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(if (unread > 9) 18.dp else 16.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
+                    }
+                }
+                onOpenSettings?.let { open ->
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = open), contentAlignment = Alignment.Center) {
+                        Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(21.dp))
+                    }
+                }
+            }
         }
         if (onBack != null && listTab == null) {
             Box(
@@ -202,6 +263,20 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 14.dp)
                     .clip(RoundedCornerShape(50)).background(Color(0xCC000000)).padding(horizontal = 14.dp, vertical = 6.dp))
         }
+    }
+
+    if (confirmUnfriend) {
+        AlertDialog(
+            onDismissRequest = { confirmUnfriend = false },
+            containerColor = Ani.Panel,
+            title = { Text("Remove friend?", style = inter(18f, FontWeight.SemiBold), color = Color.White) },
+            text = { Text("${profile?.username.orEmpty()} will no longer be your friend. You'll still follow each other.", style = inter(14f, lineHeight = 20f), color = Ani.Soft) },
+            confirmButton = {
+                Text("Remove", style = inter(15f, FontWeight.SemiBold), color = Color(0xFFFF8A80),
+                    modifier = Modifier.clickable { confirmUnfriend = false; scope.launch { runCatching { social.removeFriend(targetUid) } } }.padding(10.dp))
+            },
+            dismissButton = { Text("Cancel", style = inter(15f), color = Ani.Muted, modifier = Modifier.clickable { confirmUnfriend = false }.padding(10.dp)) },
+        )
     }
 
     // First login: accounts start with a placeholder name; ask for a real one.
@@ -308,6 +383,14 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 }
 
 @Composable
+private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.height(36.dp).clip(RoundedCornerShape(10.dp)).background(if (primary) Color.White else Ani.ButtonDark).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
+}
+
+@Composable
 private fun ActionButton(label: String, modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier.height(36.dp).clip(RoundedCornerShape(10.dp)).background(Ani.ButtonDark).clickable(onClick = onClick),
@@ -321,7 +404,6 @@ internal fun FollowButton(uid: String, myFollowing: Set<String>, myFollowers: Se
     val iFollow = uid in myFollowing
     val theyFollow = uid in myFollowers
     val label = when {
-        iFollow && theyFollow -> "Friends"
         iFollow -> "Following"
         theyFollow -> "Follow back"
         else -> "Follow"
@@ -407,6 +489,7 @@ internal fun UserCard(
     myFollowers: Set<String>,
     onOpen: () -> Unit,
     onToggle: () -> Unit,
+    myFriends: Set<String> = emptySet(),
 ) {
     val shape = RoundedCornerShape(18.dp)
     Column(
@@ -439,7 +522,7 @@ internal fun UserCard(
                 user.followers?.let { Text("$it followers", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
                 user.following?.let { Text("$it following", style = inter(12f, FontWeight.Medium), color = Ani.Muted) }
             }
-            if (user.uid in myFollowing && user.uid in myFollowers) {
+            if (user.uid in myFriends) {
                 Spacer(Modifier.height(8.dp))
                 Text("Friends", style = inter(12f, FontWeight.SemiBold), color = Ani.Lime)
             }

@@ -57,6 +57,7 @@ internal fun FollowListScreen(
     myUid: String?,
     myFollowing: Set<String>,
     myFollowers: Set<String>,
+    myFriends: Set<String>,
     onBack: () -> Unit,
     onOpenUser: (String) -> Unit,
     onToggle: (String) -> Unit,
@@ -139,12 +140,12 @@ internal fun FollowListScreen(
                     Spacer(Modifier.size(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(u.username, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val sub = when { iFollow && theyFollow -> "Friends"; theyFollow -> "Follows you"; else -> null }
+                        val sub = when { u.uid in myFriends -> "Friends"; theyFollow -> "Follows you"; else -> null }
                         if (sub != null) Text(sub, style = inter(13f), color = Ani.Muted, maxLines = 1)
                     }
                     if (myUid != null && u.uid != myUid) {
                         Spacer(Modifier.size(8.dp))
-                        val label = when { iFollow && theyFollow -> "Friends"; iFollow -> "Following"; theyFollow -> "Follow back"; else -> "Follow" }
+                        val label = when { iFollow -> "Following"; theyFollow -> "Follow back"; else -> "Follow" }
                         Box(
                             Modifier.widthIn(min = 104.dp).height(34.dp).clip(RoundedCornerShape(10.dp))
                                 .background(if (iFollow) Ani.ButtonDark else Color.White)

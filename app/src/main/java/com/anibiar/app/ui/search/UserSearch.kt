@@ -92,6 +92,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
     val me by social.authState.collectAsStateWithLifecycle()
     val myFollowing by social.myFollowing.collectAsStateWithLifecycle()
     val myFollowers by social.myFollowers.collectAsStateWithLifecycle()
+    val myFriends by social.myFriends.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
@@ -158,6 +159,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
                     u, me?.uid, myFollowing, myFollowers,
                     onOpen = { onOpenUser(u.uid) },
                     onToggle = { scope.launch { runCatching { if (u.uid in myFollowing) social.unfollow(u.uid) else social.follow(u.uid) } } },
+                    myFriends = myFriends,
                 )
             }
         }

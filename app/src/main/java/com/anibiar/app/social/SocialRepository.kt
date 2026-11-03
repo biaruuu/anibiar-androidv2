@@ -49,7 +49,15 @@ data class UserProfile(
     val bannerUrl: String? = null,
     val followers: Int? = null,
     val following: Int? = null,
+    val linkSlug: String? = null,
+    /** "mutuals" or "nobody". */
+    val friendRequests: String = "mutuals",
+    /** "everyone", "friends" or "me". */
+    val listsVisibility: String = "everyone",
 )
+
+/** One inbox entry. [type] is follow, friend_request or friend_accepted. */
+data class Notice(val id: Long, val type: String, val actor: UserProfile?, val actorId: String, val read: Boolean, val createdAt: Long)
 
 enum class SignUpResult { SignedIn, ConfirmEmail }
 
@@ -73,6 +81,20 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     val myFollowing: StateFlow<Set<String>> = _myFollowing.asStateFlow()
     private val _myFollowers = MutableStateFlow<Set<String>>(emptySet())
     val myFollowers: StateFlow<Set<String>> = _myFollowers.asStateFlow()
+    private val _myFriends = MutableStateFlow<Set<String>>(emptySet())
+    val myFriends: StateFlow<Set<String>> = _myFriends.asStateFlow()
+    private val _incoming = MutableStateFlow<Set<String>>(emptySet())
+    /** People who asked to be my friend and are waiting for my answer. */
+    val incomingRequests: StateFlow<Set<String>> = _incoming.asStateFlow()
+    private val _outgoing = MutableStateFlow<Set<String>>(emptySet())
+    /** People I asked and who haven't answered. */
+    val outgoingRequests: StateFlow<Set<String>> = _outgoing.asStateFlow()
+    private val _unread = MutableStateFlow(0)
+    val unread: StateFlow<Int> = _unread.asStateFlow()
+    /** A profile opened from a kiro://u/<link> deep link; the UI consumes it. */
+    private val _pendingUser = MutableStateFlow<String?>(null)
+    val pendingUser: StateFlow<String?> = _pendingUser.asStateFlow()
+    fun consumePendingUser() { _pendingUser.value = null }
     private val tick = MutableStateFlow(0)
 
     /** Bumped when a confirmation link signs the user in, so the UI can jump to the profile. */
@@ -117,10 +139,26 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             // Keep my own follow sets current for the Follow / Follow back buttons.
             tick.flatMapLatest { flow { while (true) { emit(Unit); delay(6000) } } }.collect {
                 val me = session?.uid
-                if (me == null) { _myFollowing.value = emptySet(); _myFollowers.value = emptySet() }
-                else runCatching {
-                    _myFollowing.value = fetchIds(me, "following")
-                    _myFollowers.value = fetchIds(me, "followers")
+                if (me == null) {
+                    _myFollowing.value = emptySet(); _myFollowers.value = emptySet()
+                    _myFriends.value = emptySet(); _incoming.value = emptySet(); _outgoing.value = emptySet(); _unread.value = 0
+                } else {
+                    runCatching {
+                        _myFollowing.value = fetchIds(me, "following")
+                        _myFollowers.value = fetchIds(me, "followers")
+                    }
+                    runCatching {
+                        val rows = getRows("/rest/v1/friend_requests?or=(requester_id.eq.$me,addressee_id.eq.$me)&select=requester_id,addressee_id,status")
+                        val friends = HashSet<String>(); val inc = HashSet<String>(); val out = HashSet<String>()
+                        for (r in rows) {
+                            val o = r.jsonObject
+                            val a = o["requester_id"]!!.jsonPrimitive.content; val b = o["addressee_id"]!!.jsonPrimitive.content
+                            val other = if (a == me) b else a
+                            if (o["status"]!!.jsonPrimitive.content == "accepted") friends.add(other) else if (a == me) out.add(other) else inc.add(other)
+                        }
+                        _myFriends.value = friends; _incoming.value = inc; _outgoing.value = out
+                    }
+                    runCatching { _unread.value = getRows("/rest/v1/notifications?user_id=eq.$me&read=eq.false&select=id").size }
                 }
             }
         }
@@ -314,6 +352,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         bannerUrl = o["banner_url"]?.jsonPrimitive?.contentOrNull,
         followers = count(o["followers"]),
         following = count(o["following"]),
+        linkSlug = o["link_slug"]?.jsonPrimitive?.contentOrNull,
+        friendRequests = o["friend_requests"]?.jsonPrimitive?.contentOrNull ?: "mutuals",
+        listsVisibility = o["lists_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -334,7 +375,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -412,5 +453,113 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     suspend fun setBanner(bytes: ByteArray, gif: Boolean) = net {
         val old = session?.uid?.let { fetchProfile(it)?.bannerUrl }
         uploadImage("banners", bytes, if (gif) "image/gif" else "image/jpeg", if (gif) "gif" else "jpg", "banner_url", old)
+    }
+
+    // ---------------------------------------------------------------- friends
+
+    /** Accepted friends of [uid], refreshed live. */
+    fun friendIds(uid: String): Flow<Set<String>> = live {
+        getRows("/rest/v1/friend_requests?status=eq.accepted&or=(requester_id.eq.$uid,addressee_id.eq.$uid)&select=requester_id,addressee_id").map {
+            val o = it.jsonObject
+            val a = o["requester_id"]!!.jsonPrimitive.content; val b = o["addressee_id"]!!.jsonPrimitive.content
+            if (a == uid) b else a
+        }.toSet()
+    }
+
+    suspend fun sendFriendRequest(target: String) = net {
+        val me = session?.uid ?: return@net
+        val (code, text) = raw(
+            "POST", "/rest/v1/friend_requests",
+            buildJsonObject { put("requester_id", me); put("addressee_id", target) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal"),
+        )
+        if (code == 403) throw ApiError("denied", "You can't send this person a friend request")
+        if (code !in 200..299 && code != 409) fail(code, text)
+        _outgoing.value = _outgoing.value + target
+        refreshSoon()
+    }
+
+    suspend fun acceptFriend(requester: String) = net {
+        val me = session?.uid ?: return@net
+        val (code, text) = raw(
+            "PATCH", "/rest/v1/friend_requests?requester_id=eq.$requester&addressee_id=eq.$me",
+            buildJsonObject { put("status", "accepted") }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"),
+        )
+        if (code !in 200..299) fail(code, text)
+        _incoming.value = _incoming.value - requester
+        _myFriends.value = _myFriends.value + requester
+        refreshSoon()
+    }
+
+    /** Cancels a request I sent, declines one I got, or removes an existing friend. */
+    suspend fun removeFriend(other: String) = net {
+        val me = session?.uid ?: return@net
+        val (code, text) = raw("DELETE", "/rest/v1/friend_requests?or=(and(requester_id.eq.$me,addressee_id.eq.$other),and(requester_id.eq.$other,addressee_id.eq.$me))")
+        if (code !in 200..299) fail(code, text)
+        _incoming.value = _incoming.value - other; _outgoing.value = _outgoing.value - other; _myFriends.value = _myFriends.value - other
+        refreshSoon()
+    }
+
+    // ---------------------------------------------------------------- inbox
+
+    fun notices(): Flow<List<Notice>> = live {
+        val me = session?.uid ?: return@live emptyList()
+        val rows = getRows("/rest/v1/notifications?user_id=eq.$me&select=id,type,read,created_at,actor_id&order=created_at.desc&limit=100")
+        val actors = profiles(rows.map { it.jsonObject["actor_id"]!!.jsonPrimitive.content }.toSet()).associateBy { it.uid }
+        rows.map {
+            val o = it.jsonObject
+            val aid = o["actor_id"]!!.jsonPrimitive.content
+            Notice(
+                id = o["id"]!!.jsonPrimitive.content.toLong(), type = o["type"]!!.jsonPrimitive.content, actor = actors[aid], actorId = aid,
+                read = o["read"]?.jsonPrimitive?.contentOrNull == "true", createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
+            )
+        }
+    }
+
+    suspend fun markAllRead() {
+        val me = session?.uid ?: return
+        runCatching {
+            raw("PATCH", "/rest/v1/notifications?user_id=eq.$me&read=eq.false", buildJsonObject { put("read", true) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+            _unread.value = 0
+            refreshSoon()
+        }
+    }
+
+    suspend fun deleteNotice(id: Long) {
+        runCatching { raw("DELETE", "/rest/v1/notifications?id=eq.$id"); refreshSoon() }
+    }
+
+    // ---------------------------------------------------------------- settings & links
+
+    private suspend fun patchProfile(body: JsonObject) {
+        val me = session?.uid ?: return
+        val (code, text) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (code == 409) throw ApiError("taken", "That link is already taken")
+        if (code !in 200..299) fail(code, text)
+        refreshSoon()
+    }
+
+    suspend fun setLinkSlug(slug: String) = net {
+        val v = slug.trim()
+        if (v.isNotEmpty()) {
+            if (!Regex("^[A-Za-z0-9_.-]{3,30}$").matches(v)) throw ApiError("bad", "Use 3-30 letters, numbers, _ . or -")
+            val (c0, t0) = raw("POST", "/rest/v1/rpc/link_available", buildJsonObject { put("s", v) }.toString().toByteArray())
+            val mine = session?.uid?.let { fetchProfile(it)?.linkSlug }
+            if (c0 in 200..299 && t0.trim() == "false" && !v.equals(mine, ignoreCase = true)) throw ApiError("taken", "That link is already taken")
+        }
+        patchProfile(buildJsonObject { put("link_slug", if (v.isEmpty()) JsonNull else JsonPrimitive(v)) })
+    }
+
+    suspend fun setFriendRequests(v: String) = net { patchProfile(buildJsonObject { put("friend_requests", v) }) }
+    suspend fun setListsVisibility(v: String) = net { patchProfile(buildJsonObject { put("lists_visibility", v) }) }
+
+    /** Opens the profile behind a kiro://u/<link> link (needs a signed-in session to read profiles). */
+    suspend fun openLink(slug: String): Boolean {
+        if (session == null) return false
+        return try {
+            val id = getRows("/rest/v1/profiles?link_slug=ilike.${encode(slug.replace("_", "\\_"))}&select=id&limit=1").firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content
+            if (id != null) _pendingUser.value = id
+            id != null
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { false }
     }
 }
