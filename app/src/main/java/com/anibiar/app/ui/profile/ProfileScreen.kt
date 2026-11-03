@@ -190,7 +190,7 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                 onToggle = { scope.launch { toggle(social, it, myFollowing) } },
             )
         }
-        if (onBack != null) {
+        if (onBack != null && listTab == null) {
             Box(
                 Modifier.padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, start = 12.dp)
                     .size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = onBack),
