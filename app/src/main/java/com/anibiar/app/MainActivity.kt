@@ -68,6 +68,13 @@ class MainActivity : ComponentActivity() {
         val uri = intent?.data ?: return
         if (uri.scheme != "kiro") return
         val app = application as AniBiarApp
+        if (uri.host == "u") {
+            val slug = uri.pathSegments.firstOrNull() ?: return
+            lifecycleScope.launch {
+                if (!app.social.openLink(slug)) android.widget.Toast.makeText(this@MainActivity, "Log in to open this profile", android.widget.Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         lifecycleScope.launch {
             val error = app.social.handleAuthLink(uri)
             android.widget.Toast.makeText(
@@ -88,6 +95,8 @@ private fun AppNavigation() {
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var inboxOpen by rememberSaveable { mutableStateOf(false) }
     var searchMode by rememberSaveable { mutableStateOf("anime") }
     val userStack = rememberSaveable(
         saver = androidx.compose.runtime.saveable.listSaver<SnapshotStateList<String>, String>(
@@ -102,14 +111,21 @@ private fun AppNavigation() {
     androidx.compose.runtime.LaunchedEffect(linkLogins) {
         if (linkLogins > 0) { searchOpen = false; userStack.clear(); profileOpen = true }
     }
+    // A profile opened from a kiro://u/<link> link.
+    val pendingUser by social.pendingUser.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(pendingUser) {
+        pendingUser?.let { searchOpen = false; settingsOpen = false; userStack.add(it); social.consumePendingUser() }
+    }
+    BackHandler(enabled = settingsOpen) { settingsOpen = false }
     BackHandler(enabled = profileOpen) { profileOpen = false }
+    BackHandler(enabled = inboxOpen) { inboxOpen = false }
     BackHandler(enabled = searchOpen) { searchOpen = false }
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; searchOpen = true })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; searchOpen = true })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -123,14 +139,34 @@ private fun AppNavigation() {
             }
         }
 
+        if (settingsOpen) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                com.anibiar.app.ui.settings.SettingsScreen(
+                    onLogin = { settingsOpen = false; profileOpen = true },
+                    onOpenInbox = { inboxOpen = true },
+                    onOpenProfile = { settingsOpen = false; profileOpen = true },
+                )
+            }
+        }
+
         if (profileOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                 val a = authState
                 if (a != null) {
-                    com.anibiar.app.ui.profile.ProfileScreen(uid = null, onBack = null, onOpenUser = { userStack.add(it) })
+                    com.anibiar.app.ui.profile.ProfileScreen(
+                        uid = null, onBack = { profileOpen = false }, onOpenUser = { userStack.add(it) },
+                        onOpenInbox = { inboxOpen = true },
+                        onOpenSettings = { profileOpen = false; settingsOpen = true },
+                    )
                 } else {
                     com.anibiar.app.ui.auth.AuthScreen(onClose = { profileOpen = false })
                 }
+            }
+        }
+
+        if (inboxOpen && authState != null) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                com.anibiar.app.ui.inbox.InboxScreen(onBack = { inboxOpen = false }, onOpenUser = { userStack.add(it) })
             }
         }
 
@@ -174,7 +210,7 @@ private fun AppNavigation() {
 
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !(profileOpen && authState == null),
+            visible = stack.isEmpty() && !profileOpen && !inboxOpen && userStack.isEmpty(),
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),
@@ -183,16 +219,15 @@ private fun AppNavigation() {
             com.anibiar.app.ui.nav.BottomNavBar(
                 selected = when {
                     profileOpen -> com.anibiar.app.ui.nav.NavTab.Profile
+                    settingsOpen -> com.anibiar.app.ui.nav.NavTab.Settings
                     searchOpen -> com.anibiar.app.ui.nav.NavTab.Search
                     else -> com.anibiar.app.ui.nav.NavTab.Home
                 },
                 onSelect = { tab ->
-                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) { searchOpen = false; profileOpen = false; userStack.clear() }
-                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) { profileOpen = false; userStack.clear(); searchOpen = true }
-                    else if (tab == com.anibiar.app.ui.nav.NavTab.Profile) { searchOpen = false; userStack.clear(); profileOpen = true }
-                    else {
-                        android.widget.Toast.makeText(context, "${tab.label} is coming soon", android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) { searchOpen = false; profileOpen = false; settingsOpen = false; inboxOpen = false; userStack.clear() }
+                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) { profileOpen = false; settingsOpen = false; inboxOpen = false; userStack.clear(); searchOpen = true }
+                    else if (tab == com.anibiar.app.ui.nav.NavTab.Profile) { searchOpen = false; settingsOpen = false; userStack.clear(); profileOpen = true }
+                    else { searchOpen = false; profileOpen = false; inboxOpen = false; userStack.clear(); settingsOpen = true }
                 },
                 modifier = Modifier
                     .androidx_navPadding(),
