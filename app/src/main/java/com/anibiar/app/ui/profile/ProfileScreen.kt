@@ -128,51 +128,52 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                         Chip("Edit banner", Modifier.align(Alignment.BottomEnd).padding(12.dp)) { pickBanner.launch("image/*") }
                     }
                 }
-                Column(Modifier.padding(horizontal = 16.dp).padding(top = 0.dp)) {
-                    Row(Modifier.offset(y = (-36).dp), verticalAlignment = Alignment.Bottom) {
-                        Box {
+                Column(Modifier.padding(horizontal = 16.dp)) {
+                    // Instagram-style: avatar overlaps the banner, the counts sit to its right.
+                    Row(Modifier.fillMaxWidth().height(60.dp)) {
+                        Box(Modifier.offset(y = (-36).dp)) {
                             Avatar(profile?.avatarUrl, profile?.username, 88.dp, Modifier.border(4.dp, Ani.Onyx, CircleShape))
                             if (isMe) {
                                 Box(
                                     Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(Ani.Lavender)
+                                        .border(2.dp, Ani.Onyx, CircleShape)
                                         .clickable { pickAvatar.launch("image/*") },
                                     contentAlignment = Alignment.Center,
                                 ) { Icon(AniIcons.Add, null, tint = Color(0xFF121214), modifier = Modifier.size(18.dp)) }
                             }
                         }
-                        Spacer(Modifier.weight(1f))
-                        if (!isMe && me != null) {
-                            FollowButton(targetUid, myFollowing, myFollowers) { scope.launch { toggle(social, targetUid, myFollowing) } }
+                        Spacer(Modifier.width(8.dp))
+                        Row(Modifier.weight(1f).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            Stat("Followers", followerIds.size, tab == "followers") { tab = "followers" }
+                            Stat("Following", followingIds.size, tab == "following") { tab = "following" }
+                            Stat("Friends", friends.size, tab == "friends") { tab = "friends" }
                         }
                     }
-                    Column(Modifier.offset(y = (-24).dp)) {
-                        Text(profile?.username ?: "Loading…", style = inter(24f, FontWeight.Bold), color = Color.White)
-                        Spacer(Modifier.height(4.dp))
-                        profile?.createdAt?.takeIf { it > 0 }?.let {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(AniIcons.Calendar, null, tint = Ani.Muted, modifier = Modifier.size(15.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Member since ${SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(it))}", style = inter(13f), color = Ani.Muted)
-                            }
+                    Spacer(Modifier.height(2.dp))
+                    Text(profile?.username ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White)
+                    profile?.createdAt?.takeIf { it > 0 }?.let {
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(AniIcons.Calendar, null, tint = Ani.Muted, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("Member since ${SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date(it))}", style = inter(12.5f), color = Ani.Muted)
                         }
-                        Spacer(Modifier.height(10.dp))
-                        val bio = profile?.bio.orEmpty()
-                        if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
-                        else if (isMe) Text("Add a bio so people know who you are.", style = inter(14f), color = Ani.Muted)
-                        if (isMe) {
-                            Spacer(Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlineChip("Edit bio") { editBio = true }
-                                OutlineChip("Log out") { social.signOut() }
-                            }
-                        }
-                        Spacer(Modifier.height(18.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    val bio = profile?.bio.orEmpty()
+                    if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
+                    else if (isMe) Text("Add a bio so people know who you are.", style = inter(14f), color = Ani.Muted)
+                    Spacer(Modifier.height(14.dp))
+                    if (isMe) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Stat("Followers", followerIds.size, tab == "followers", Modifier.weight(1f)) { tab = "followers" }
-                            Stat("Following", followingIds.size, tab == "following", Modifier.weight(1f)) { tab = "following" }
-                            Stat("Friends", friends.size, tab == "friends", Modifier.weight(1f)) { tab = "friends" }
+                            ActionButton("Edit bio", Modifier.weight(1f)) { editBio = true }
+                            ActionButton("Log out", Modifier.weight(1f)) { social.signOut() }
                         }
+                    } else if (me != null) {
+                        FollowButton(targetUid, myFollowing, myFollowers) { scope.launch { toggle(social, targetUid, myFollowing) } }
                     }
+                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
                 }
             }
             if (isMe && me?.verified == false) item(key = "verify") {
@@ -299,17 +300,24 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Stat(label: String, count: Int, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
+private fun Stat(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
     Column(
-        modifier.clip(shape).border(1.dp, if (selected) Ani.Lavender.copy(alpha = 0.7f) else Ani.Border, shape)
-            .background(if (selected) Ani.Lavender.copy(alpha = 0.10f) else Color.Transparent)
-            .clickable(onClick = onClick).padding(vertical = 10.dp),
+        Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("$count", style = inter(18f, FontWeight.Bold), color = Color.White)
-        Text(label, style = inter(12f), color = if (selected) Ani.Lavender else Ani.Muted)
+        Text(label, style = inter(12.5f, if (selected) FontWeight.SemiBold else FontWeight.Normal), color = if (selected) Ani.Lavender else Ani.Muted)
+        Spacer(Modifier.height(3.dp))
+        Box(Modifier.width(22.dp).height(2.dp).clip(RoundedCornerShape(50)).background(if (selected) Ani.Lavender else Color.Transparent))
     }
+}
+
+@Composable
+private fun ActionButton(label: String, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.height(36.dp).clip(RoundedCornerShape(10.dp)).background(Ani.ButtonDark).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = Color.White) }
 }
 
 /** Follow / Follow back / Following / Friends, from the viewer's perspective. */
