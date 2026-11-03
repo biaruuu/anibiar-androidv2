@@ -166,7 +166,7 @@ fun ProfileScreen(
                     }
                     Spacer(Modifier.height(2.dp))
                     Text(profile?.shownName ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (profile != null) Text("@${profile.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    profile?.let { Text("@${it.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     Spacer(Modifier.height(8.dp))
                     val bio = profile?.bio.orEmpty()
                     if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
