@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -89,7 +90,7 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
     val myFollowing by social.myFollowing.collectAsStateWithLifecycle()
     val myFollowers by social.myFollowers.collectAsStateWithLifecycle()
 
-    var tab by rememberSaveable(targetUid) { mutableStateOf("followers") }
+    var listTab by rememberSaveable(targetUid) { mutableStateOf<String?>(null) }
     var editBio by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
 
@@ -132,7 +133,7 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                     // Instagram-style: avatar overlaps the banner, the counts sit to its right.
                     Row(Modifier.fillMaxWidth().height(60.dp)) {
                         Box(Modifier.offset(y = (-36).dp)) {
-                            Avatar(profile?.avatarUrl, profile?.username, 88.dp, Modifier.border(4.dp, Ani.Onyx, CircleShape))
+                            Avatar(profile?.avatarUrl, profile?.username, 88.dp, Modifier.requiredSize(88.dp).border(4.dp, Ani.Onyx, CircleShape))
                             if (isMe) {
                                 Box(
                                     Modifier.align(Alignment.BottomEnd).size(28.dp).clip(CircleShape).background(Ani.Lavender)
@@ -144,9 +145,9 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
                         }
                         Spacer(Modifier.width(8.dp))
                         Row(Modifier.weight(1f).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            Stat("Followers", followerIds.size, tab == "followers") { tab = "followers" }
-                            Stat("Following", followingIds.size, tab == "following") { tab = "following" }
-                            Stat("Friends", friends.size, tab == "friends") { tab = "friends" }
+                            Stat("Followers", followerIds.size) { listTab = "followers" }
+                            Stat("Following", followingIds.size) { listTab = "following" }
+                            Stat("Friends", friends.size) { listTab = "friends" }
                         }
                     }
                     Spacer(Modifier.height(2.dp))
@@ -179,19 +180,15 @@ fun ProfileScreen(uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> U
             if (isMe && me?.verified == false) item(key = "verify") {
                 VerifyBanner(me?.email.orEmpty())
             }
-            val list = when (tab) { "following" -> following; "friends" -> friends; else -> followers }
-            if (list.isEmpty()) {
-                item(key = "empty-$tab") {
-                    Text(
-                        when (tab) { "following" -> "Not following anyone yet."; "friends" -> "No friends yet. Follow back to become friends."; else -> "No followers yet." },
-                        style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                }
-            } else {
-                items(list, key = { "$tab-${it.uid}" }) { u ->
-                    UserRow(u, me?.uid, myFollowing, myFollowers, onOpen = { onOpenUser(u.uid) }, onToggle = { scope.launch { toggle(social, u.uid, myFollowing) } })
-                }
-            }
+        }
+        listTab?.let { t ->
+            FollowListScreen(
+                username = profile?.username.orEmpty(), initialTab = t,
+                followers = followers, following = following, friends = friends,
+                myUid = me?.uid, myFollowing = myFollowing, myFollowers = myFollowers,
+                onBack = { listTab = null }, onOpenUser = { onOpenUser(it) },
+                onToggle = { scope.launch { toggle(social, it, myFollowing) } },
+            )
         }
         if (onBack != null) {
             Box(
@@ -300,15 +297,13 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun Stat(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
+private fun Stat(label: String, count: Int, onClick: () -> Unit) {
     Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 6.dp, vertical = 2.dp),
+        Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("$count", style = inter(18f, FontWeight.Bold), color = Color.White)
-        Text(label, style = inter(12.5f, if (selected) FontWeight.SemiBold else FontWeight.Normal), color = if (selected) Ani.Lavender else Ani.Muted)
-        Spacer(Modifier.height(3.dp))
-        Box(Modifier.width(22.dp).height(2.dp).clip(RoundedCornerShape(50)).background(if (selected) Ani.Lavender else Color.Transparent))
+        Text(label, style = inter(13f), color = Color.White)
     }
 }
 
