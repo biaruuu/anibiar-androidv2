@@ -92,7 +92,7 @@ private fun prettyDate(iso: String?): String? = iso?.take(10)?.let { d ->
 /** The Watch page: player on top, then episode, audio + server pickers, episode navigation and the anime card. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit, joinRoom: com.anibiar.app.social.Room? = null) {
+fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit, joinRoom: com.anibiar.app.social.Room? = null, onRoomMoved: (com.anibiar.app.social.Room) -> Unit = {}) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val scope = rememberCoroutineScope()
@@ -129,6 +129,25 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     val isHost = room?.hostId == social.myId
     val roomEnded by (together?.ended ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     val roomMembers by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
+    val locked = room != null && !isHost
+    fun hostOnly() { android.widget.Toast.makeText(context, "Only the host can change the episode", android.widget.Toast.LENGTH_SHORT).show() }
+    var pickerOpen by remember { mutableStateOf(false) }
+    // Voice call: starts by itself once I'm in a room (and have allowed the microphone).
+    var micOk by remember { mutableStateOf(androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) }
+    val micLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { micOk = it }
+    var voice by remember { mutableStateOf<com.anibiar.app.social.VoiceChat?>(null) }
+    val vMuted by (voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
+    LaunchedEffect(together) { if (together != null && !micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
+    LaunchedEffect(together, micOk) {
+        val t = together
+        if (t == null) { voice?.stop(); voice = null }
+        else if (micOk && voice == null) voice = runCatching { com.anibiar.app.social.VoiceChat(context.applicationContext, t, social.myId.orEmpty(), app.appScope).also { it.start() } }.getOrNull()
+    }
+    DisposableEffect(Unit) { onDispose { voice?.stop(); voice = null } }
+    LaunchedEffect(together) {
+        val t = together ?: return@LaunchedEffect
+        t.moved.collect { r -> t.detach(); together = null; room = null; onRoomMoved(r) }
+    }
     LaunchedEffect(room?.id) {
         val r = room ?: return@LaunchedEffect
         if (together == null) together = com.anibiar.app.social.WatchTogether(social, app.appScope, r).also { it.start() }
@@ -142,8 +161,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         if (roomEnded) { together?.let { /* host is gone; keep watching alone */ }; android.widget.Toast.makeText(context, "The host ended the room", android.widget.Toast.LENGTH_SHORT).show(); room = null; together = null }
     }
     // Any local change of episode or audio (buttons, auto-next, picker) is shared with the room.
-    LaunchedEffect(ep, audio, together) {
+    LaunchedEffect(ep, audio, together, isHost) {
         val t = together ?: return@LaunchedEffect
+        if (!isHost) return@LaunchedEffect
         if (t.episode != ep || t.audio != audio) t.changeEpisode(ep, audio)
     }
 
@@ -204,7 +224,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
     BackHandler(enabled = fullscreen) { fullscreen = false }
 
-    fun select(n: Int) { ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
+    fun select(n: Int) { if (locked) { hostOnly(); return }; ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
     fun saveProgress(t: Double, d: Double, episode: Int) {
         if (d <= 0) return
         app.history.save(HistoryItem(id, name, anime?.bannerImage ?: anime?.posterUrl, episode, (t / d).toFloat().coerceIn(0f, 1f)))
@@ -232,7 +252,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onAutoSkip = { autoSkip = it; prefsStore.edit().putBoolean("autoSkip", it).apply() },
                 startAt = null,
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
-                onEnded = { if (autoNext && next != null) select(next.number) },
+                onEnded = { if (autoNext && next != null && !locked) select(next.number) },
                 onFail = {
                     val all = watch?.streams.orEmpty(); val at = all.indexOfFirst { it.id == stream?.id }
                     if (at in 0 until all.lastIndex) streamName = all[at + 1].name
@@ -284,7 +304,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             val available = if (k == "sub") !eps?.sub.isNullOrEmpty() else !eps?.dub.isNullOrEmpty()
                             DropdownMenuItem(
                                 text = { Text(label + if (!available) "  ·  Unavailable" else "", style = inter(15f), color = if (available) Color.White else Ani.Muted) },
-                                enabled = available, onClick = { audio = k; streamName = null; audioOpen = false },
+                                enabled = available, onClick = { audioOpen = false; if (locked) hostOnly() else { audio = k; streamName = null } },
                                 trailingIcon = { if (audio == k && available) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(20.dp)) },
                             )
                         }
@@ -331,7 +351,17 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 Text(
                     if (room == null) "Watch together" else "In a room · ${roomMembers.size} watching",
                     style = inter(14f, FontWeight.SemiBold), color = if (room != null) Ani.Lime else Color.White,
+                    modifier = Modifier.weight(1f),
                 )
+                if (room != null) {
+                    Text(
+                        if (!micOk) "Mic off" else if (vMuted) "Muted" else "Mic on",
+                        style = inter(12.5f, FontWeight.SemiBold), color = if (micOk && !vMuted) Color.Black else Color.White,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (micOk && !vMuted) Ani.Lime else Color(0x33FFFFFF))
+                            .clickable { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                }
             }
 
             // Previous / Episodes / Next
@@ -417,6 +447,21 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             },
             onLeave = { together?.leave(isHost); together = null; room = null; togetherOpen = false },
             onDismiss = { togetherOpen = false },
+            onPickAnime = { togetherOpen = false; pickerOpen = true },
+        )
+    }
+    if (pickerOpen) {
+        com.anibiar.app.ui.watch.AnimePickerSheet(
+            onDismiss = { pickerOpen = false },
+            onPick = { m ->
+                pickerOpen = false
+                val r = room; val t = together
+                if (r != null && t != null && isHost) {
+                    val next = r.copy(animeId = m.id, title = m.displayTitle, cover = m.posterUrl, episode = 1, audio = "sub")
+                    t.changeAnime(next); t.detach(); together = null; room = null
+                    onRoomMoved(next)
+                }
+            },
         )
     }
     if (episodesOpen) {

@@ -252,6 +252,7 @@ private fun AppNavigation() {
                 Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                     com.anibiar.app.ui.watch.WatchScreen(
                         id = watchId, startEp = watchEp, onBack = { watchId = 0; joinRoom = null }, joinRoom = joinRoom,
+                        onRoomMoved = { r -> joinRoom = r; watchEp = r.episode; watchId = r.animeId },
                         onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
                     )
                 }

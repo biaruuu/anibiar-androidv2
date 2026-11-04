@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun TogetherSheet(
     room: Room?, together: WatchTogether?, isHost: Boolean, starting: Boolean,
-    onStart: () -> Unit, onLeave: () -> Unit, onDismiss: () -> Unit,
+    onStart: () -> Unit, onLeave: () -> Unit, onDismiss: () -> Unit, onPickAnime: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     val social = app.social
@@ -70,7 +70,7 @@ fun TogetherSheet(
             Spacer(Modifier.height(4.dp))
             Text(
                 if (room == null) "Start a room and invite friends. Play, pause and seeking stay in sync for everyone, and anyone can change the episode."
-                else "${room.title} · everyone in the room sees the same moment.",
+                else "${room.title} · everyone sees the same moment, and you're on a voice call. Only the host changes the episode or anime. Use headphones to avoid echo.",
                 style = inter(13.5f, lineHeight = 19f), color = Ani.Muted,
             )
             Spacer(Modifier.height(14.dp))
@@ -112,6 +112,13 @@ fun TogetherSheet(
                     }
                 }
                 Spacer(Modifier.height(10.dp))
+                if (isHost) {
+                    Box(
+                        Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Lavender).clickable(onClick = onPickAnime),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("Change anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
+                    Spacer(Modifier.height(8.dp))
+                }
                 Box(
                     Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable(onClick = onLeave),
                     contentAlignment = Alignment.Center,

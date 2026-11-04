@@ -19,7 +19,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean)
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis())
 
 /** An episode/audio change made by someone in the room. */
 data class RoomChange(val episode: Int, val audio: String)
@@ -40,9 +40,15 @@ class WatchTogether(
     private val channel = "room-${room.id}"
     private val me = social.myId.orEmpty()
     @Volatile private var offset = 0L
-    private val _commands = MutableSharedFlow<SyncCommand>(replay = 1, extraBufferCapacity = 8)
+    private val _commands = MutableSharedFlow<SyncCommand>(replay = 0, extraBufferCapacity = 8)
     val commands: SharedFlow<SyncCommand> = _commands
-    private val _changes = MutableSharedFlow<RoomChange>(replay = 1, extraBufferCapacity = 4)
+    private val _changes = MutableSharedFlow<RoomChange>(replay = 0, extraBufferCapacity = 4)
+    private val _moved = MutableSharedFlow<Room>(replay = 0, extraBufferCapacity = 2)
+    /** The host switched the room to another anime. */
+    val moved: SharedFlow<Room> = _moved
+    /** Voice-chat signalling goes through the same channel. */
+    @Volatile var rtcListener: ((JsonObject) -> Unit)? = null
+    fun sendRtc(extra: JsonObject) = send("rtc", extra)
     val changes: SharedFlow<RoomChange> = _changes
     private val _members = MutableStateFlow<Set<String>>(setOf(me))
     val members: StateFlow<Set<String>> = _members.asStateFlow()
@@ -78,6 +84,12 @@ class WatchTogether(
                         val au = p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub"
                         episode = ep; audio = au
                         _changes.tryEmit(RoomChange(ep, au))
+                    }
+                    "rtc" -> rtcListener?.invoke(p)
+                    "anime" -> {
+                        val id = p["id"]?.jsonPrimitive?.intOrNull ?: return@collect
+                        _moved.tryEmit(Room(room.id, room.hostId, id, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull,
+                            p["ep"]?.jsonPrimitive?.intOrNull ?: 1, p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub", false))
                     }
                     "end" -> _ended.value = true
                 }
@@ -154,6 +166,22 @@ class WatchTogether(
         episode = ep; audio = au; leader = true
         send("change", buildJsonObject { put("ep", ep); put("audio", au) })
         scope.launch { social.updateRoom(room.id, ep, au) }
+    }
+
+    /** Host moves everyone to another anime. */
+    fun changeAnime(next: Room) {
+        send("anime", buildJsonObject {
+            put("id", next.animeId); put("title", next.title); put("ep", next.episode); put("audio", next.audio)
+            put("cover", next.cover.orEmpty())
+        })
+        scope.launch { social.switchRoomAnime(next) }
+    }
+
+    /** Stop this instance without telling anyone (the room carries on in a new Watch page). */
+    fun detach() {
+        jobs.forEach { it.cancel() }; jobs.clear()
+        val name = channel
+        scope.launch { delay(2500); social.realtime.leave(name) }
     }
 
     fun leave(endForAll: Boolean) {

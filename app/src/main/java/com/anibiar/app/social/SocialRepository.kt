@@ -686,6 +686,14 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         raw("PATCH", "/rest/v1/watch_rooms?id=eq.$id", buildJsonObject { put("episode", episode); put("audio", audio) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
     }
 
+    suspend fun switchRoomAnime(r: Room) = runCatching {
+        val body = buildJsonObject {
+            put("anime_id", r.animeId); put("title", r.title); put("episode", r.episode); put("audio", r.audio)
+            put("cover", if (r.cover == null) JsonNull else JsonPrimitive(r.cover))
+        }
+        raw("PATCH", "/rest/v1/watch_rooms?id=eq.${r.id}", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+    }
+
     suspend fun endRoom(id: String) = runCatching {
         raw("PATCH", "/rest/v1/watch_rooms?id=eq.$id", buildJsonObject { put("ended", true) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
     }

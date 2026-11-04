@@ -173,17 +173,25 @@ fun KiroPlayer(
     val remoteUntil = remember { LongArray(1) }
     val pendingCmd = remember { arrayOfNulls<com.anibiar.app.social.SyncCommand>(1) }
     val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    val lastHardSeek = remember { LongArray(1) }
     val speedNow by rememberUpdatedState(speed)
     fun applyCmd(c: com.anibiar.app.social.SyncCommand) {
         remoteUntil[0] = System.currentTimeMillis() + 1000
-        val drift = c.positionMs - player.currentPosition
-        if (c.hard || kotlin.math.abs(drift) > 800) {
-            player.seekTo(c.positionMs.coerceAtLeast(0)); ended = false
-        } else if (c.playing && kotlin.math.abs(drift) > 120) {
-            // Small drift: nudge the speed for a moment instead of a visible jump.
+        val nowMs = System.currentTimeMillis()
+        // A command that waited for the video to be ready is older now: move its target forward.
+        val target = c.positionMs + if (c.playing) (nowMs - c.at).coerceAtLeast(0) else 0
+        val drift = target - player.currentPosition
+        val away = kotlin.math.abs(drift)
+        if (c.hard) {
+            if (away > 500) { player.seekTo(target.coerceAtLeast(0)); lastHardSeek[0] = nowMs; ended = false }
+        } else if (away > 4000 && nowMs - lastHardSeek[0] > 8000) {
+            // Far off (slow connection, long buffer): jump, but never more than once every 8 s so it can't thrash.
+            player.seekTo(target.coerceAtLeast(0)); lastHardSeek[0] = nowMs; ended = false
+        } else if (c.playing && away > 250 && away <= 4000) {
+            // Small drift: change speed gently instead of seeking, so nothing reloads.
             driftJob[0]?.cancel()
-            player.setPlaybackSpeed(speedNow * if (drift > 0) 1.1f else 0.9f)
-            driftJob[0] = scope.launch { delay((kotlin.math.abs(drift) * 10).coerceIn(150, 1500)); player.setPlaybackSpeed(speedNow) }
+            player.setPlaybackSpeed(speedNow * if (drift > 0) 1.12f else 0.88f)
+            driftJob[0] = scope.launch { delay((away * 8).coerceIn(200, 3000)); player.setPlaybackSpeed(speedNow) }
         }
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
     }
@@ -286,6 +294,7 @@ fun KiroPlayer(
             if (kind != null && autoSkipNow && kind !in skipped && player.isPlaying) {
                 val r = if (kind == "intro") intro!! else outro!!
                 skipped += kind; skipToast = kind to t; skipTarget = null
+                remoteUntil[0] = System.currentTimeMillis() + 1000
                 player.seekTo((r.end * 1000).toLong())
             } else if (skipToast == null) skipTarget = kind
             if (player.isPlaying && timeMs - reported > 5000) { reported = timeMs; onTimeNow(t, durationMs / 1000.0) }
