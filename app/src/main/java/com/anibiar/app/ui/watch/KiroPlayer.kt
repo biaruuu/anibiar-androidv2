@@ -113,6 +113,10 @@ private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
 private fun boostLabel(i: Int) = "${i * 100}%"
 private val CAPTION_SIZES = listOf("Small" to 1.0f, "Medium" to 1.22f, "Large" to 1.5f)
+private fun isEnglishTrack(lang: String, label: String): Boolean {
+    val l = lang.trim().lowercase(); val n = label.trim().lowercase()
+    return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
+}
 private val CAPTION_STYLES = listOf("Default", "Dark box")
 
 private fun fmt(sec: Double): String {
@@ -180,7 +184,12 @@ fun KiroPlayer(
     val skipped = remember { HashSet<String>() }
 
     val sortedSubs = remember(subtitles) {
-        subtitles.sortedBy { t -> if (t.srclang.startsWith("en", true) || t.label.contains("english", true)) 0 else if (t.default) 1 else 2 }
+        subtitles.sortedBy { t -> if (isEnglishTrack(t.srclang, t.label)) 0 else if (t.default) 1 else 2 }
+    }
+    // English only by default: if the stream has no English track, captions start off instead of picking another language.
+    LaunchedEffect(sortedSubs) {
+        val first = sortedSubs.firstOrNull()
+        if (first != null && !isEnglishTrack(first.srclang, first.label) && captionTrack == 0) captionTrack = -1
     }
     fun say(text: String, err: Boolean = false) { notice = text to err }
 
@@ -454,17 +463,17 @@ fun KiroPlayer(
             val (line, italic) = active
             val base = (w.value * 0.027f).coerceIn(12f, 38f) * CAPTION_SIZES[captionSize].second
             val face = TextStyle(
-                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.18f).sp, fontWeight = FontWeight.Medium,
+                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.18f).sp, fontWeight = FontWeight.Normal,
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.1.sp,
             )
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = w * 0.06f).padding(bottom = (w * 0.032f).coerce(16.dp, 44.dp)), contentAlignment = Alignment.Center) {
                 if (captionStyle == 0) {
                     // Crunchyroll look: white Trebuchet with a thick black outline and a soft drop shadow, no box.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.13f).sp.toPx() }
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.1f).sp.toPx() }
                     Text(
                         line, style = face.copy(
                             color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
-                            shadow = Shadow(Color(0x99000000), Offset(0f, 2f), 4f),
+                            shadow = Shadow(Color(0x80000000), Offset(0f, 1.5f), 3f),
                         ),
                     )
                     Text(line, style = face.copy(color = Color.White))

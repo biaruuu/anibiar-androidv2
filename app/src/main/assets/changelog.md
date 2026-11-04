@@ -1,3 +1,7 @@
+## 9 | English captions by default | 2026-11-05
+- Captions now always start on English; if a video has no English track they stay off instead of picking another language
+- Subtitle text is thinner and cleaner, closer to Crunchyroll
+
 ## 8 | Captions: Crunchyroll look by default | 2026-11-05
 - Captions now default to Small, thinner Trebuchet text with a light outline, sitting lower on the screen like Crunchyroll
 - The "Crunchyroll" caption style is now just "Default"; Dark box is still available
