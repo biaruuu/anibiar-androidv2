@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 class AniBiarApp : Application(), ImageLoaderFactory {
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val repository: AnimeRepository by lazy { AnimeRepository(this) }
     val history: WatchHistory by lazy { WatchHistory(this) }

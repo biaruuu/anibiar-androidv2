@@ -92,7 +92,7 @@ private fun prettyDate(iso: String?): String? = iso?.take(10)?.let { d ->
 /** The Watch page: player on top, then episode, audio + server pickers, episode navigation and the anime card. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit) {
+fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit, joinRoom: com.anibiar.app.social.Room? = null) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val scope = rememberCoroutineScope()
@@ -109,7 +109,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var eps by remember { mutableStateOf<EpisodesPayload?>(null) }
     var epsError by remember { mutableStateOf<String?>(null) }
     var epsTry by remember { mutableIntStateOf(0) }
-    var audio by remember { mutableStateOf("sub") }
+    var audio by remember { mutableStateOf(joinRoom?.audio ?: "sub") }
     var ep by remember { mutableIntStateOf(startEp.coerceAtLeast(0)) }
     var watch by remember { mutableStateOf<WatchPayload?>(null) }
     var watchError by remember { mutableStateOf<String?>(null) }
@@ -119,6 +119,33 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var synopsisEpisode by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
+
+    // ---- Watch together ----
+    val social = app.social
+    var room by remember { mutableStateOf(joinRoom) }
+    var together by remember { mutableStateOf<com.anibiar.app.social.WatchTogether?>(null) }
+    var togetherOpen by remember { mutableStateOf(false) }
+    var starting by remember { mutableStateOf(false) }
+    val isHost = room?.hostId == social.myId
+    val roomEnded by (together?.ended ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
+    val roomMembers by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
+    LaunchedEffect(room?.id) {
+        val r = room ?: return@LaunchedEffect
+        if (together == null) together = com.anibiar.app.social.WatchTogether(social, app.appScope, r).also { it.start() }
+    }
+    DisposableEffect(Unit) { onDispose { together?.leave(endForAll = room?.hostId == social.myId); together = null } }
+    LaunchedEffect(together) {
+        val t = together ?: return@LaunchedEffect
+        t.changes.collect { c -> if (c.episode != ep) { ep = c.episode; synopsisEpisode = false; watch = null }; if (c.audio != audio) { audio = c.audio; streamName = null } }
+    }
+    LaunchedEffect(roomEnded) {
+        if (roomEnded) { together?.let { /* host is gone; keep watching alone */ }; android.widget.Toast.makeText(context, "The host ended the room", android.widget.Toast.LENGTH_SHORT).show(); room = null; together = null }
+    }
+    // Any local change of episode or audio (buttons, auto-next, picker) is shared with the room.
+    LaunchedEffect(ep, audio, together) {
+        val t = together ?: return@LaunchedEffect
+        if (t.episode != ep || t.audio != audio) t.changeEpisode(ep, audio)
+    }
 
     LaunchedEffect(id, epsTry) {
         eps = null; epsError = null
@@ -212,6 +239,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 },
                 fullscreen = fullscreen, onFullscreen = { fullscreen = it },
                 modifier = Modifier.fillMaxSize(),
+                together = together,
             )
             if (!ready) {
                 Box(Modifier.fillMaxSize().background(Color(0xD9000000)), contentAlignment = Alignment.Center) {
@@ -287,6 +315,25 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 }
             }
 
+            // Watch together
+            Row(
+                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp))
+                    .background(if (room != null) Ani.Lime.copy(alpha = 0.14f) else Color(0x1AFFFFFF))
+                    .border(1.dp, if (room != null) Ani.Lime.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+                    .clickable {
+                        if (social.myId == null) android.widget.Toast.makeText(context, "Log in to watch together", android.widget.Toast.LENGTH_SHORT).show()
+                        else togetherOpen = true
+                    }.padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AniIcons.Person, null, tint = if (room != null) Ani.Lime else Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (room == null) "Watch together" else "In a room · ${roomMembers.size} watching",
+                    style = inter(14f, FontWeight.SemiBold), color = if (room != null) Ani.Lime else Color.White,
+                )
+            }
+
             // Previous / Episodes / Next
             val edge = Color(0x33FFFFFF)
             Row(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, edge, RoundedCornerShape(12.dp))) {
@@ -356,6 +403,22 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
     }
 
+    if (togetherOpen) {
+        com.anibiar.app.ui.watch.TogetherSheet(
+            room = room, together = together, isHost = isHost, starting = starting,
+            onStart = {
+                starting = true
+                scope.launch {
+                    runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
+                        .onSuccess { room = it }
+                        .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
+                    starting = false
+                }
+            },
+            onLeave = { together?.leave(isHost); together = null; room = null; togetherOpen = false },
+            onDismiss = { togetherOpen = false },
+        )
+    }
     if (episodesOpen) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         var reverse by remember { mutableStateOf(false) }

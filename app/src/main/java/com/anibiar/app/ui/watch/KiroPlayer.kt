@@ -127,6 +127,7 @@ fun KiroPlayer(
     startAt: Double?, onTime: (Double, Double) -> Unit, onEnded: () -> Unit, onFail: () -> Unit,
     fullscreen: Boolean, onFullscreen: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    together: com.anibiar.app.social.WatchTogether? = null,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -167,10 +168,41 @@ fun KiroPlayer(
     }
     fun say(text: String, err: Boolean = false) { notice = text to err }
 
+    // ---- watch together: my actions go out, theirs come in ----
+    val togetherNow by rememberUpdatedState(together)
+    val remoteUntil = remember { LongArray(1) }
+    val pendingCmd = remember { arrayOfNulls<com.anibiar.app.social.SyncCommand>(1) }
+    val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    val speedNow by rememberUpdatedState(speed)
+    fun applyCmd(c: com.anibiar.app.social.SyncCommand) {
+        remoteUntil[0] = System.currentTimeMillis() + 1000
+        val drift = c.positionMs - player.currentPosition
+        if (c.hard || kotlin.math.abs(drift) > 800) {
+            player.seekTo(c.positionMs.coerceAtLeast(0)); ended = false
+        } else if (c.playing && kotlin.math.abs(drift) > 120) {
+            // Small drift: nudge the speed for a moment instead of a visible jump.
+            driftJob[0]?.cancel()
+            player.setPlaybackSpeed(speedNow * if (drift > 0) 1.1f else 0.9f)
+            driftJob[0] = scope.launch { delay((kotlin.math.abs(drift) * 10).coerceIn(150, 1500)); player.setPlaybackSpeed(speedNow) }
+        }
+        if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
+    }
+    LaunchedEffect(together) {
+        val t = together ?: return@LaunchedEffect
+        t.commands.collect { c -> if (player.playbackState == Player.STATE_READY) applyCmd(c) else pendingCmd[0] = c }
+    }
+
     // ---- player wiring ----
     DisposableEffect(player) {
         val l = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (System.currentTimeMillis() > remoteUntil[0] && player.duration > 0) togetherNow?.announce(playWhenReady, player.currentPosition)
+            }
+            override fun onPositionDiscontinuity(o: Player.PositionInfo, n: Player.PositionInfo, reason: Int) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK && System.currentTimeMillis() > remoteUntil[0] && player.duration > 0)
+                    togetherNow?.announce(player.playWhenReady, n.positionMs)
+            }
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_ENDED) { ended = true; playing = false }
@@ -240,6 +272,12 @@ fun KiroPlayer(
         var reported = 0L
         while (true) {
             if (scrubFrac == null) timeMs = player.currentPosition.coerceAtLeast(0)
+            togetherNow?.let { tg ->
+                if (player.playbackState == Player.STATE_READY) {
+                    pendingCmd[0]?.let { pendingCmd[0] = null; applyCmd(it) }
+                    tg.tick(player.playWhenReady, player.currentPosition)
+                }
+            }
             bufferedMs = player.bufferedPosition
             if (player.duration > 0) durationMs = player.duration
             val t = timeMs / 1000.0

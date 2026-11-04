@@ -28,6 +28,15 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.lifecycleScope
 import com.anibiar.app.AniBiarApp
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -124,7 +133,33 @@ private fun AppNavigation() {
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
     var watchId by rememberSaveable { mutableStateOf(0) }
     var watchEp by rememberSaveable { mutableStateOf(1) }
-    BackHandler(enabled = watchId != 0) { watchId = 0 }
+    var joinRoom by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.social.Room?>(null) }
+    BackHandler(enabled = watchId != 0) { watchId = 0; joinRoom = null }
+    val toastCtx = androidx.compose.ui.platform.LocalContext.current
+    val mainScope = androidx.compose.runtime.rememberCoroutineScope()
+    var banner by androidx.compose.runtime.remember { mutableStateOf<Pair<com.anibiar.app.social.Room, String>?>(null) }
+    fun joinRoomById(roomId: String) {
+        mainScope.launch {
+            val r = runCatching { social.fetchRoom(roomId) }.getOrNull()
+            if (r == null || r.ended) {
+                android.widget.Toast.makeText(toastCtx, if (r == null) "Couldn't open that room" else "That room has ended", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                banner = null; inboxOpen = false; searchOpen = false; profileOpen = false; settingsOpen = false; userStack.clear(); stack.clear()
+                joinRoom = r; watchEp = r.episode; watchId = r.animeId
+            }
+        }
+    }
+    // Invites arrive live over realtime; each one is checked against the database before it is shown.
+    androidx.compose.runtime.LaunchedEffect(authState?.uid) {
+        social.inviteStream().collect { b ->
+            val rid = b.payload["room"]?.jsonPrimitive?.contentOrNull ?: return@collect
+            val r = runCatching { social.fetchRoom(rid) }.getOrNull() ?: return@collect
+            if (r.ended || joinRoom?.id == r.id || r.hostId == social.myId) return@collect
+            val who = runCatching { social.profiles(listOf(r.hostId)).firstOrNull()?.shownName }.getOrNull() ?: "A friend"
+            banner = r to who
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(banner) { if (banner != null) { kotlinx.coroutines.delay(20_000); banner = null } }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -169,7 +204,7 @@ private fun AppNavigation() {
 
         if (inboxOpen && authState != null) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.inbox.InboxScreen(onBack = { inboxOpen = false }, onOpenUser = { userStack.add(it) })
+                com.anibiar.app.ui.inbox.InboxScreen(onBack = { inboxOpen = false }, onOpenUser = { userStack.add(it) }, onJoinRoom = { joinRoomById(it) })
             }
         }
 
@@ -213,13 +248,34 @@ private fun AppNavigation() {
         }
 
         if (watchId != 0) {
-            androidx.compose.runtime.key(watchId) {
+            androidx.compose.runtime.key(watchId, joinRoom?.id) {
                 Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                     com.anibiar.app.ui.watch.WatchScreen(
-                        id = watchId, startEp = watchEp, onBack = { watchId = 0 },
+                        id = watchId, startEp = watchEp, onBack = { watchId = 0; joinRoom = null }, joinRoom = joinRoom,
                         onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
                     )
                 }
+            }
+        }
+
+        // Live "join my room" invite
+        banner?.let { (r, who) ->
+            Row(
+                Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(12.dp).fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Ani.Panel)
+                    .border(1.dp, Ani.Lime.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(14.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text("$who invited you to watch together", style = com.anibiar.app.ui.theme.inter(14f, androidx.compose.ui.text.font.FontWeight.SemiBold), color = androidx.compose.ui.graphics.Color.White, maxLines = 2)
+                    androidx.compose.material3.Text("${r.title} · Episode ${r.episode}", style = com.anibiar.app.ui.theme.inter(12.5f), color = Ani.Muted, maxLines = 1)
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
+                androidx.compose.material3.Text("Dismiss", style = com.anibiar.app.ui.theme.inter(13f), color = Ani.Muted, modifier = Modifier.clickable { banner = null }.padding(8.dp))
+                androidx.compose.material3.Text(
+                    "Join", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.Black,
+                    modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(Ani.Lime).clickable { joinRoomById(r.id) }.padding(horizontal = 18.dp, vertical = 9.dp),
+                )
             }
         }
 

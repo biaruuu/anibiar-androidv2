@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 
 /** Follows, friend requests and accepted requests, newest first. */
 @Composable
-fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit) {
+fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (String) -> Unit = {}) {
     BackHandler(onBack = onBack)
     val app = LocalContext.current.applicationContext as AniBiarApp
     val social = app.social
@@ -97,6 +97,7 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                         onAccept = { scope.launch { runCatching { social.acceptFriend(n.actorId) } } },
                         onDecline = { scope.launch { runCatching { social.removeFriend(n.actorId) } } },
                         onFollowBack = { scope.launch { runCatching { social.follow(n.actorId) } } },
+                        onJoin = { n.ref?.let(onJoinRoom) },
                     )
                 }
             }
@@ -107,12 +108,13 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit) {
 @Composable
 private fun NoticeRow(
     n: Notice, iFollow: Boolean, pending: Boolean,
-    onOpen: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit, onFollowBack: () -> Unit,
+    onOpen: () -> Unit, onAccept: () -> Unit, onDecline: () -> Unit, onFollowBack: () -> Unit, onJoin: () -> Unit,
 ) {
     val name = n.actor?.username ?: "Someone"
     val what = when (n.type) {
         "follow" -> " started following you."
         "friend_request" -> " wants to be your friend."
+        "watch_invite" -> " invited you to watch together."
         else -> " accepted your friend request."
     }
     Row(
@@ -138,6 +140,10 @@ private fun NoticeRow(
                     Pill("Decline", primary = false, onClick = onDecline)
                 }
             }
+        }
+        if (n.type == "watch_invite" && n.ref != null) {
+            Spacer(Modifier.width(8.dp))
+            Pill("Join", primary = true, onClick = onJoin)
         }
         if (n.type == "follow" && !iFollow) {
             Spacer(Modifier.width(8.dp))

@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -71,7 +73,10 @@ data class UserProfile(
 }
 
 /** One inbox entry. [type] is follow, friend_request or friend_accepted. */
-data class Notice(val id: Long, val type: String, val actor: UserProfile?, val actorId: String, val read: Boolean, val createdAt: Long)
+data class Notice(val id: Long, val type: String, val actor: UserProfile?, val actorId: String, val read: Boolean, val createdAt: Long, val ref: String? = null)
+
+/** A Watch Together room. */
+data class Room(val id: String, val hostId: String, val animeId: Int, val title: String, val cover: String?, val episode: Int, val audio: String, val ended: Boolean)
 
 enum class SignUpResult { SignedIn, ConfirmEmail }
 
@@ -88,6 +93,8 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     private val prefs = context.getSharedPreferences("kiro_session", Context.MODE_PRIVATE)
     private val refreshLock = Mutex()
     private var session: Session? = null
+    val realtime = Realtime(scope)
+    val myId: String? get() = session?.uid
 
     private val _auth = MutableStateFlow<AuthState?>(null)
     val authState: StateFlow<AuthState?> = _auth.asStateFlow()
@@ -528,7 +535,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     fun notices(): Flow<List<Notice>> = live {
         val me = session?.uid ?: return@live emptyList()
-        val rows = getRows("/rest/v1/notifications?user_id=eq.$me&select=id,type,read,created_at,actor_id&order=created_at.desc&limit=100")
+        val rows = getRows("/rest/v1/notifications?user_id=eq.$me&select=id,type,read,created_at,actor_id,ref&order=created_at.desc&limit=100")
         val actors = profiles(rows.map { it.jsonObject["actor_id"]!!.jsonPrimitive.content }.toSet()).associateBy { it.uid }
         rows.map {
             val o = it.jsonObject
@@ -536,6 +543,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             Notice(
                 id = o["id"]!!.jsonPrimitive.content.toLong(), type = o["type"]!!.jsonPrimitive.content, actor = actors[aid], actorId = aid,
                 read = o["read"]?.jsonPrimitive?.contentOrNull == "true", createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
+                ref = o["ref"]?.jsonPrimitive?.contentOrNull,
             )
         }
     }
@@ -631,5 +639,76 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             if (id != null) _pendingUser.value = id
             id != null
         } catch (e: CancellationException) { throw e } catch (e: Exception) { false }
+    }
+
+    // ---------------------------------------------------------------- watch together
+
+    private fun parseRoom(o: JsonObject) = Room(
+        id = o["id"]!!.jsonPrimitive.content, hostId = o["host_id"]!!.jsonPrimitive.content,
+        animeId = o["anime_id"]!!.jsonPrimitive.content.toInt(), title = o["title"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        cover = o["cover"]?.jsonPrimitive?.contentOrNull, episode = o["episode"]!!.jsonPrimitive.content.toInt(),
+        audio = o["audio"]?.jsonPrimitive?.contentOrNull ?: "sub", ended = o["ended"]?.jsonPrimitive?.contentOrNull == "true",
+    )
+
+    suspend fun createRoom(animeId: Int, title: String, cover: String?, episode: Int, audio: String): Room = net {
+        val me = session?.uid ?: throw ApiError("auth", "Log in to watch together")
+        val body = buildJsonObject {
+            put("host_id", me); put("anime_id", animeId); put("title", title); put("episode", episode); put("audio", audio)
+            put("cover", if (cover == null) JsonNull else JsonPrimitive(cover))
+        }
+        val (code, text) = raw("POST", "/rest/v1/watch_rooms", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=representation"))
+        if (code !in 200..299) fail(code, text)
+        parseRoom(json.parseToJsonElement(text).jsonArray[0].jsonObject)
+    }
+
+    suspend fun fetchRoom(id: String): Room? = net {
+        getRows("/rest/v1/watch_rooms?id=eq.${encode(id)}&select=*&limit=1").firstOrNull()?.let { parseRoom(it.jsonObject) }
+    }
+
+    /** Friends who already have an invite to [roomId]. */
+    suspend fun invitedIds(roomId: String): Set<String> = net {
+        getRows("/rest/v1/watch_invites?room_id=eq.$roomId&select=user_id").map { it.jsonObject["user_id"]!!.jsonPrimitive.content }.toSet()
+    }
+
+    /** Invites a friend: stored (so it also lands in their inbox) and pushed live over realtime. */
+    suspend fun inviteToRoom(room: Room, userId: String) = net {
+        val me = session?.uid ?: return@net
+        val body = buildJsonObject { put("room_id", room.id); put("user_id", userId); put("from_id", me) }
+        val (code, text) = raw("POST", "/rest/v1/watch_invites", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"))
+        if (code !in 200..299) fail(code, text)
+        val chan = "inv-$userId"
+        realtime.join(chan)
+        realtime.send(chan, "invite", buildJsonObject { put("room", room.id); put("from", me); put("title", room.title); put("ep", room.episode) })
+        scope.launch { delay(4000); realtime.leave(chan) }
+    }
+
+    suspend fun updateRoom(id: String, episode: Int, audio: String) = runCatching {
+        raw("PATCH", "/rest/v1/watch_rooms?id=eq.$id", buildJsonObject { put("episode", episode); put("audio", audio) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+    }
+
+    suspend fun endRoom(id: String) = runCatching {
+        raw("PATCH", "/rest/v1/watch_rooms?id=eq.$id", buildJsonObject { put("ended", true) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+    }
+
+    /** Milliseconds to add to this phone's clock to get server time (best of a few round trips). */
+    suspend fun clockOffset(): Long {
+        var best = Long.MAX_VALUE; var offset = 0L
+        repeat(5) {
+            runCatching {
+                val t0 = System.currentTimeMillis()
+                val (code, text) = raw("POST", "/rest/v1/rpc/server_time", "{}".toByteArray(), authed = false)
+                val t1 = System.currentTimeMillis()
+                if (code in 200..299 && t1 - t0 < best) { best = t1 - t0; offset = text.trim().toLong() - (t0 + (t1 - t0) / 2) }
+            }
+        }
+        return offset
+    }
+
+    /** Live invites pushed to me while the app is open. */
+    fun inviteStream(): Flow<Broadcast> = _auth.map { it?.uid }.distinctUntilChanged().flatMapLatest { uid ->
+        if (uid == null) emptyFlow() else {
+            val name = "inv-$uid"
+            realtime.join(name).onCompletion { realtime.leave(name) }
+        }
     }
 }
