@@ -19,7 +19,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0)
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0, val cap: String? = null, val capSize: Int = 0, val capStyle: Int = 0)
 
 /** A guest asking the host for another anime or episode. */
 data class RoomRequest(val from: String, val animeId: Int?, val title: String, val cover: String?, val episode: Int)
@@ -69,6 +69,20 @@ class WatchTogether(
         return (ms / 1000.0).takeIf { it > 1.0 }
     }
     @Volatile var boost = 0
+    @Volatile var captionLabel = ""
+    @Volatile var captionSize = 0
+    @Volatile var captionStyle = 0
+    // Guests report when their video stalls; the host pauses for everyone until they're back (or 8 s pass).
+    private val buffering = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val _waiting = MutableStateFlow(false)
+    val waiting: StateFlow<Boolean> = _waiting.asStateFlow()
+    fun reportBuffering(on: Boolean) = send("buf", buildJsonObject { put("on", on.toString()) })
+    private fun refreshWaiting() {
+        val cutoff = System.currentTimeMillis() - 8000
+        buffering.entries.removeAll { it.value < cutoff }
+        val w = buffering.isNotEmpty()
+        if (_waiting.value != w) _waiting.value = w
+    }
     fun request(animeId: Int?, title: String, cover: String?, episode: Int) = send("request", buildJsonObject {
         if (animeId != null) put("id", animeId); put("title", title); put("cover", cover.orEmpty()); put("ep", episode)
     })
@@ -118,13 +132,14 @@ class WatchTogether(
                     "state" -> onState(p)
                     "hello" -> { send("here", buildJsonObject { put("muted", myMuted.toString()) }); if (leader || room.hostId == me) { /* newcomer needs the position */ requestAnnounce = true } }
                     "here" -> Unit
-                    "bye" -> { seen.remove(from); _muted.value = _muted.value - from; publishMembers() }
+                    "bye" -> { buffering.remove(from); refreshWaiting(); seen.remove(from); _muted.value = _muted.value - from; publishMembers() }
                     "change" -> {
                         val ep = p["ep"]?.jsonPrimitive?.intOrNull ?: return@collect
                         val au = p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub"
                         episode = ep; audio = au
                         _changes.tryEmit(RoomChange(ep, au))
                     }
+                    "buf" -> { if (p["on"]?.jsonPrimitive?.contentOrNull == "true") buffering[from] = System.currentTimeMillis() else buffering.remove(from); refreshWaiting() }
                     "fs" -> noteFs(p["on"]?.jsonPrimitive?.contentOrNull == "true")
                     "rtc" -> rtcListener?.invoke(p)
                     "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
@@ -174,7 +189,8 @@ class WatchTogether(
         val target = if (playing) pos + (now() - ts).coerceAtLeast(0) else pos
         p["fs"]?.jsonPrimitive?.contentOrNull?.let { noteFs(it == "true") }
         val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
-        _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0))
+        _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0,
+            cap = p["cap"]?.jsonPrimitive?.contentOrNull, capSize = p["cs"]?.jsonPrimitive?.intOrNull ?: 0, capStyle = p["cst"]?.jsonPrimitive?.intOrNull ?: 0))
     }
 
     private fun send(event: String, extra: JsonObject) {
@@ -190,18 +206,19 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString())
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle)
         })
     }
 
     /** Called by the player every tick; the leader re-announces every ~2 s so others stay locked on. */
     private var lastBeat = 0L
     fun tick(playing: Boolean, positionMs: Long) {
+        refreshWaiting()
         val t = System.currentTimeMillis()
         if ((leader && t - lastBeat > 1000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString())
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle)
             })
         }
     }

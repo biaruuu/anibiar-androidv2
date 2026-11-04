@@ -103,6 +103,7 @@ import kotlinx.coroutines.withContext
 
 private val Glass = Color(0x3A1B1B20)
 private val GlassEdge = Color(0x26FFFFFF)
+private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
 private fun boostLabel(i: Int) = "${i * 100}%"
@@ -160,6 +161,8 @@ fun KiroPlayer(
     var userQuality by remember { mutableStateOf(false) }
     var heights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var captionTrack by remember { mutableIntStateOf(0) }
+    var captionTry by remember { mutableIntStateOf(0) }
+    var captionState by remember { mutableStateOf("") }
     var captionSize by remember { mutableIntStateOf(0) }
     var captionStyle by remember { mutableIntStateOf(0) }
     var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
@@ -181,6 +184,10 @@ fun KiroPlayer(
     val readOnlyNow by rememberUpdatedState(readOnly)
     val remoteUntil = remember { LongArray(1) }
     val retries = remember { IntArray(1) }
+    val playedOnce = remember { BooleanArray(1) }
+    val bufSent = remember { LongArray(1) }
+    val autoPaused = remember { BooleanArray(1) }
+    val autoAt = remember { LongArray(1) }
     val pendingCmd = remember { arrayOfNulls<com.anibiar.app.social.SyncCommand>(1) }
     val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     val lastHardSeek = remember { LongArray(1) }
@@ -206,7 +213,25 @@ fun KiroPlayer(
         }
         if (c.speed != speedNow) speed = c.speed
         if (c.boost != boost) boost = c.boost
+        if (c.capSize != captionSize) captionSize = c.capSize
+        if (c.capStyle != captionStyle) captionStyle = c.capStyle
+        c.cap?.let { label ->
+            val idx = if (label.isEmpty()) -1 else sortedSubs.indexOfFirst { it.label == label }
+            if (idx != captionTrack && (idx >= 0 || label.isEmpty())) captionTrack = idx
+        }
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
+    }
+    // Host: someone's video is stalling, so wait for them; carry on when they're ready (or after 8 s).
+    LaunchedEffect(together) {
+        val t = together ?: return@LaunchedEffect
+        t.waiting.collect { w ->
+            if (readOnlyNow) return@collect
+            if (w && player.playWhenReady && player.playbackState == Player.STATE_READY) {
+                autoPaused[0] = true; autoAt[0] = System.currentTimeMillis(); player.playWhenReady = false
+            } else if (!w && autoPaused[0]) {
+                autoPaused[0] = false; autoAt[0] = System.currentTimeMillis(); player.playWhenReady = true
+            }
+        }
     }
     LaunchedEffect(together) {
         val t = together ?: return@LaunchedEffect
@@ -218,6 +243,7 @@ fun KiroPlayer(
         val l = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (System.currentTimeMillis() - autoAt[0] > 600) autoPaused[0] = false // the host chose this themselves
                 if (!readOnlyNow && System.currentTimeMillis() > remoteUntil[0] && player.duration > 0) togetherNow?.announce(playWhenReady, player.currentPosition)
             }
             override fun onPositionDiscontinuity(o: Player.PositionInfo, n: Player.PositionInfo, reason: Int) {
@@ -226,6 +252,12 @@ fun KiroPlayer(
             }
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
+                if (state == Player.STATE_READY) {
+                    playedOnce[0] = true
+                    if (bufSent[0] != 0L) { bufSent[0] = 0; if (readOnlyNow) togetherNow?.reportBuffering(false) }
+                } else if (state == Player.STATE_BUFFERING && playedOnce[0] && readOnlyNow && bufSent[0] == 0L) {
+                    bufSent[0] = System.currentTimeMillis(); togetherNow?.reportBuffering(true)
+                }
                 if (state == Player.STATE_ENDED) { ended = true; playing = false }
                 if (state == Player.STATE_READY) { durationMs = player.duration.coerceAtLeast(0); error = null }
             }
@@ -253,7 +285,7 @@ fun KiroPlayer(
 
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
-        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; timeMs = 0; durationMs = 0
+        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
             .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4).build()
@@ -264,6 +296,12 @@ fun KiroPlayer(
     LaunchedEffect(boost) {
         togetherNow?.let { t -> t.boost = boost; if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false) }
     }
+    LaunchedEffect(captionTrack, captionSize, captionStyle, sortedSubs) {
+        togetherNow?.let { t ->
+            t.captionLabel = sortedSubs.getOrNull(captionTrack)?.label.orEmpty(); t.captionSize = captionSize; t.captionStyle = captionStyle
+            if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false)
+        }
+    }
     LaunchedEffect(volume, muted) { player.volume = if (muted) 0f else volume }
     LaunchedEffect(speed) {
         player.setPlaybackSpeed(speed)
@@ -273,7 +311,7 @@ fun KiroPlayer(
     // Volume boost through the system loudness enhancer.
     val enhancer = remember { arrayOfNulls<android.media.audiofx.LoudnessEnhancer>(1) }
     DisposableEffect(Unit) { onDispose { runCatching { enhancer[0]?.release() } } }
-    LaunchedEffect(boost, src, buffering) {
+    LaunchedEffect(boost, src, buffering, playing) {
         runCatching {
             val session = player.audioSessionId
             if (session == C.AUDIO_SESSION_ID_UNSET || session == 0) return@runCatching
@@ -295,11 +333,24 @@ fun KiroPlayer(
     }
 
     // Captions: fetch + parse the chosen track.
-    LaunchedEffect(sortedSubs, captionTrack) {
-        cues = emptyList()
-        val t = sortedSubs.getOrNull(captionTrack) ?: return@LaunchedEffect
-        cues = runCatching { withContext(Dispatchers.Default) { Captions.parse(Streaming.text(t.src)) } }.getOrDefault(emptyList())
+    LaunchedEffect(sortedSubs, captionTrack, captionTry) {
+        val t = sortedSubs.getOrNull(captionTrack)
+        if (t == null) { cues = emptyList(); captionState = ""; return@LaunchedEffect }
+        val key = "$title|${t.label}"
+        cueCache[key]?.let { cues = it; captionState = ""; return@LaunchedEffect }
+        cues = emptyList(); captionState = "loading"
+        // The subtitle file comes through a proxy that can hiccup: try a few times, then remember the result.
+        for (attempt in 0 until 4) {
+            val got = runCatching { withContext(Dispatchers.Default) { Captions.parse(Streaming.text(t.src)) } }.getOrNull()
+            if (!got.isNullOrEmpty()) {
+                if (cueCache.size > 40) cueCache.clear()
+                cueCache[key] = got; cues = got; captionState = ""; return@LaunchedEffect
+            }
+            delay(600L * (attempt + 1))
+        }
+        captionState = "error"
     }
+    LaunchedEffect(captionState) { if (captionState == "error") say("Captions couldn't load. Open Settings, Captions to retry", true) }
 
     // Position, buffering, skip intro/outro, progress reporting.
     val onTimeNow by rememberUpdatedState(onTime)
@@ -308,6 +359,9 @@ fun KiroPlayer(
         var reported = 0L
         while (true) {
             if (scrubFrac == null) timeMs = player.currentPosition.coerceAtLeast(0)
+            if (readOnlyNow && bufSent[0] != 0L && player.playbackState == Player.STATE_BUFFERING && System.currentTimeMillis() - bufSent[0] > 2000) {
+                bufSent[0] = System.currentTimeMillis(); togetherNow?.reportBuffering(true)
+            }
             togetherNow?.let { tg ->
                 if (player.playbackState == Player.STATE_READY) {
                     pendingCmd[0]?.let { pendingCmd[0] = null; applyCmd(it) }
@@ -481,7 +535,7 @@ fun KiroPlayer(
                         } else say("This server only streams. Pick another one to download.", true)
                     }
                     if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
-                        captionTrack = if (captionTrack >= 0) -1 else 0
+                        if (!readOnly) captionTrack = if (captionTrack >= 0) -1 else 0
                     }
                     BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
                 }
@@ -547,8 +601,8 @@ fun KiroPlayer(
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
                         MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost) + if (readOnly) " · host" else "") { if (!readOnly) menuView = "boost" }
                         if (sortedSubs.isNotEmpty()) {
-                            MenuRow(VidIcons.ClosedCaptions, "Captions", sortedSubs.getOrNull(captionTrack)?.label ?: "Off") { menuView = "captions" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
+                            MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off") + if (readOnly) " · host" else "") { if (captionState == "error") captionTry++ else if (!readOnly) menuView = "captions" }
+                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first + if (readOnly) " · host" else "") { if (!readOnly) menuView = "style" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                         MenuRow(VidIcons.Play, "Autoplay", if (autoplay) "On" else "Off", chevron = false) { onAutoplay(!autoplay) }
