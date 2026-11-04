@@ -120,14 +120,16 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var expanded by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
 
-    // ---- Watch together ----
+    // ---- Watch together (the room lives in RoomSession, so leaving this page doesn't end it) ----
     val social = app.social
-    var room by remember { mutableStateOf(joinRoom) }
-    var together by remember { mutableStateOf<com.anibiar.app.social.WatchTogether?>(null) }
+    val session = app.roomSession
+    val room = session.room?.takeIf { it.animeId == id }
+    val together = if (room != null) session.together else null
+    val voice = if (room != null) session.voice else null
+    val roomProfiles = session.profiles
     var togetherOpen by remember { mutableStateOf(false) }
     var starting by remember { mutableStateOf(false) }
     val isHost = room?.hostId == social.myId
-    val roomEnded by (together?.ended ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     val roomMembers by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val locked = room != null && !isHost
     fun hostOnly() { android.widget.Toast.makeText(context, "Only the host can change the episode", android.widget.Toast.LENGTH_SHORT).show() }
@@ -135,56 +137,18 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     // Voice call: starts by itself once I'm in a room (and have allowed the microphone).
     var micOk by remember { mutableStateOf(androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) }
     val micLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { micOk = it }
-    var voice by remember { mutableStateOf<com.anibiar.app.social.VoiceChat?>(null) }
     val vMuted by (voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
-    LaunchedEffect(together) { if (together != null && !micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
-    LaunchedEffect(together, micOk) {
-        val t = together
-        if (t == null) { voice?.stop(); voice = null }
-        else if (micOk && voice == null) voice = runCatching { com.anibiar.app.social.VoiceChat(context.applicationContext, t, social.myId.orEmpty(), app.appScope).also { it.start() } }.getOrNull()
-    }
-    DisposableEffect(Unit) { onDispose { voice?.stop(); voice = null } }
+    LaunchedEffect(joinRoom?.id) { joinRoom?.let { session.enter(it) } }
+    LaunchedEffect(together != null) { if (together != null && !micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
+    LaunchedEffect(together, micOk) { if (together != null && micOk) session.ensureVoice() }
     val speaking by (voice?.speaking ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val mutedUsers by (together?.mutedUsers ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
-    var roomProfiles by remember { mutableStateOf<Map<String, com.anibiar.app.social.UserProfile>>(emptyMap()) }
     val memberList = roomMembers.toList()
-    // Names/avatars for everyone in the room, plus a sound + toast when someone joins or leaves.
-    var prevMembers by remember { mutableStateOf<Set<String>?>(null) }
-    LaunchedEffect(roomMembers, room?.id) {
-        if (room == null) { prevMembers = null; return@LaunchedEffect }
-        val missing = roomMembers.filter { it !in roomProfiles }
-        if (missing.isNotEmpty()) roomProfiles = roomProfiles + social.profiles(missing).associateBy { it.uid }
-        val before = prevMembers
-        prevMembers = roomMembers
-        if (before == null) return@LaunchedEffect
-        val me = social.myId
-        val joined = (roomMembers - before).filter { it != me }
-        val left = (before - roomMembers).filter { it != me }
-        if (joined.isEmpty() && left.isEmpty()) return@LaunchedEffect
-        runCatching {
-            val tone = android.media.ToneGenerator(if (voice != null) android.media.AudioManager.STREAM_VOICE_CALL else android.media.AudioManager.STREAM_MUSIC, 90)
-            tone.startTone(if (joined.isNotEmpty()) android.media.ToneGenerator.TONE_PROP_ACK else android.media.ToneGenerator.TONE_PROP_NACK, 350)
-            scope.launch { kotlinx.coroutines.delay(800); tone.release() }
-        }
-        fun nameOf(u: String) = roomProfiles[u]?.shownName ?: "Someone"
-        joined.forEach { android.widget.Toast.makeText(context, "${nameOf(it)} joined the room", android.widget.Toast.LENGTH_SHORT).show() }
-        left.forEach { android.widget.Toast.makeText(context, "${nameOf(it)} left the room", android.widget.Toast.LENGTH_SHORT).show() }
-    }
-    LaunchedEffect(together) {
-        val t = together ?: return@LaunchedEffect
-        t.moved.collect { r -> t.detach(); together = null; room = null; onRoomMoved(r) }
-    }
-    LaunchedEffect(room?.id) {
-        val r = room ?: return@LaunchedEffect
-        if (together == null) together = com.anibiar.app.social.WatchTogether(social, app.appScope, r).also { it.start() }
-    }
-    DisposableEffect(Unit) { onDispose { together?.leave(endForAll = room?.hostId == social.myId); together = null } }
+    var driftMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(together) { val t = together ?: return@LaunchedEffect; while (true) { driftMs = t.driftMs; kotlinx.coroutines.delay(500) } }
     LaunchedEffect(together) {
         val t = together ?: return@LaunchedEffect
         t.changes.collect { c -> if (c.episode != ep) { ep = c.episode; synopsisEpisode = false; watch = null }; if (c.audio != audio) { audio = c.audio; streamName = null } }
-    }
-    LaunchedEffect(roomEnded) {
-        if (roomEnded) { together?.let { /* host is gone; keep watching alone */ }; android.widget.Toast.makeText(context, "The host ended the room", android.widget.Toast.LENGTH_SHORT).show(); room = null; together = null }
     }
     // Any local change of episode or audio (buttons, auto-next, picker) is shared with the room.
     LaunchedEffect(ep, audio, together, isHost) {
@@ -287,7 +251,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onAutoplay = { autoplay = it; prefsStore.edit().putBoolean("autoplay", it).apply() },
                 onAutoNext = { autoNext = it; prefsStore.edit().putBoolean("autoNext", it).apply() },
                 onAutoSkip = { autoSkip = it; prefsStore.edit().putBoolean("autoSkip", it).apply() },
-                startAt = null,
+                startAt = together?.resumeSeconds(current?.number),
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
                 onEnded = { if (autoNext && next != null && !locked) select(next.number) },
                 onFail = {
@@ -343,11 +307,21 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             val r = room; val t = together
                             if (rq.animeId != null && r != null && t != null) {
                                 val next = r.copy(animeId = rq.animeId, title = rq.title, cover = rq.cover, episode = 1, audio = "sub")
-                                t.changeAnime(next); t.detach(); together = null; room = null
+                                session.moveTo(next)
                                 onRoomMoved(next)
                             } else if (rq.animeId == null) { ep = rq.episode; synopsisEpisode = false; watch = null }
                         }.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Ani.Lime))
+                Spacer(Modifier.width(8.dp))
+                Text("Live · ${memberList.size} in the room", style = inter(12.5f, FontWeight.SemiBold), color = Ani.Soft)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (isHost) "You control playback" else if (kotlin.math.abs(driftMs) < 600) "In sync with host" else "Syncing…",
+                    style = inter(12f), color = if (isHost || kotlin.math.abs(driftMs) < 600) Ani.Lime else Ani.Amber,
+                )
             }
             com.anibiar.app.ui.watch.RoomPanel(
                 members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
@@ -356,7 +330,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onEpisodes = { episodesOpen = true },
                 onAnime = { pickerOpen = true },
                 onInvite = { togetherOpen = true },
-                onLeave = { together?.leave(isHost); together = null; room = null },
+                onLeave = { session.leave(isHost) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -424,7 +398,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             starting = true
                             scope.launch {
                                 runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
-                                    .onSuccess { room = it }
+                                    .onSuccess { session.enter(it) }
                                     .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
                                 starting = false
                             }
@@ -526,12 +500,12 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 starting = true
                 scope.launch {
                     runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
-                        .onSuccess { room = it }
+                        .onSuccess { session.enter(it) }
                         .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
                     starting = false
                 }
             },
-            onLeave = { together?.leave(isHost); together = null; room = null; togetherOpen = false },
+            onLeave = { session.leave(isHost); togetherOpen = false },
             onDismiss = { togetherOpen = false },
             onPickAnime = { togetherOpen = false; pickerOpen = true },
             audio = audio, dubAvailable = !eps?.dub.isNullOrEmpty(), onAudio = { audio = it; streamName = null },
@@ -546,7 +520,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 val r = room; val t = together
                 if (r != null && t != null && isHost) {
                     val next = r.copy(animeId = m.id, title = m.displayTitle, cover = m.posterUrl, episode = 1, audio = "sub")
-                    t.changeAnime(next); t.detach(); together = null; room = null
+                    session.moveTo(next)
                     onRoomMoved(next)
                 } else if (t != null) {
                     t.request(m.id, m.displayTitle, m.posterUrl, 1)

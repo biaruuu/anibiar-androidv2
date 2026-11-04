@@ -136,6 +136,7 @@ fun KiroPlayer(
     val scope = rememberCoroutineScope()
     val player = remember {
         ExoPlayer.Builder(context)
+            .setBandwidthMeter(androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context).setInitialBitrateEstimate(12_000_000L).build())
             .setLoadControl(androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(30_000, 70_000, 1_500, 3_000).build())
             .build()
     }
@@ -179,6 +180,7 @@ fun KiroPlayer(
     val togetherNow by rememberUpdatedState(together)
     val readOnlyNow by rememberUpdatedState(readOnly)
     val remoteUntil = remember { LongArray(1) }
+    val retries = remember { IntArray(1) }
     val pendingCmd = remember { arrayOfNulls<com.anibiar.app.social.SyncCommand>(1) }
     val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     val lastHardSeek = remember { LongArray(1) }
@@ -190,6 +192,7 @@ fun KiroPlayer(
         val target = c.positionMs + if (c.playing) (nowMs - c.at).coerceAtLeast(0) else 0
         val drift = target - player.currentPosition
         val away = kotlin.math.abs(drift)
+        togetherNow?.driftMs = drift
         if (c.hard) {
             if (away > 500) { player.seekTo(target.coerceAtLeast(0)); lastHardSeek[0] = nowMs; ended = false }
         } else if (away > 4000 && nowMs - lastHardSeek[0] > 8000) {
@@ -226,7 +229,12 @@ fun KiroPlayer(
                 if (state == Player.STATE_ENDED) { ended = true; playing = false }
                 if (state == Player.STATE_READY) { durationMs = player.duration.coerceAtLeast(0); error = null }
             }
-            override fun onPlayerError(e: PlaybackException) { error = "This server couldn't play the video."; onFail() }
+            override fun onPlayerError(e: PlaybackException) {
+                // A pinned quality that fails goes back to Auto; a hiccup gets two quiet retries before trying the next server.
+                if (quality > 0) { userQuality = true; quality = -1 }
+                if (retries[0] < 2) { retries[0]++; scope.launch { delay(700); player.prepare() }; return }
+                error = "This server couldn't play the video (${e.errorCodeName})."; onFail()
+            }
             override fun onVideoSizeChanged(v: VideoSize) { if (v.width > 0 && v.height > 0) videoRatio = v.width * v.pixelWidthHeightRatio / v.height }
             override fun onTracksChanged(t: Tracks) {
                 heights = t.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
@@ -235,14 +243,17 @@ fun KiroPlayer(
             }
         }
         player.addListener(l)
-        onDispose { player.removeListener(l); player.release() }
+        onDispose {
+            togetherNow?.let { it.resumeEp = it.episode; it.resumePos = player.currentPosition.coerceAtLeast(0); it.resumePlaying = player.playWhenReady && player.playbackState == Player.STATE_READY; it.resumeAt = System.currentTimeMillis() }
+            player.removeListener(l); player.release()
+        }
     }
     DisposableEffect(playing) { view.keepScreenOn = playing; onDispose { view.keepScreenOn = false } }
     LaunchedEffect(textureView) { textureView?.let { player.setVideoTextureView(it) } }
 
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
-        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; timeMs = 0; durationMs = 0
+        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
             .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4).build()
@@ -271,8 +282,7 @@ fun KiroPlayer(
         }
     }
 
-    // HD by default: start on the highest quality the stream offers (you can still pick another).
-    LaunchedEffect(heights) { if (heights.isNotEmpty() && quality == -1 && !userQuality) quality = heights.first() }
+    // HD without pinning: Auto, but starting from a high bandwidth estimate so it begins on the best quality.
     // Quality: pin the chosen height, or let the player adapt.
     LaunchedEffect(quality, heights) {
         val builder = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO)

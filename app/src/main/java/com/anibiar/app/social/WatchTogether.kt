@@ -49,6 +49,18 @@ class WatchTogether(
     private val _requests = MutableSharedFlow<RoomRequest>(extraBufferCapacity = 8)
     val requests: SharedFlow<RoomRequest> = _requests
     @Volatile var speed = 1f
+    /** How far (ms) this phone was from the host the last time it synced. */
+    @Volatile var driftMs = 0L
+    /** Where I was when I left the watch page, so coming back resumes at the right moment. */
+    @Volatile var resumeEp = -1
+    @Volatile var resumePos = 0L
+    @Volatile var resumePlaying = false
+    @Volatile var resumeAt = 0L
+    fun resumeSeconds(ep: Int?): Double? {
+        if (ep == null || ep != resumeEp || resumeAt == 0L) return null
+        val ms = resumePos + if (resumePlaying) System.currentTimeMillis() - resumeAt else 0L
+        return (ms / 1000.0).takeIf { it > 1.0 }
+    }
     @Volatile var boost = 0
     fun request(animeId: Int?, title: String, cover: String?, episode: Int) = send("request", buildJsonObject {
         if (animeId != null) put("id", animeId); put("title", title); put("cover", cover.orEmpty()); put("ep", episode)
@@ -109,6 +121,7 @@ class WatchTogether(
                     "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
                     "anime" -> {
                         val id = p["id"]?.jsonPrimitive?.intOrNull ?: return@collect
+                        episode = p["ep"]?.jsonPrimitive?.intOrNull ?: 1; audio = p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub"
                         _moved.tryEmit(Room(room.id, room.hostId, id, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull,
                             p["ep"]?.jsonPrimitive?.intOrNull ?: 1, p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub", false))
                     }
@@ -192,6 +205,7 @@ class WatchTogether(
 
     /** Host moves everyone to another anime. */
     fun changeAnime(next: Room) {
+        episode = next.episode; audio = next.audio
         send("anime", buildJsonObject {
             put("id", next.animeId); put("title", next.title); put("ep", next.episode); put("audio", next.audio)
             put("cover", next.cover.orEmpty())

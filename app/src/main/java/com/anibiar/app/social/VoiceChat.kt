@@ -79,7 +79,7 @@ class VoiceChat(
             inited = true
         }
         factory = PeerConnectionFactory.builder()
-            .setAudioDeviceModule(JavaAudioDeviceModule.builder(app).setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true).createAudioDeviceModule())
+            .setAudioDeviceModule(JavaAudioDeviceModule.builder(app).setUseHardwareAcousticEchoCanceler(false).setUseHardwareNoiseSuppressor(false).createAudioDeviceModule())
             .createPeerConnectionFactory()
         val constraints = MediaConstraints().apply {
             for (k in listOf("googEchoCancellation", "googNoiseSuppression", "googAutoGainControl", "googHighpassFilter", "googEchoCancellation2", "googNoiseSuppression2"))
@@ -181,10 +181,10 @@ class VoiceChat(
         return pc
     }
 
-    /** Opus tuned for clear speech: 64 kbps mono, in-band error correction, 10 ms packets for low delay. */
+    /** Opus tuned for clear speech: 96 kbps full-band mono, in-band error correction, 20 ms packets. */
     private fun hq(sdp: String): String {
         val pt = Regex("a=rtpmap:(\\d+) opus/48000/2").find(sdp)?.groupValues?.get(1) ?: return sdp
-        val params = "minptime=10;useinbandfec=1;stereo=0;sprop-stereo=0;maxaveragebitrate=64000;maxplaybackrate=48000;cbr=0"
+        val params = "minptime=20;useinbandfec=1;stereo=0;sprop-stereo=0;maxaveragebitrate=96000;maxplaybackrate=48000;cbr=0;usedtx=0"
         val fmtp = Regex("a=fmtp:$pt ([^\\r\\n]*)")
         return if (fmtp.containsMatchIn(sdp)) fmtp.replace(sdp) { m ->
             val keep = m.groupValues[1].split(";").filter { kv -> kv.isNotBlank() && params.split(";").none { it.substringBefore("=") == kv.substringBefore("=") } }

@@ -21,6 +21,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
     val repository: AnimeRepository by lazy { AnimeRepository(this) }
     val history: WatchHistory by lazy { WatchHistory(this) }
     val watchlist: Watchlist by lazy { Watchlist(this) }
+    val roomSession: com.anibiar.app.social.RoomSession by lazy { com.anibiar.app.social.RoomSession(this, social, appScope) }
     val social: com.anibiar.app.social.SocialRepository by lazy { com.anibiar.app.social.SocialRepository(this, appScope) }
 
     override fun onCreate() {

@@ -115,6 +115,7 @@ private fun AppNavigation() {
     ) { mutableStateListOf<String>() }
     val context0 = androidx.compose.ui.platform.LocalContext.current
     val social = (context0.applicationContext as AniBiarApp).social
+    val roomSession = (context0.applicationContext as AniBiarApp).roomSession
     val authState by social.authState.collectAsStateWithLifecycle()
     val linkLogins by social.linkLogins.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(linkLogins) {
@@ -137,7 +138,15 @@ private fun AppNavigation() {
     var watchId by rememberSaveable { mutableStateOf(0) }
     var watchEp by rememberSaveable { mutableStateOf(1) }
     var joinRoom by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.social.Room?>(null) }
-    BackHandler(enabled = watchId != 0) { watchId = 0; joinRoom = null }
+    BackHandler(enabled = watchId != 0) { watchId = 0 }
+    // The host moved the room to another anime: follow if the watch page is open.
+    val liveRoom = roomSession.room
+    var prevRoomAnime by androidx.compose.runtime.remember { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.LaunchedEffect(liveRoom?.animeId) {
+        val r = liveRoom; val prev = prevRoomAnime
+        prevRoomAnime = r?.animeId
+        if (r != null && prev != null && prev != r.animeId && watchId == prev) { joinRoom = r; watchEp = roomSession.together?.episode ?: r.episode; watchId = r.animeId }
+    }
     val toastCtx = androidx.compose.ui.platform.LocalContext.current
     val mainScope = androidx.compose.runtime.rememberCoroutineScope()
     var banner by androidx.compose.runtime.remember { mutableStateOf<Pair<com.anibiar.app.social.Room, String>?>(null) }
@@ -254,7 +263,7 @@ private fun AppNavigation() {
             androidx.compose.runtime.key(watchId, joinRoom?.id) {
                 Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                     com.anibiar.app.ui.watch.WatchScreen(
-                        id = watchId, startEp = watchEp, onBack = { watchId = 0; joinRoom = null }, joinRoom = joinRoom,
+                        id = watchId, startEp = watchEp, onBack = { watchId = 0 }, joinRoom = joinRoom,
                         onRoomMoved = { r -> joinRoom = r; watchEp = r.episode; watchId = r.animeId },
                         onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
                     )
@@ -262,6 +271,14 @@ private fun AppNavigation() {
             }
         }
 
+        // In a call: a bar stays on screen so you can browse; tap it to return to the room.
+        if (liveRoom != null && !(watchId != 0 && watchId == liveRoom.animeId)) {
+            com.anibiar.app.ui.watch.CallBar(
+                roomSession, social.myId,
+                onOpen = { joinRoom = liveRoom; watchEp = roomSession.together?.episode ?: liveRoom.episode; searchOpen = false; profileOpen = false; settingsOpen = false; inboxOpen = false; userStack.clear(); stack.clear(); watchId = liveRoom.animeId },
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
         // Live "join my room" invite
         banner?.let { (r, who) ->
             Row(
