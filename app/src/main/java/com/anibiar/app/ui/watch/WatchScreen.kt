@@ -212,7 +212,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
         onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED; controller?.show(WindowInsetsCompat.Type.systemBars()) }
     }
-    BackHandler(enabled = fullscreen) { if (locked) android.widget.Toast.makeText(context, "The host controls fullscreen", android.widget.Toast.LENGTH_SHORT).show() else { fullscreen = false; together?.setFullscreen(false) } }
+    BackHandler(enabled = fullscreen) { if (locked) android.widget.Toast.makeText(context, "The host controls fullscreen", android.widget.Toast.LENGTH_SHORT).show() else { fullscreen = false; together?.shareFullscreen(false) } }
     LaunchedEffect(together, locked) { val t = together ?: return@LaunchedEffect; if (locked) t.fsEvents.collect { fullscreen = it } }
 
     var requests by remember { mutableStateOf<List<com.anibiar.app.social.RoomRequest>>(emptyList()) }
@@ -262,7 +262,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 fullscreen = fullscreen,
                 onFullscreen = {
                     if (locked) android.widget.Toast.makeText(context, "Only the host can go fullscreen", android.widget.Toast.LENGTH_SHORT).show()
-                    else { fullscreen = it; together?.setFullscreen(it) }
+                    else { fullscreen = it; together?.shareFullscreen(it) }
                 },
                 modifier = Modifier.fillMaxSize(),
                 together = together,

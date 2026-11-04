@@ -54,7 +54,7 @@ class WatchTogether(
     private var remoteFs = false
     private val _fs = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
     val fsEvents: SharedFlow<Boolean> = _fs
-    fun setFullscreen(on: Boolean) { fullscreen = on; send("fs", buildJsonObject { put("on", on.toString()) }) }
+    fun shareFullscreen(on: Boolean) { fullscreen = on; send("fs", buildJsonObject { put("on", on.toString()) }) }
     private fun noteFs(on: Boolean) { if (on != remoteFs) { remoteFs = on; _fs.tryEmit(on) } }
     /** How far (ms) this phone was from the host the last time it synced. */
     @Volatile var driftMs = 0L
