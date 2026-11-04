@@ -136,7 +136,7 @@ internal fun HoverOverlay(
             val (fav, toggleFav) = rememberFav(media)
             Box(
                 Modifier
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .size(28.dp)
                     .clip(CircleShape)

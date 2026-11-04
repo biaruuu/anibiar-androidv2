@@ -122,10 +122,13 @@ private fun AppNavigation() {
     BackHandler(enabled = searchOpen) { searchOpen = false }
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
+    var watchId by rememberSaveable { mutableStateOf(0) }
+    var watchEp by rememberSaveable { mutableStateOf(1) }
+    BackHandler(enabled = watchId != 0) { watchId = 0 }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; searchOpen = true })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -202,15 +205,27 @@ private fun AppNavigation() {
                             onBack = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) },
                             onOpen = { next -> stack.add(next) },
                             onHome = { stack.clear() },
+                            onWatch = { aid, n -> watchEp = n; watchId = aid },
                         )
                     }
                 }
             }
         }
 
+        if (watchId != 0) {
+            androidx.compose.runtime.key(watchId) {
+                Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                    com.anibiar.app.ui.watch.WatchScreen(
+                        id = watchId, startEp = watchEp, onBack = { watchId = 0 },
+                        onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
+                    )
+                }
+            }
+        }
+
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !profileOpen && !inboxOpen && userStack.isEmpty(),
+            visible = stack.isEmpty() && !profileOpen && !inboxOpen && userStack.isEmpty() && watchId == 0,
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),

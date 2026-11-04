@@ -110,7 +110,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -132,6 +132,7 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, viewModel: Home
         onToggleSaved = app.watchlist::toggle,
         onOpen = onOpen,
         onSearch = onSearch,
+        onWatch = onWatch,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -144,6 +145,7 @@ private fun HomeContent(
     onToggleSaved: (Int) -> Unit,
     onOpen: (Int) -> Unit,
     onSearch: () -> Unit,
+    onWatch: (Int) -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -257,7 +259,7 @@ private fun HomeContent(
                                 height = heroHeight,
                                 onPageChanged = { heroIndex = it },
                                 saved = saved,
-                                onWatch = onOpen,
+                                onWatch = onWatch,
                                 onDetails = onOpen,
                                 onAdd = onToggleSaved,
                             )

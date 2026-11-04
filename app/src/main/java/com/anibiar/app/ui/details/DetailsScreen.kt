@@ -127,6 +127,7 @@ fun DetailsScreen(
     onBack: () -> Unit,
     onOpen: (Int) -> Unit,
     onHome: () -> Unit,
+    onWatch: (Int, Int) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
@@ -214,7 +215,7 @@ fun DetailsScreen(
                         posterWidth = posterW,
                         titleSize = titleSp,
                         inList = media.id in saved,
-                        onWatch = comingSoon,
+                        onWatch = { onWatch(media.id, 1) },
                         onToggleList = { app.watchlist.toggle(media.id) },
                         isFav = media.id in favIds,
                         onToggleFav = {
@@ -237,7 +238,7 @@ fun DetailsScreen(
                 val episodeCount = media.airedEpisodes ?: media.episodes ?: media.streamingEpisodes.size
                 if (episodeCount > 0) {
                     item(key = "episodes") {
-                        Episodes(media, episodeCount, state.episodes, side, epW, onClick = comingSoon)
+                        Episodes(media, episodeCount, state.episodes, side, epW, onClick = { n -> onWatch(media.id, n) })
                     }
                 }
 
@@ -1066,7 +1067,7 @@ private fun Episodes(
     episodes: List<com.anibiar.app.data.EpisodeInfo>?,
     side: Dp,
     cardWidth: Dp,
-    onClick: () -> Unit,
+    onClick: (Int) -> Unit,
 ) {
     // Real titles / dates / thumbnails (ani.zip + MAL); AniList's streaming titles fill any gap.
     val streaming = remember(media.id) {
@@ -1103,7 +1104,7 @@ private fun Episodes(
                 val active = hover.active() || arm?.armed == "E$number"
                 val titleColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender, Color.White)
                 val borderColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender.copy(alpha = 0.7f), Ani.Border)
-                Column(Modifier.width(cardWidth).hoverCard(hover, onClick, onArm = arm?.let { a -> { a.arm("E$number") } })) {
+                Column(Modifier.width(cardWidth).hoverCard(hover, { onClick(number) }, onArm = arm?.let { a -> { a.arm("E$number") } })) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape)
                             .border(1.dp, borderColor, shape).background(Ani.Item),
