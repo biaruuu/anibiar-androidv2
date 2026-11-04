@@ -19,7 +19,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f)
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0)
 
 /** A guest asking the host for another anime or episode. */
 data class RoomRequest(val from: String, val animeId: Int?, val title: String, val cover: String?, val episode: Int)
@@ -49,6 +49,7 @@ class WatchTogether(
     private val _requests = MutableSharedFlow<RoomRequest>(extraBufferCapacity = 8)
     val requests: SharedFlow<RoomRequest> = _requests
     @Volatile var speed = 1f
+    @Volatile var boost = 0
     fun request(animeId: Int?, title: String, cover: String?, episode: Int) = send("request", buildJsonObject {
         if (animeId != null) put("id", animeId); put("title", title); put("cover", cover.orEmpty()); put("ep", episode)
     })
@@ -150,7 +151,7 @@ class WatchTogether(
         leader = false
         val target = if (playing) pos + (now() - ts).coerceAtLeast(0) else pos
         val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
-        _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd))
+        _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0))
     }
 
     private fun send(event: String, extra: JsonObject) {
@@ -166,7 +167,7 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString())
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost)
         })
     }
 
@@ -174,10 +175,10 @@ class WatchTogether(
     private var lastBeat = 0L
     fun tick(playing: Boolean, positionMs: Long) {
         val t = System.currentTimeMillis()
-        if ((leader && playing && t - lastBeat > 2000) || requestAnnounce) {
+        if ((leader && t - lastBeat > 2000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString())
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost)
             })
         }
     }

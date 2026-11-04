@@ -134,7 +134,11 @@ fun KiroPlayer(
     val context = LocalContext.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
-    val player = remember { ExoPlayer.Builder(context).build() }
+    val player = remember {
+        ExoPlayer.Builder(context)
+            .setLoadControl(androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(30_000, 70_000, 1_500, 3_000).build())
+            .build()
+    }
     var textureView by remember { mutableStateOf<TextureView?>(null) }
 
     var playing by remember { mutableStateOf(false) }
@@ -152,6 +156,7 @@ fun KiroPlayer(
     var speed by remember { mutableFloatStateOf(1f) }
     var boost by remember { mutableIntStateOf(0) }
     var quality by remember { mutableIntStateOf(-1) }
+    var userQuality by remember { mutableStateOf(false) }
     var heights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var captionTrack by remember { mutableIntStateOf(0) }
     var captionSize by remember { mutableIntStateOf(0) }
@@ -197,6 +202,7 @@ fun KiroPlayer(
             driftJob[0] = scope.launch { delay((away * 8).coerceIn(200, 3000)); player.setPlaybackSpeed(speedNow) }
         }
         if (c.speed != speedNow) speed = c.speed
+        if (c.boost != boost) boost = c.boost
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
     }
     LaunchedEffect(together) {
@@ -236,13 +242,16 @@ fun KiroPlayer(
 
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
-        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; timeMs = 0; durationMs = 0
+        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
             .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4).build()
         player.setMediaItem(item, ((startAt ?: 0.0) * 1000).toLong())
         player.prepare()
         player.playWhenReady = autoplayNow
+    }
+    LaunchedEffect(boost) {
+        togetherNow?.let { t -> t.boost = boost; if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false) }
     }
     LaunchedEffect(volume, muted) { player.volume = if (muted) 0f else volume }
     LaunchedEffect(speed) {
@@ -262,6 +271,8 @@ fun KiroPlayer(
         }
     }
 
+    // HD by default: start on the highest quality the stream offers (you can still pick another).
+    LaunchedEffect(heights) { if (heights.isNotEmpty() && quality == -1 && !userQuality) quality = heights.first() }
     // Quality: pin the chosen height, or let the player adapt.
     LaunchedEffect(quality, heights) {
         val builder = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO)
@@ -524,7 +535,7 @@ fun KiroPlayer(
                 when (menuView) {
                     "main" -> {
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
-                        MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost)) { menuView = "boost" }
+                        MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost) + if (readOnly) " · host" else "") { if (!readOnly) menuView = "boost" }
                         if (sortedSubs.isNotEmpty()) {
                             MenuRow(VidIcons.ClosedCaptions, "Captions", sortedSubs.getOrNull(captionTrack)?.label ?: "Off") { menuView = "captions" }
                             MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
@@ -535,8 +546,8 @@ fun KiroPlayer(
                         MenuRow(VidIcons.SeekForward10, "Auto next episode", if (autoNext) "On" else "Off", chevron = false) { onAutoNext(!autoNext) }
                     }
                     "quality" -> {
-                        OptionRow("Auto", quality == -1) { quality = -1; menuView = "main" }
-                        heights.forEach { h -> OptionRow("${h}p", quality == h) { quality = h; menuView = "main" } }
+                        OptionRow("Auto", quality == -1) { userQuality = true; quality = -1; menuView = "main" }
+                        heights.forEach { h -> OptionRow("${h}p", quality == h) { userQuality = true; quality = h; menuView = "main" } }
                     }
                     "boost" -> BOOST_MB.indices.forEach { i -> OptionRow(boostLabel(i), boost == i) { boost = i; menuView = "main" } }
                     "captions" -> {

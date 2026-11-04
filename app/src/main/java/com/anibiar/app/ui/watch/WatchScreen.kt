@@ -419,14 +419,23 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     .border(1.dp, if (room != null) Ani.Lime.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(12.dp))
                     .clickable {
                         if (social.myId == null) android.widget.Toast.makeText(context, "Log in to watch together", android.widget.Toast.LENGTH_SHORT).show()
-                        else togetherOpen = true
+                        else if (!starting) {
+                            // Straight into the full-screen room; invite friends from there.
+                            starting = true
+                            scope.launch {
+                                runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
+                                    .onSuccess { room = it }
+                                    .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
+                                starting = false
+                            }
+                        }
                     }.padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(AniIcons.Person, null, tint = if (room != null) Ani.Lime else Color.White, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    if (room == null) "Watch together" else "In a room · ${roomMembers.size} watching",
+                    if (starting) "Starting…" else if (room == null) "Watch together" else "In a room · ${roomMembers.size} watching",
                     style = inter(14f, FontWeight.SemiBold), color = if (room != null) Ani.Lime else Color.White,
                     modifier = Modifier.weight(1f),
                 )
@@ -510,7 +519,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
     }
 
-    if (togetherOpen) {
+    if (togetherOpen && room != null) {
         com.anibiar.app.ui.watch.TogetherSheet(
             room = room, together = together, isHost = isHost, starting = starting,
             onStart = {
@@ -531,7 +540,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
     if (pickerOpen) {
         com.anibiar.app.ui.watch.AnimePickerSheet(
-            onDismiss = { pickerOpen = false },
+            onDismiss = { pickerOpen = false }, isHost = isHost,
             onPick = { m ->
                 pickerOpen = false
                 val r = room; val t = together

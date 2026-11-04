@@ -52,7 +52,7 @@ import kotlinx.serialization.json.put
 /** The host picks another anime for the whole room. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnimePickerSheet(onPick: (Media) -> Unit, onDismiss: () -> Unit) {
+fun AnimePickerSheet(onPick: (Media) -> Unit, onDismiss: () -> Unit, isHost: Boolean = true) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     var q by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<Media>>(emptyList()) }
@@ -70,17 +70,15 @@ fun AnimePickerSheet(onPick: (Media) -> Unit, onDismiss: () -> Unit) {
         results = runCatching { app.repository.search(vars).media }.getOrDefault(emptyList())
         busy = false
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Ani.Panel) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 12.dp)) {
-            Text("Change anime", style = inter(20f, FontWeight.Bold), color = Color.White)
-            Spacer(Modifier.height(10.dp))
+    FullScreenPanel(if (isHost) "Change anime" else "Request an anime", onDismiss) {
+        Column(Modifier.fillMaxWidth().weight(1f)) {
             Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Item).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
                 if (q.isEmpty()) Text("Search anime…", style = inter(15f), color = Ani.Muted)
                 BasicTextField(q, { q = it }, singleLine = true, textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lime), modifier = Modifier.fillMaxWidth())
             }
             Spacer(Modifier.height(8.dp))
             if (busy && results.isEmpty()) Text("Searching…", style = inter(13.5f), color = Ani.Muted, modifier = Modifier.padding(12.dp))
-            LazyColumn(Modifier.fillMaxWidth().height(420.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                 items(results, key = { it.id }) { m ->
                     Row(Modifier.fillMaxWidth().clickable { onPick(m) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.width(46.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)).background(Ani.Item)) {

@@ -81,7 +81,11 @@ class VoiceChat(
         factory = PeerConnectionFactory.builder()
             .setAudioDeviceModule(JavaAudioDeviceModule.builder(app).setUseHardwareAcousticEchoCanceler(true).setUseHardwareNoiseSuppressor(true).createAudioDeviceModule())
             .createPeerConnectionFactory()
-        val source = factory.createAudioSource(MediaConstraints())
+        val constraints = MediaConstraints().apply {
+            for (k in listOf("googEchoCancellation", "googNoiseSuppression", "googAutoGainControl", "googHighpassFilter", "googEchoCancellation2", "googNoiseSuppression2"))
+                mandatory.add(MediaConstraints.KeyValuePair(k, "true"))
+        }
+        val source = factory.createAudioSource(constraints)
         track = factory.createAudioTrack("kiro-mic", source)
     }
 
@@ -177,10 +181,22 @@ class VoiceChat(
         return pc
     }
 
+    /** Opus tuned for clear speech: 64 kbps mono, in-band error correction, 10 ms packets for low delay. */
+    private fun hq(sdp: String): String {
+        val pt = Regex("a=rtpmap:(\\d+) opus/48000/2").find(sdp)?.groupValues?.get(1) ?: return sdp
+        val params = "minptime=10;useinbandfec=1;stereo=0;sprop-stereo=0;maxaveragebitrate=64000;maxplaybackrate=48000;cbr=0"
+        val fmtp = Regex("a=fmtp:$pt ([^\\r\\n]*)")
+        return if (fmtp.containsMatchIn(sdp)) fmtp.replace(sdp) { m ->
+            val keep = m.groupValues[1].split(";").filter { kv -> kv.isNotBlank() && params.split(";").none { it.substringBefore("=") == kv.substringBefore("=") } }
+            "a=fmtp:$pt " + (keep + params.split(";")).joinToString(";")
+        } else sdp.replace(Regex("(a=rtpmap:$pt opus/48000/2\\r?\\n)"), "$1a=fmtp:$pt $params\r\n")
+    }
+
     private fun offerTo(uid: String) {
         val pc = peer(uid)
         pc.createOffer(object : Sdp() {
-            override fun onCreateSuccess(d: SessionDescription) {
+            override fun onCreateSuccess(orig: SessionDescription) {
+                val d = SessionDescription(orig.type, hq(orig.description))
                 pc.setLocalDescription(Sdp(), d)
                 tg.sendRtc(buildJsonObject { put("to", uid); put("kind", "offer"); put("sdp", d.description) })
             }
@@ -200,7 +216,8 @@ class VoiceChat(
                     override fun onSetSuccess() {
                         drain(from, pc)
                         pc.createAnswer(object : Sdp() {
-                            override fun onCreateSuccess(d: SessionDescription) {
+                            override fun onCreateSuccess(orig: SessionDescription) {
+                                val d = SessionDescription(orig.type, hq(orig.description))
                                 pc.setLocalDescription(Sdp(), d)
                                 tg.sendRtc(buildJsonObject { put("to", from); put("kind", "answer"); put("sdp", d.description) })
                             }

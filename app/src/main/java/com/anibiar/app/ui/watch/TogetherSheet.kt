@@ -68,11 +68,9 @@ fun TogetherSheet(
     LaunchedEffect(friendIds) { friends = social.profiles(friendIds) }
     LaunchedEffect(room?.id) { room?.let { r -> runCatching { invited.clear(); invited.addAll(social.invitedIds(r.id)) } } }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = Ani.Panel) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 16.dp)) {
-            Text("Watch together", style = inter(20f, FontWeight.Bold), color = Color.White)
-            Spacer(Modifier.height(4.dp))
-            Text(
+    FullScreenPanel(if (room == null) "Watch together" else "Room", onDismiss) {
+        Column(Modifier.fillMaxWidth().weight(1f)) {
+                        Text(
                 if (room == null) "Start a room and invite friends. Play, pause and seeking stay in sync for everyone, and anyone can change the episode."
                 else "${room.title} · everyone sees the same moment, and you're on a voice call. Only the host changes the episode or anime. Use headphones to avoid echo.",
                 style = inter(13.5f, lineHeight = 19f), color = Ani.Muted,
@@ -89,7 +87,7 @@ fun TogetherSheet(
                 Spacer(Modifier.height(6.dp))
                 if (friends.isEmpty()) {
                     Text("Add friends from their profile to invite them here.", style = inter(13.5f), color = Ani.Muted, modifier = Modifier.padding(vertical = 8.dp))
-                } else LazyColumn(Modifier.fillMaxWidth().height((friends.size.coerceAtMost(5) * 60).dp)) {
+                } else LazyColumn(Modifier.fillMaxWidth().weight(1f)) {
                     items(friends, key = { it.uid }) { f ->
                         val here = f.uid in members
                         val sent = f.uid in invited
