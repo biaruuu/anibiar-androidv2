@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,6 +66,12 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
                 "Build ${info.build} is ready (${"%.0f".format(info.size / 1_000_000f)} MB). It installs over your current app, so you stay logged in and keep your data.",
                 style = inter(14f, lineHeight = 20f), color = Ani.Muted,
             )
+            if (info.entries.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("What's new", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)
+                Spacer(Modifier.height(6.dp))
+                Column(Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState())) { ChangeList(info.entries) }
+            }
             if (needsPermission) {
                 Spacer(Modifier.height(10.dp))
                 Text("Allow Kiro to install updates in the settings screen that just opened, come back, then tap Install.", style = inter(13f, lineHeight = 18f), color = Ani.Amber)

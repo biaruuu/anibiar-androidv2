@@ -195,14 +195,14 @@ fun KiroPlayer(
         togetherNow?.driftMs = drift
         if (c.hard) {
             if (away > 500) { player.seekTo(target.coerceAtLeast(0)); lastHardSeek[0] = nowMs; ended = false }
-        } else if (away > 4000 && nowMs - lastHardSeek[0] > 8000) {
-            // Far off (slow connection, long buffer): jump, but never more than once every 8 s so it can't thrash.
+        } else if (away > 1800 && nowMs - lastHardSeek[0] > 4000) {
+            // Far off (slow connection, long buffer): jump, but never more than once every 4 s so it can't thrash.
             player.seekTo(target.coerceAtLeast(0)); lastHardSeek[0] = nowMs; ended = false
-        } else if (c.playing && away > 250 && away <= 4000) {
+        } else if (c.playing && away > 100 && away <= 1800) {
             // Small drift: change speed gently instead of seeking, so nothing reloads.
             driftJob[0]?.cancel()
-            player.setPlaybackSpeed(speedNow * if (drift > 0) 1.12f else 0.88f)
-            driftJob[0] = scope.launch { delay((away * 8).coerceIn(200, 3000)); player.setPlaybackSpeed(speedNow) }
+            player.setPlaybackSpeed(speedNow * if (drift > 0) 1.15f else 0.85f)
+            driftJob[0] = scope.launch { delay((away * 7).coerceIn(150, 2500)); player.setPlaybackSpeed(speedNow) }
         }
         if (c.speed != speedNow) speed = c.speed
         if (c.boost != boost) boost = c.boost

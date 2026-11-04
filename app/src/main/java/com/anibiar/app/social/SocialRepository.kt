@@ -699,7 +699,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Milliseconds to add to this phone's clock to get server time (best of a few round trips). */
-    suspend fun clockOffset(): Long {
+    suspend fun clockOffset(): Long? {
         var best = Long.MAX_VALUE; var offset = 0L
         repeat(5) {
             runCatching {
@@ -709,7 +709,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 if (code in 200..299 && t1 - t0 < best) { best = t1 - t0; offset = text.trim().toLong() - (t0 + (t1 - t0) / 2) }
             }
         }
-        return offset
+        return if (best == Long.MAX_VALUE) null else offset
     }
 
     /** Live invites pushed to me while the app is open. */

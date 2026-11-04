@@ -212,7 +212,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
         onDispose { activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED; controller?.show(WindowInsetsCompat.Type.systemBars()) }
     }
-    BackHandler(enabled = fullscreen) { fullscreen = false }
+    BackHandler(enabled = fullscreen) { if (locked) android.widget.Toast.makeText(context, "The host controls fullscreen", android.widget.Toast.LENGTH_SHORT).show() else { fullscreen = false; together?.setFullscreen(false) } }
+    LaunchedEffect(together, locked) { val t = together ?: return@LaunchedEffect; if (locked) t.fsEvents.collect { fullscreen = it } }
 
     var requests by remember { mutableStateOf<List<com.anibiar.app.social.RoomRequest>>(emptyList()) }
     LaunchedEffect(together) {
@@ -258,7 +259,11 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     val all = watch?.streams.orEmpty(); val at = all.indexOfFirst { it.id == stream?.id }
                     if (at in 0 until all.lastIndex) streamName = all[at + 1].name
                 },
-                fullscreen = fullscreen, onFullscreen = { fullscreen = it },
+                fullscreen = fullscreen,
+                onFullscreen = {
+                    if (locked) android.widget.Toast.makeText(context, "Only the host can go fullscreen", android.widget.Toast.LENGTH_SHORT).show()
+                    else { fullscreen = it; together?.setFullscreen(it) }
+                },
                 modifier = Modifier.fillMaxSize(),
                 together = together,
                 readOnly = locked,
@@ -312,16 +317,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             } else if (rq.animeId == null) { ep = rq.episode; synopsisEpisode = false; watch = null }
                         }.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(Ani.Lime))
-                Spacer(Modifier.width(8.dp))
-                Text("Live · ${memberList.size} in the room", style = inter(12.5f, FontWeight.SemiBold), color = Ani.Soft)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    if (isHost) "You control playback" else if (kotlin.math.abs(driftMs) < 600) "In sync with host" else "Syncing…",
-                    style = inter(12f), color = if (isHost || kotlin.math.abs(driftMs) < 600) Ani.Lime else Ani.Amber,
-                )
             }
             com.anibiar.app.ui.watch.RoomPanel(
                 members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),

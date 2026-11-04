@@ -226,9 +226,13 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
     var checking by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     InfoRow(if (checking) "Checking…" else "Check for updates", "", onClick = {
-        if (!checking) { checking = true; scope.launch { val u = com.anibiar.app.update.Updater.check(); checking = false; if (u == null) toast("You're on the latest version") else found = u } }
+        if (!checking) { checking = true; scope.launch { val u = com.anibiar.app.update.Updater.check(context); checking = false; if (u == null) toast("You're on the latest version") else found = u } }
     })
     found?.let { com.anibiar.app.update.UpdateDialog(it, onDismiss = { found = null }) }
+    Divider()
+    var showLog by remember { mutableStateOf(false) }
+    InfoRow("What's new", "", onClick = { showLog = true })
+    if (showLog) com.anibiar.app.update.WhatsNewDialog(com.anibiar.app.update.Changelog.bundled(context), "Changelog") { showLog = false }
 }
 
 @Composable

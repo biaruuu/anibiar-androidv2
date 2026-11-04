@@ -49,6 +49,13 @@ class WatchTogether(
     private val _requests = MutableSharedFlow<RoomRequest>(extraBufferCapacity = 8)
     val requests: SharedFlow<RoomRequest> = _requests
     @Volatile var speed = 1f
+    /** Fullscreen belongs to the host: it is shared with everyone. */
+    @Volatile var fullscreen = false
+    private var remoteFs = false
+    private val _fs = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
+    val fsEvents: SharedFlow<Boolean> = _fs
+    fun setFullscreen(on: Boolean) { fullscreen = on; send("fs", buildJsonObject { put("on", on.toString()) }) }
+    private fun noteFs(on: Boolean) { if (on != remoteFs) { remoteFs = on; _fs.tryEmit(on) } }
     /** How far (ms) this phone was from the host the last time it synced. */
     @Volatile var driftMs = 0L
     /** Where I was when I left the watch page, so coming back resumes at the right moment. */
@@ -97,7 +104,8 @@ class WatchTogether(
     private fun now() = System.currentTimeMillis() + offset
 
     fun start() {
-        jobs += scope.launch { offset = social.clockOffset() }
+        // Keep my clock aligned with the server's so every position is compared on the same timeline.
+        jobs += scope.launch { while (true) { social.clockOffset()?.let { offset = it }; delay(20_000) } }
         val flow = social.realtime.join(channel)
         jobs += scope.launch {
             flow.collect { b ->
@@ -117,6 +125,7 @@ class WatchTogether(
                         episode = ep; audio = au
                         _changes.tryEmit(RoomChange(ep, au))
                     }
+                    "fs" -> noteFs(p["on"]?.jsonPrimitive?.contentOrNull == "true")
                     "rtc" -> rtcListener?.invoke(p)
                     "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
                     "anime" -> {
@@ -163,6 +172,7 @@ class WatchTogether(
         val hard = p["hard"]?.jsonPrimitive?.contentOrNull == "true"
         leader = false
         val target = if (playing) pos + (now() - ts).coerceAtLeast(0) else pos
+        p["fs"]?.jsonPrimitive?.contentOrNull?.let { noteFs(it == "true") }
         val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
         _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0))
     }
@@ -180,7 +190,7 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost)
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString())
         })
     }
 
@@ -188,10 +198,10 @@ class WatchTogether(
     private var lastBeat = 0L
     fun tick(playing: Boolean, positionMs: Long) {
         val t = System.currentTimeMillis()
-        if ((leader && t - lastBeat > 2000) || requestAnnounce) {
+        if ((leader && t - lastBeat > 1000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost)
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString())
             })
         }
     }

@@ -133,7 +133,18 @@ private fun AppNavigation() {
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
     var update by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { update = com.anibiar.app.update.Updater.check() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { update = com.anibiar.app.update.Updater.check(context0) }
+    // After an update: show what changed once.
+    var whatsNew by androidx.compose.runtime.remember { mutableStateOf<List<com.anibiar.app.update.ChangeEntry>>(emptyList()) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val all = com.anibiar.app.update.Changelog.bundled(context0)
+        val seen = com.anibiar.app.update.Changelog.lastSeen(context0)
+        val fresh = all.filter { it.id > seen }.take(4)
+        if (fresh.isNotEmpty()) whatsNew = fresh
+    }
+    if (whatsNew.isNotEmpty()) com.anibiar.app.update.WhatsNewDialog(whatsNew, "What's new in this update") {
+        com.anibiar.app.update.Changelog.markSeen(context0, whatsNew.maxOf { it.id }); whatsNew = emptyList()
+    }
     update?.let { u -> com.anibiar.app.update.UpdateDialog(u, onDismiss = { update = null }) }
     var watchId by rememberSaveable { mutableStateOf(0) }
     var watchEp by rememberSaveable { mutableStateOf(1) }

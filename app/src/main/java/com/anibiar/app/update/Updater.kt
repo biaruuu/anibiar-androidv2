@@ -19,7 +19,7 @@ import okhttp3.Request
 import java.io.File
 import java.util.concurrent.TimeUnit
 
-data class UpdateInfo(val build: Int, val url: String, val size: Long, val notes: String)
+data class UpdateInfo(val build: Int, val url: String, val size: Long, val notes: String, val entries: List<ChangeEntry> = emptyList())
 
 /**
  * Checks the GitHub release for a newer build, downloads Kiro.apk and hands it to the system installer.
@@ -30,7 +30,17 @@ object Updater {
     private val json = Json { ignoreUnknownKeys = true }
     private val client by lazy { Http.plain.newBuilder().readTimeout(60, TimeUnit.SECONDS).build() }
 
-    suspend fun check(): UpdateInfo? = withContext(Dispatchers.IO) {
+    private const val CHANGELOG = "https://raw.githubusercontent.com/biaruuu/anibiar-androidv2/main/app/src/main/assets/changelog.md"
+
+    /** What changed since the version installed here (newer entries from the online changelog). */
+    private fun newEntries(context: Context?): List<ChangeEntry> = runCatching {
+        val have = context?.let { Changelog.bundled(it).maxOfOrNull { e -> e.id } } ?: 0
+        client.newCall(Request.Builder().url(CHANGELOG).build()).execute().use { r ->
+            if (!r.isSuccessful) emptyList() else Changelog.parse(r.body!!.string()).filter { it.id > have }
+        }
+    }.getOrDefault(emptyList())
+
+    suspend fun check(context: Context? = null): UpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
             val req = Request.Builder().url(LATEST).header("Accept", "application/vnd.github+json").build()
             client.newCall(req).execute().use { r ->
@@ -41,7 +51,7 @@ object Updater {
                 val asset = o["assets"]?.jsonArray?.map { it.jsonObject }?.firstOrNull { it["name"]?.jsonPrimitive?.contentOrNull == "Kiro.apk" } ?: return@use null
                 UpdateInfo(
                     build, asset["browser_download_url"]!!.jsonPrimitive.content,
-                    asset["size"]?.jsonPrimitive?.longOrNull ?: 0L, o["body"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    asset["size"]?.jsonPrimitive?.longOrNull ?: 0L, o["body"]?.jsonPrimitive?.contentOrNull.orEmpty(), newEntries(context),
                 )
             }
         }.getOrNull()
