@@ -1,3 +1,7 @@
+## 8 | Captions: Crunchyroll look by default | 2026-11-05
+- Captions now default to Small, thinner Trebuchet text with a light outline, sitting lower on the screen like Crunchyroll
+- The "Crunchyroll" caption style is now just "Default"; Dark box is still available
+
 ## 7 | Crunchyroll captions, mic fixes | 2026-11-05
 - New caption look: Trebuchet MS with a black outline and soft shadow, like Crunchyroll (Dark box still available in caption style); italics for thoughts and narration
 - Mic fix: call setup messages are now handled in order (they could be dropped before), the call keeps the mic alive in the background, and a working relay server helps on mobile data
