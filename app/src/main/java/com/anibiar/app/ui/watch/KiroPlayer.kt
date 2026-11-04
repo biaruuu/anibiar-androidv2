@@ -469,14 +469,15 @@ fun KiroPlayer(
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = w * 0.06f).padding(bottom = (w * 0.032f).coerce(16.dp, 44.dp)), contentAlignment = Alignment.Center) {
                 if (captionStyle == 0) {
                     // Crunchyroll look: white Trebuchet with a thick black outline and a soft drop shadow, no box.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.1f).sp.toPx() }
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.16f).sp.toPx() }
                     Text(
                         line, style = face.copy(
                             color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
-                            shadow = Shadow(Color(0x80000000), Offset(0f, 1.5f), 3f),
+                            shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 4f),
                         ),
                     )
                     Text(line, style = face.copy(color = Color.White))
+                    Text(line, style = face.copy(color = Color.White, drawStyle = Stroke(width = strokePx * 0.28f, join = StrokeJoin.Round)))
                 } else {
                     Text(
                         line, style = face.copy(color = Color.White),

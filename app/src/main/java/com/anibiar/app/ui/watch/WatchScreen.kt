@@ -269,6 +269,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 together = together,
                 readOnly = locked,
             )
+            if (room != null) com.anibiar.app.ui.watch.ReactionOverlay(together, Modifier.fillMaxSize())
             if (room != null && fullscreen) {
                 com.anibiar.app.ui.watch.AvatarStrip(memberList, roomProfiles, speaking, mutedUsers, social.myId.orEmpty(), Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
             }
@@ -319,6 +320,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                         }.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
             }
+            com.anibiar.app.ui.watch.ReactionBar(onReact = { together?.react(it) })
             com.anibiar.app.ui.watch.RoomPanel(
                 members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
                 speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted, links = voiceLinks,

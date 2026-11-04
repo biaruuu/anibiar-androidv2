@@ -1,3 +1,7 @@
+## 10 | Reactions and bolder captions | 2026-11-05
+- Watch together: tap an emoji under the video and everyone in the room sees it float up over the video
+- Captions are bolder and easier to read, still in the Crunchyroll style
+
 ## 9 | English captions by default | 2026-11-05
 - Captions now always start on English; if a video has no English track they stay off instead of picking another language
 - Subtitle text is thinner and cleaner, closer to Crunchyroll
