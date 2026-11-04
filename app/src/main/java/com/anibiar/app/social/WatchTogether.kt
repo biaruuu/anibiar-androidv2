@@ -55,6 +55,15 @@ class WatchTogether(
     private val _ended = MutableStateFlow(false)
     val ended: StateFlow<Boolean> = _ended.asStateFlow()
     private val seen = HashMap<String, Long>()
+    private val _muted = MutableStateFlow<Set<String>>(emptySet())
+    /** People whose microphone is muted. */
+    val mutedUsers: StateFlow<Set<String>> = _muted.asStateFlow()
+    @Volatile private var myMuted = false
+    fun setMuted(m: Boolean) { myMuted = m; send("mic", buildJsonObject { put("muted", m.toString()) }) }
+    private fun noteMuted(from: String, p: JsonObject) {
+        val m = p["muted"]?.jsonPrimitive?.contentOrNull ?: return
+        _muted.value = if (m == "true") _muted.value + from else _muted.value - from
+    }
     private var jobs = mutableListOf<Job>()
 
     /** True when I was the last to control playback, so I should keep announcing. */
@@ -74,11 +83,12 @@ class WatchTogether(
                 val from = p["from"]?.jsonPrimitive?.contentOrNull ?: return@collect
                 if (from == me) return@collect
                 touch(from)
+                noteMuted(from, p)
                 when (b.event) {
                     "state" -> onState(p)
-                    "hello" -> { send("here", buildJsonObject { }); if (leader || room.hostId == me) { /* newcomer needs the position */ requestAnnounce = true } }
+                    "hello" -> { send("here", buildJsonObject { put("muted", myMuted.toString()) }); if (leader || room.hostId == me) { /* newcomer needs the position */ requestAnnounce = true } }
                     "here" -> Unit
-                    "bye" -> { seen.remove(from); publishMembers() }
+                    "bye" -> { seen.remove(from); _muted.value = _muted.value - from; publishMembers() }
                     "change" -> {
                         val ep = p["ep"]?.jsonPrimitive?.intOrNull ?: return@collect
                         val au = p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub"
@@ -102,9 +112,9 @@ class WatchTogether(
             while (true) {
                 delay(2000)
                 if (n++ < 3) send("hello", buildJsonObject { })
-                val cutoff = System.currentTimeMillis() - 9000
+                val cutoff = System.currentTimeMillis() - 6000
                 if (seen.entries.removeAll { it.value < cutoff }) publishMembers()
-                send("here", buildJsonObject { })
+                send("here", buildJsonObject { put("muted", myMuted.toString()) })
             }
         }
     }

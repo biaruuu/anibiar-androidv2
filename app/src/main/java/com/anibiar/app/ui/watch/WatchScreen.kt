@@ -144,6 +144,32 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         else if (micOk && voice == null) voice = runCatching { com.anibiar.app.social.VoiceChat(context.applicationContext, t, social.myId.orEmpty(), app.appScope).also { it.start() } }.getOrNull()
     }
     DisposableEffect(Unit) { onDispose { voice?.stop(); voice = null } }
+    val speaking by (voice?.speaking ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
+    val mutedUsers by (together?.mutedUsers ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
+    var roomProfiles by remember { mutableStateOf<Map<String, com.anibiar.app.social.UserProfile>>(emptyMap()) }
+    val memberList = roomMembers.toList()
+    // Names/avatars for everyone in the room, plus a sound + toast when someone joins or leaves.
+    var prevMembers by remember { mutableStateOf<Set<String>?>(null) }
+    LaunchedEffect(roomMembers, room?.id) {
+        if (room == null) { prevMembers = null; return@LaunchedEffect }
+        val missing = roomMembers.filter { it !in roomProfiles }
+        if (missing.isNotEmpty()) roomProfiles = roomProfiles + social.profiles(missing).associateBy { it.uid }
+        val before = prevMembers
+        prevMembers = roomMembers
+        if (before == null) return@LaunchedEffect
+        val me = social.myId
+        val joined = (roomMembers - before).filter { it != me }
+        val left = (before - roomMembers).filter { it != me }
+        if (joined.isEmpty() && left.isEmpty()) return@LaunchedEffect
+        runCatching {
+            val tone = android.media.ToneGenerator(if (voice != null) android.media.AudioManager.STREAM_VOICE_CALL else android.media.AudioManager.STREAM_MUSIC, 90)
+            tone.startTone(if (joined.isNotEmpty()) android.media.ToneGenerator.TONE_PROP_ACK else android.media.ToneGenerator.TONE_PROP_NACK, 350)
+            scope.launch { kotlinx.coroutines.delay(800); tone.release() }
+        }
+        fun nameOf(u: String) = roomProfiles[u]?.shownName ?: "Someone"
+        joined.forEach { android.widget.Toast.makeText(context, "${nameOf(it)} joined the room", android.widget.Toast.LENGTH_SHORT).show() }
+        left.forEach { android.widget.Toast.makeText(context, "${nameOf(it)} left the room", android.widget.Toast.LENGTH_SHORT).show() }
+    }
     LaunchedEffect(together) {
         val t = together ?: return@LaunchedEffect
         t.moved.collect { r -> t.detach(); together = null; room = null; onRoomMoved(r) }
@@ -261,6 +287,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.fillMaxSize(),
                 together = together,
             )
+            if (room != null && fullscreen) {
+                com.anibiar.app.ui.watch.AvatarStrip(memberList, roomProfiles, speaking, mutedUsers, social.myId.orEmpty(), Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
+            }
             if (!ready) {
                 Box(Modifier.fillMaxSize().background(Color(0xD9000000)), contentAlignment = Alignment.Center) {
                     if (poster != null && watchError == null && epsError == null) AsyncImage(poster, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().background(Color.Black), alpha = 0.3f)
@@ -284,6 +313,15 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
 
         if (!fullscreen) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (room != null) {
+                com.anibiar.app.ui.watch.RoomPanel(
+                    members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
+                    speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted,
+                    onMic = { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) },
+                    onInvite = { togetherOpen = true },
+                    onLeave = { together?.leave(isHost); together = null; room = null },
+                )
+            }
             // Episode heading
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -336,7 +374,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             }
 
             // Watch together
-            Row(
+            if (room == null) Row(
                 Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp))
                     .background(if (room != null) Ani.Lime.copy(alpha = 0.14f) else Color(0x1AFFFFFF))
                     .border(1.dp, if (room != null) Ani.Lime.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(12.dp))

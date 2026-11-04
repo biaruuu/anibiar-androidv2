@@ -96,6 +96,7 @@ class VoiceChat(
                 peers.keys.filter { it !in members }.forEach { close(it) }
             }
         }
+        jobs += scope.launch { while (!stopped) { pollLevels(); delay(250) } }
         // Retry connections that never came up (the other side may have joined the channel a moment late).
         jobs += scope.launch {
             while (!stopped) {
@@ -111,7 +112,29 @@ class VoiceChat(
         }
     }
 
-    fun setMuted(m: Boolean) { _muted.value = m; track.setEnabled(!m) }
+    fun setMuted(m: Boolean) { _muted.value = m; track.setEnabled(!m); tg.setMuted(m) }
+
+    private val _speaking = MutableStateFlow<Set<String>>(emptySet())
+    /** Who is talking right now (from the call's audio levels). */
+    val speaking: StateFlow<Set<String>> = _speaking.asStateFlow()
+    private val lastSpoke = ConcurrentHashMap<String, Long>()
+    private fun pollLevels() {
+        peers.forEach { (uid, pc) ->
+            runCatching {
+                pc.getStats { report ->
+                    report.statsMap.values.forEach { s ->
+                        val kind = s.members["kind"] as? String
+                        val level = (s.members["audioLevel"] as? Number)?.toDouble() ?: return@forEach
+                        if (kind != "audio") return@forEach
+                        val who = when (s.type) { "inbound-rtp" -> uid; "media-source" -> me; else -> null } ?: return@forEach
+                        if (level > 0.025 && !(who == me && _muted.value)) lastSpoke[who] = System.currentTimeMillis()
+                    }
+                }
+            }
+        }
+        val now = System.currentTimeMillis()
+        _speaking.value = lastSpoke.filterValues { now - it < 500 }.keys.toSet()
+    }
 
     fun stop() {
         if (stopped) return
