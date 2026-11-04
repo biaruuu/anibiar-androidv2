@@ -3,6 +3,8 @@ package com.anibiar.app.ui.watch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +54,8 @@ import kotlinx.coroutines.launch
 fun TogetherSheet(
     room: Room?, together: WatchTogether?, isHost: Boolean, starting: Boolean,
     onStart: () -> Unit, onLeave: () -> Unit, onDismiss: () -> Unit, onPickAnime: () -> Unit = {},
+    audio: String = "sub", dubAvailable: Boolean = false, onAudio: (String) -> Unit = {},
+    servers: List<String> = emptyList(), server: String? = null, onServer: (String) -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     val social = app.social
@@ -112,13 +116,32 @@ fun TogetherSheet(
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                if (isHost) {
-                    Box(
-                        Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Lavender).clickable(onClick = onPickAnime),
-                        contentAlignment = Alignment.Center,
-                    ) { Text("Change anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
-                    Spacer(Modifier.height(8.dp))
+                Text("Playback", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    listOf("sub" to "Sub", "dub" to "Dub").forEach { (k, label) ->
+                        val on = audio == k
+                        val can = isHost && (k == "sub" || dubAvailable)
+                        Text(label, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else if (can) Color.White else Ani.Muted,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lime else Ani.ButtonDark).clickable(enabled = can && !on) { onAudio(k) }.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
                 }
+                if (servers.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                        servers.forEach { s ->
+                            Text(s, style = inter(13.5f, FontWeight.SemiBold), color = if (s == server) Color.Black else Color.White,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(if (s == server) Ani.Lavender else Ani.ButtonDark).clickable { onServer(s) }.padding(horizontal = 16.dp, vertical = 8.dp))
+                        }
+                    }
+                    Text("Your server only affects your own video quality.", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
+                }
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Lavender).clickable(onClick = onPickAnime),
+                    contentAlignment = Alignment.Center,
+                ) { Text(if (isHost) "Change anime" else "Request an anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
+                Spacer(Modifier.height(8.dp))
                 Box(
                     Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable(onClick = onLeave),
                     contentAlignment = Alignment.Center,

@@ -131,6 +131,9 @@ private fun AppNavigation() {
     BackHandler(enabled = searchOpen) { searchOpen = false }
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
+    var update by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { update = com.anibiar.app.update.Updater.check() }
+    update?.let { u -> com.anibiar.app.update.UpdateDialog(u, onDismiss = { update = null }) }
     var watchId by rememberSaveable { mutableStateOf(0) }
     var watchEp by rememberSaveable { mutableStateOf(1) }
     var joinRoom by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.social.Room?>(null) }

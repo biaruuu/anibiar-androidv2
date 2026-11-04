@@ -19,7 +19,10 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis())
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f)
+
+/** A guest asking the host for another anime or episode. */
+data class RoomRequest(val from: String, val animeId: Int?, val title: String, val cover: String?, val episode: Int)
 
 /** An episode/audio change made by someone in the room. */
 data class RoomChange(val episode: Int, val audio: String)
@@ -43,6 +46,12 @@ class WatchTogether(
     private val _commands = MutableSharedFlow<SyncCommand>(replay = 0, extraBufferCapacity = 8)
     val commands: SharedFlow<SyncCommand> = _commands
     private val _changes = MutableSharedFlow<RoomChange>(replay = 0, extraBufferCapacity = 4)
+    private val _requests = MutableSharedFlow<RoomRequest>(extraBufferCapacity = 8)
+    val requests: SharedFlow<RoomRequest> = _requests
+    @Volatile var speed = 1f
+    fun request(animeId: Int?, title: String, cover: String?, episode: Int) = send("request", buildJsonObject {
+        if (animeId != null) put("id", animeId); put("title", title); put("cover", cover.orEmpty()); put("ep", episode)
+    })
     private val _moved = MutableSharedFlow<Room>(replay = 0, extraBufferCapacity = 2)
     /** The host switched the room to another anime. */
     val moved: SharedFlow<Room> = _moved
@@ -96,6 +105,7 @@ class WatchTogether(
                         _changes.tryEmit(RoomChange(ep, au))
                     }
                     "rtc" -> rtcListener?.invoke(p)
+                    "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
                     "anime" -> {
                         val id = p["id"]?.jsonPrimitive?.intOrNull ?: return@collect
                         _moved.tryEmit(Room(room.id, room.hostId, id, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull,
@@ -139,7 +149,8 @@ class WatchTogether(
         val hard = p["hard"]?.jsonPrimitive?.contentOrNull == "true"
         leader = false
         val target = if (playing) pos + (now() - ts).coerceAtLeast(0) else pos
-        _commands.tryEmit(SyncCommand(playing, target, hard))
+        val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
+        _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd))
     }
 
     private fun send(event: String, extra: JsonObject) {
@@ -155,7 +166,7 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString())
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString())
         })
     }
 
@@ -166,7 +177,7 @@ class WatchTogether(
         if ((leader && playing && t - lastBeat > 2000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false")
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString())
             })
         }
     }

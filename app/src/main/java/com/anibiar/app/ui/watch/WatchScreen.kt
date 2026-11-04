@@ -250,7 +250,18 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
     BackHandler(enabled = fullscreen) { fullscreen = false }
 
-    fun select(n: Int) { if (locked) { hostOnly(); return }; ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
+    var requests by remember { mutableStateOf<List<com.anibiar.app.social.RoomRequest>>(emptyList()) }
+    LaunchedEffect(together) {
+        val t = together ?: return@LaunchedEffect
+        t.requests.collect { requests = requests + it; android.widget.Toast.makeText(context, "A friend sent a request", android.widget.Toast.LENGTH_SHORT).show() }
+    }
+    fun select(n: Int) {
+        if (locked) {
+            episodesOpen = false
+            together?.request(null, name, null, n)
+            android.widget.Toast.makeText(context, "Request sent to the host", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }; ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
     fun saveProgress(t: Double, d: Double, episode: Int) {
         if (d <= 0) return
         app.history.save(HistoryItem(id, name, anime?.bannerImage ?: anime?.posterUrl, episode, (t / d).toFloat().coerceIn(0f, 1f)))
@@ -286,6 +297,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 fullscreen = fullscreen, onFullscreen = { fullscreen = it },
                 modifier = Modifier.fillMaxSize(),
                 together = together,
+                readOnly = locked,
             )
             if (room != null && fullscreen) {
                 com.anibiar.app.ui.watch.AvatarStrip(memberList, roomProfiles, speaking, mutedUsers, social.myId.orEmpty(), Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
@@ -312,16 +324,43 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             }
         }
 
-        if (!fullscreen) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (room != null) {
-                com.anibiar.app.ui.watch.RoomPanel(
-                    members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
-                    speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted,
-                    onMic = { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) },
-                    onInvite = { togetherOpen = true },
-                    onLeave = { together?.leave(isHost); together = null; room = null },
-                )
+        // In a room the page is the call: tiles fill the screen under the video, controls pinned below.
+        if (!fullscreen && room != null) Column(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            requests.firstOrNull()?.let { rq ->
+                val who = roomProfiles[rq.from]?.shownName ?: "Someone"
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Ani.Panel).border(1.dp, Ani.Lavender.copy(alpha = 0.6f), RoundedCornerShape(14.dp)).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("$who requests", style = inter(12f), color = Ani.Muted)
+                        Text(if (rq.animeId != null) rq.title else "Episode ${rq.episode}", style = inter(14.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Text("Dismiss", style = inter(13f), color = Ani.Muted, modifier = Modifier.clickable { requests = requests.drop(1) }.padding(8.dp))
+                    Text("Accept", style = inter(13.5f, FontWeight.Bold), color = Color.Black,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.Lime).clickable {
+                            requests = requests.drop(1)
+                            val r = room; val t = together
+                            if (rq.animeId != null && r != null && t != null) {
+                                val next = r.copy(animeId = rq.animeId, title = rq.title, cover = rq.cover, episode = 1, audio = "sub")
+                                t.changeAnime(next); t.detach(); together = null; room = null
+                                onRoomMoved(next)
+                            } else if (rq.animeId == null) { ep = rq.episode; synopsisEpisode = false; watch = null }
+                        }.padding(horizontal = 16.dp, vertical = 8.dp))
+                }
             }
+            com.anibiar.app.ui.watch.RoomPanel(
+                members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
+                speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted,
+                onMic = { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) },
+                onEpisodes = { episodesOpen = true },
+                onAnime = { pickerOpen = true },
+                onInvite = { togetherOpen = true },
+                onLeave = { together?.leave(isHost); together = null; room = null },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (!fullscreen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // Episode heading
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -486,6 +525,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             onLeave = { together?.leave(isHost); together = null; room = null; togetherOpen = false },
             onDismiss = { togetherOpen = false },
             onPickAnime = { togetherOpen = false; pickerOpen = true },
+            audio = audio, dubAvailable = !eps?.dub.isNullOrEmpty(), onAudio = { audio = it; streamName = null },
+            servers = watch?.streams?.map { it.name }.orEmpty(), server = stream?.name, onServer = { streamName = it },
         )
     }
     if (pickerOpen) {
@@ -498,6 +539,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     val next = r.copy(animeId = m.id, title = m.displayTitle, cover = m.posterUrl, episode = 1, audio = "sub")
                     t.changeAnime(next); t.detach(); together = null; room = null
                     onRoomMoved(next)
+                } else if (t != null) {
+                    t.request(m.id, m.displayTitle, m.posterUrl, 1)
+                    android.widget.Toast.makeText(context, "Request sent to the host", android.widget.Toast.LENGTH_SHORT).show()
                 }
             },
         )

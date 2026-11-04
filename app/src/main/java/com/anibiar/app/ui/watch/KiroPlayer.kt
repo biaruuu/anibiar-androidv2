@@ -128,6 +128,8 @@ fun KiroPlayer(
     fullscreen: Boolean, onFullscreen: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     together: com.anibiar.app.social.WatchTogether? = null,
+    /** Guests in a room: no play/pause, seeking, skipping or speed (the host controls those). */
+    readOnly: Boolean = false,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -170,6 +172,7 @@ fun KiroPlayer(
 
     // ---- watch together: my actions go out, theirs come in ----
     val togetherNow by rememberUpdatedState(together)
+    val readOnlyNow by rememberUpdatedState(readOnly)
     val remoteUntil = remember { LongArray(1) }
     val pendingCmd = remember { arrayOfNulls<com.anibiar.app.social.SyncCommand>(1) }
     val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
@@ -193,6 +196,7 @@ fun KiroPlayer(
             player.setPlaybackSpeed(speedNow * if (drift > 0) 1.12f else 0.88f)
             driftJob[0] = scope.launch { delay((away * 8).coerceIn(200, 3000)); player.setPlaybackSpeed(speedNow) }
         }
+        if (c.speed != speedNow) speed = c.speed
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
     }
     LaunchedEffect(together) {
@@ -205,10 +209,10 @@ fun KiroPlayer(
         val l = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                if (System.currentTimeMillis() > remoteUntil[0] && player.duration > 0) togetherNow?.announce(playWhenReady, player.currentPosition)
+                if (!readOnlyNow && System.currentTimeMillis() > remoteUntil[0] && player.duration > 0) togetherNow?.announce(playWhenReady, player.currentPosition)
             }
             override fun onPositionDiscontinuity(o: Player.PositionInfo, n: Player.PositionInfo, reason: Int) {
-                if (reason == Player.DISCONTINUITY_REASON_SEEK && System.currentTimeMillis() > remoteUntil[0] && player.duration > 0)
+                if (!readOnlyNow && reason == Player.DISCONTINUITY_REASON_SEEK && System.currentTimeMillis() > remoteUntil[0] && player.duration > 0)
                     togetherNow?.announce(player.playWhenReady, n.positionMs)
             }
             override fun onPlaybackStateChanged(state: Int) {
@@ -241,7 +245,10 @@ fun KiroPlayer(
         player.playWhenReady = autoplayNow
     }
     LaunchedEffect(volume, muted) { player.volume = if (muted) 0f else volume }
-    LaunchedEffect(speed) { player.setPlaybackSpeed(speed) }
+    LaunchedEffect(speed) {
+        player.setPlaybackSpeed(speed)
+        togetherNow?.let { t -> t.speed = speed; if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false) }
+    }
 
     // Volume boost through the system loudness enhancer.
     val enhancer = remember { arrayOfNulls<android.media.audiofx.LoudnessEnhancer>(1) }
@@ -291,12 +298,12 @@ fun KiroPlayer(
             val t = timeMs / 1000.0
             fun inside(r: TimeRange?) = r != null && t >= r.start && t < r.end - 1
             val kind = if (inside(intro)) "intro" else if (inside(outro)) "outro" else null
-            if (kind != null && autoSkipNow && kind !in skipped && player.isPlaying) {
+            if (kind != null && autoSkipNow && !readOnlyNow && kind !in skipped && player.isPlaying) {
                 val r = if (kind == "intro") intro!! else outro!!
                 skipped += kind; skipToast = kind to t; skipTarget = null
                 remoteUntil[0] = System.currentTimeMillis() + 1000
                 player.seekTo((r.end * 1000).toLong())
-            } else if (skipToast == null) skipTarget = kind
+            } else if (skipToast == null) skipTarget = if (readOnlyNow) null else kind
             if (player.isPlaying && timeMs - reported > 5000) { reported = timeMs; onTimeNow(t, durationMs / 1000.0) }
             delay(200)
         }
@@ -313,11 +320,13 @@ fun KiroPlayer(
     }
 
     fun seekBy(sec: Int) {
+        if (readOnly) { say("Only the host controls playback"); return }
         val to = (player.currentPosition + sec * 1000L).coerceIn(0, if (player.duration > 0) player.duration else Long.MAX_VALUE)
         player.seekTo(to); timeMs = to; ended = false
         flash = (sec < 0) to (flash?.second ?: 0) + 1
     }
     fun togglePlay() {
+        if (readOnly) { say("Only the host controls playback"); return }
         if (ended) { player.seekTo(0); ended = false; player.play() } else if (player.isPlaying) player.pause() else player.play()
     }
 
@@ -343,7 +352,7 @@ fun KiroPlayer(
                     onTap = { if (menuOpen) menuOpen = false else showControls = !showControls },
                     onDoubleTap = { o ->
                         val f = o.x / size.width
-                        if (f < 0.33f) seekBy(-10) else if (f > 0.67f) seekBy(10) else onFullscreen(!fullscreen)
+                        if (f < 0.33f) { if (!readOnly) seekBy(-10) } else if (f > 0.67f) { if (!readOnly) seekBy(10) } else onFullscreen(!fullscreen)
                         showControls = true
                     },
                 )
@@ -491,10 +500,10 @@ fun KiroPlayer(
                     }
                 }
                 TrackBar(
-                    (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live,
+                    (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live && !readOnly,
                     Modifier.fillMaxWidth(), thumb = scrubFrac != null,
                     onScrub = { scrubFrac = it; timeMs = (it * durationMs).toLong() },
-                    onSeek = { f -> scrubFrac = null; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
+                    onSeek = { f -> scrubFrac = null; if (readOnly) return@TrackBar; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
                     seekMode = true,
                 )
             }
@@ -520,7 +529,7 @@ fun KiroPlayer(
                             MenuRow(VidIcons.ClosedCaptions, "Captions", sortedSubs.getOrNull(captionTrack)?.label ?: "Off") { menuView = "captions" }
                             MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
                         }
-                        MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
+                        if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                         MenuRow(VidIcons.Play, "Autoplay", if (autoplay) "On" else "Off", chevron = false) { onAutoplay(!autoplay) }
                         MenuRow(VidIcons.SeekForward10, "Auto skip intro/outro", if (intro == null && outro == null) "No data" else if (autoSkip) "On" else "Off", chevron = false) { onAutoSkip(!autoSkip) }
                         MenuRow(VidIcons.SeekForward10, "Auto next episode", if (autoNext) "On" else "Off", chevron = false) { onAutoNext(!autoNext) }

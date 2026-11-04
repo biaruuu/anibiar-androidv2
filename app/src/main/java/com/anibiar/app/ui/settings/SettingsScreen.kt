@@ -221,6 +221,14 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
     InfoRow("Privacy Policy", "", onClick = { toast("Coming soon") })
     Divider()
     InfoRow("App version", version)
+    Divider()
+    var found by remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
+    var checking by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    InfoRow(if (checking) "Checking…" else "Check for updates", "", onClick = {
+        if (!checking) { checking = true; scope.launch { val u = com.anibiar.app.update.Updater.check(); checking = false; if (u == null) toast("You're on the latest version") else found = u } }
+    })
+    found?.let { com.anibiar.app.update.UpdateDialog(it, onDismiss = { found = null }) }
 }
 
 @Composable

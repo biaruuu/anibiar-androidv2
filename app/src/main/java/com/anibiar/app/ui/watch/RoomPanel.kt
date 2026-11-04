@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -63,30 +64,35 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
 
 @Composable
 private fun RoundButton(icon: ImageVector, bg: Color, tint: Color, onClick: () -> Unit) {
-    Box(Modifier.size(54.dp).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(52.dp).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(26.dp))
     }
 }
 
-/** The Discord-style call: participants on top, round controls under them. */
+/** The Discord-style call: participants fill the screen under the video, round controls pinned at the bottom. */
 @Composable
 fun RoomPanel(
     members: List<String>, profiles: Map<String, UserProfile>, hostId: String, myId: String,
     speaking: Set<String>, muted: Set<String>, micOk: Boolean, myMuted: Boolean,
-    onMic: () -> Unit, onInvite: () -> Unit, onLeave: () -> Unit,
+    onMic: () -> Unit, onEpisodes: () -> Unit, onAnime: () -> Unit, onInvite: () -> Unit, onLeave: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val ordered = members.sortedWith(compareBy({ it != hostId }, { it != myId }))
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val cols = if (ordered.size <= 1) 1 else if (maxWidth >= 720.dp) 3 else 2
-            val ratio = if (cols == 1) 16f / 9f else 1.1f
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val n = ordered.size.coerceAtLeast(1)
+            val portrait = maxWidth < maxHeight
+            val cols = if (portrait) (if (n <= 3) 1 else 2) else (if (n <= 2) 2 else 3)
+            val rows = (n + cols - 1) / cols
+            val gap = 8.dp
+            val tileH = ((maxHeight - gap * (rows - 1)) / rows).coerceAtLeast(120.dp)
+            Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(gap)) {
                 ordered.chunked(cols).forEach { row ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                         row.forEach { uid ->
                             Tile(
                                 profiles[uid], uid, uid in speaking, uid in muted || (uid == myId && (myMuted || !micOk)), uid == hostId, uid == myId,
-                                Modifier.weight(1f).aspectRatio(ratio),
+                                Modifier.weight(1f).height(tileH),
                             )
                         }
                         repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
@@ -94,8 +100,10 @@ fun RoomPanel(
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterHorizontally)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
             RoundButton(if (!micOk || myMuted) AniIcons.MicOff else AniIcons.Mic, if (!micOk || myMuted) Color.White else Color(0xFF3A3A3D), if (!micOk || myMuted) Color.Black else Color.White, onMic)
+            RoundButton(AniIcons.Menu, Color(0xFF3A3A3D), Color.White, onEpisodes)
+            RoundButton(AniIcons.Search, Color(0xFF3A3A3D), Color.White, onAnime)
             RoundButton(AniIcons.PersonAdd, Color(0xFF3A3A3D), Color.White, onInvite)
             RoundButton(AniIcons.CallEnd, Danger, Color.White, onLeave)
         }
