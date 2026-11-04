@@ -142,6 +142,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     LaunchedEffect(together != null) { if (together != null && !micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
     LaunchedEffect(together, micOk) { if (together != null && micOk) session.ensureVoice() }
     val speaking by (voice?.speaking ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
+    val voiceLinks by (voice?.states ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<String, String>()) }).collectAsStateWithLifecycle()
     val mutedUsers by (together?.mutedUsers ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val memberList = roomMembers.toList()
     var driftMs by remember { mutableStateOf(0L) }
@@ -320,7 +321,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             }
             com.anibiar.app.ui.watch.RoomPanel(
                 members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
-                speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted,
+                speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted, links = voiceLinks,
                 onMic = { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) },
                 onEpisodes = { episodesOpen = true },
                 onAnime = { pickerOpen = true },

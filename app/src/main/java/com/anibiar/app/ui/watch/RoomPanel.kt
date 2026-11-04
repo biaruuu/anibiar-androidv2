@@ -42,7 +42,7 @@ private val Danger = Color(0xFFED4245)
 
 /** One person in the call: big avatar, green ring while talking, mic-off badge when muted. */
 @Composable
-private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean, host: Boolean, me: Boolean, modifier: Modifier) {
+private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean, host: Boolean, me: Boolean, link: String?, modifier: Modifier) {
     BoxWithConstraints(
         modifier.clip(RoundedCornerShape(20.dp)).background(Tile)
             .then(if (speaking) Modifier.border(3.dp, Speaking, RoundedCornerShape(20.dp)) else Modifier),
@@ -53,6 +53,13 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
         Row(Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color(0x99000000)).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text((p?.shownName ?: "…") + if (me) " (you)" else "", style = inter(12.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (host) Text("  HOST", style = inter(10f, FontWeight.Bold), color = Ani.Lime)
+        }
+        if (!me && link != null) {
+            val c = when (link) { "connected" -> Speaking; "failed" -> Danger; else -> Color(0xFFFEA500) }
+            Row(Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color(0x99000000)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(c))
+                Text(when (link) { "connected" -> "  Voice connected"; "failed" -> "  Can't connect voice"; else -> "  Connecting voice…" }, style = inter(10.5f, FontWeight.SemiBold), color = Color.White)
+            }
         }
         if (muted) {
             Box(Modifier.align(Alignment.BottomEnd).padding(10.dp).size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xCC1E1F22)), contentAlignment = Alignment.Center) {
@@ -73,7 +80,7 @@ private fun RoundButton(icon: ImageVector, bg: Color, tint: Color, onClick: () -
 @Composable
 fun RoomPanel(
     members: List<String>, profiles: Map<String, UserProfile>, hostId: String, myId: String,
-    speaking: Set<String>, muted: Set<String>, micOk: Boolean, myMuted: Boolean,
+    speaking: Set<String>, muted: Set<String>, micOk: Boolean, myMuted: Boolean, links: Map<String, String> = emptyMap(),
     onMic: () -> Unit, onEpisodes: () -> Unit, onAnime: () -> Unit, onInvite: () -> Unit, onLeave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -91,7 +98,7 @@ fun RoomPanel(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                         row.forEach { uid ->
                             Tile(
-                                profiles[uid], uid, uid in speaking, uid in muted || (uid == myId && (myMuted || !micOk)), uid == hostId, uid == myId,
+                                profiles[uid], uid, uid in speaking, uid in muted || (uid == myId && (myMuted || !micOk)), uid == hostId, uid == myId, links[uid],
                                 Modifier.weight(1f).height(tileH),
                             )
                         }

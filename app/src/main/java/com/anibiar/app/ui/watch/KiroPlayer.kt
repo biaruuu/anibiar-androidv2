@@ -93,6 +93,11 @@ import coil.compose.AsyncImage
 import com.anibiar.app.data.Streaming
 import com.anibiar.app.data.StreamSubtitle
 import com.anibiar.app.data.TimeRange
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
+import com.anibiar.app.ui.theme.TrebuchetFamily
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.VidIcons
 import com.anibiar.app.ui.theme.inter
@@ -107,8 +112,8 @@ private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
 private fun boostLabel(i: Int) = "${i * 100}%"
-private val CAPTION_SIZES = listOf("Small" to 0.88f, "Medium" to 1.1f, "Large" to 1.4f)
-private val CAPTION_STYLES = listOf("Dark box", "Outline")
+private val CAPTION_SIZES = listOf("Small" to 0.82f, "Medium" to 1.0f, "Large" to 1.28f)
+private val CAPTION_STYLES = listOf("Crunchyroll", "Dark box")
 
 private fun fmt(sec: Double): String {
     if (!sec.isFinite() || sec < 0) return "0:00"
@@ -163,7 +168,7 @@ fun KiroPlayer(
     var captionTrack by remember { mutableIntStateOf(0) }
     var captionTry by remember { mutableIntStateOf(0) }
     var captionState by remember { mutableStateOf("") }
-    var captionSize by remember { mutableIntStateOf(0) }
+    var captionSize by remember { mutableIntStateOf(1) }
     var captionStyle by remember { mutableIntStateOf(0) }
     var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -444,17 +449,31 @@ fun KiroPlayer(
         }
 
         // Captions
-        val line = Captions.active(cues, timeMs / 1000.0)
-        if (line != null) {
-            val base = (w.value * 0.026f).coerceIn(13.6f, 40f) * CAPTION_SIZES[captionSize].second
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = w * 0.05f).padding(bottom = (w * 0.065f).coerce(34.dp, 80.dp)), contentAlignment = Alignment.Center) {
-                Text(
-                    line, textAlign = TextAlign.Center, color = Color.White,
-                    style = inter(base, FontWeight.Bold, lineHeight = base * 1.35f).copy(
-                        shadow = if (captionStyle == 1) Shadow(Color.Black, Offset(0f, 1f), 7f) else null,
-                    ),
-                    modifier = Modifier.then(if (captionStyle == 0) Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xBF000000)).padding(horizontal = 8.dp, vertical = 2.dp) else Modifier),
-                )
+        val active = Captions.activeLine(cues, timeMs / 1000.0)
+        if (active != null) {
+            val (line, italic) = active
+            val base = (w.value * 0.034f).coerceIn(15f, 46f) * CAPTION_SIZES[captionSize].second
+            val face = TextStyle(
+                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.22f).sp, fontWeight = FontWeight.Bold,
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.2.sp,
+            )
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = w * 0.06f).padding(bottom = (w * 0.06f).coerce(30.dp, 76.dp)), contentAlignment = Alignment.Center) {
+                if (captionStyle == 0) {
+                    // Crunchyroll look: white Trebuchet with a thick black outline and a soft drop shadow, no box.
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
+                    Text(
+                        line, style = face.copy(
+                            color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
+                            shadow = Shadow(Color(0xAA000000), Offset(0f, 3f), 6f),
+                        ),
+                    )
+                    Text(line, style = face.copy(color = Color.White))
+                } else {
+                    Text(
+                        line, style = face.copy(color = Color.White),
+                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xBF000000)).padding(horizontal = 10.dp, vertical = 3.dp),
+                    )
+                }
             }
         }
 

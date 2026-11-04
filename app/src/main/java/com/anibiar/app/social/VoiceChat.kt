@@ -46,13 +46,26 @@ class VoiceChat(
 ) {
     companion object {
         @Volatile private var inited = false
-        private val ICE = listOf(
-            PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-            PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
-            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:80").setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
-            PeerConnection.IceServer.builder("turn:openrelay.metered.ca:443").setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
-            PeerConnection.IceServer.builder("turns:openrelay.metered.ca:443?transport=tcp").setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
-        )
+        /**
+         * STUN plus a public TURN relay (Metered's Open Relay "static auth" server, which accepts time-limited
+         * credentials derived from its published shared secret). The relay is what makes voice work on mobile data,
+         * where phones usually can't reach each other directly.
+         */
+        private fun iceServers(): List<PeerConnection.IceServer> {
+            val user = ((System.currentTimeMillis() / 1000) + 24 * 3600).toString() + ":kiro"
+            val mac = javax.crypto.Mac.getInstance("HmacSHA1").apply { init(javax.crypto.spec.SecretKeySpec("openrelayprojectsecret".toByteArray(), "HmacSHA1")) }
+            val pass = android.util.Base64.encodeToString(mac.doFinal(user.toByteArray()), android.util.Base64.NO_WRAP)
+            fun turn(url: String) = PeerConnection.IceServer.builder(url).setUsername(user).setPassword(pass).createIceServer()
+            return listOf(
+                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+                PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
+                PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer(),
+                turn("turn:staticauth.openrelay.metered.ca:80"),
+                turn("turn:staticauth.openrelay.metered.ca:443"),
+                turn("turn:staticauth.openrelay.metered.ca:443?transport=tcp"),
+                turn("turns:staticauth.openrelay.metered.ca:443?transport=tcp"),
+            )
+        }
     }
 
     private val app = context.applicationContext
@@ -64,6 +77,12 @@ class VoiceChat(
     private val peers = ConcurrentHashMap<String, PeerConnection>()
     private val started = ConcurrentHashMap<String, Long>()
     private val queuedIce = ConcurrentHashMap<String, MutableList<IceCandidate>>()
+    /** Setup messages are handled strictly one at a time, in the order they arrived. */
+    private val signals = kotlinx.coroutines.channels.Channel<JsonObject>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    private val _states = MutableStateFlow<Map<String, String>>(emptyMap())
+    /** Per person: "connecting", "connected" or "failed". */
+    val states: StateFlow<Map<String, String>> = _states.asStateFlow()
+    private fun setState(uid: String, s: String?) { _states.value = if (s == null) _states.value - uid else _states.value + (uid to s) }
     private val jobs = mutableListOf<Job>()
     @Volatile private var stopped = false
 
@@ -93,7 +112,8 @@ class VoiceChat(
         oldMode = audio.mode; oldSpeaker = audio.isSpeakerphoneOn
         audio.mode = AudioManager.MODE_IN_COMMUNICATION
         audio.isSpeakerphoneOn = true
-        tg.rtcListener = { p -> scope.launch { onSignal(p) } }
+        tg.rtcListener = { p -> signals.trySend(p) }
+        jobs += scope.launch { for (p in signals) runCatching { onSignal(p) } }
         jobs += scope.launch {
             tg.members.collect { members ->
                 members.forEach { uid -> if (uid != me && me < uid && peers[uid] == null) offerTo(uid) }
@@ -109,7 +129,8 @@ class VoiceChat(
                 peers.forEach { (uid, pc) ->
                     val st = pc.iceConnectionState()
                     if (st == PeerConnection.IceConnectionState.CONNECTED || st == PeerConnection.IceConnectionState.COMPLETED) up++
-                    else if (me < uid && System.currentTimeMillis() - (started[uid] ?: 0) > 9000) { close(uid); if (uid in tg.members.value) offerTo(uid) }
+                    else if (me < uid && System.currentTimeMillis() - (started[uid] ?: 0) > 8000) { close(uid); if (uid in tg.members.value) offerTo(uid) }
+                    else if (System.currentTimeMillis() - (started[uid] ?: 0) > 20000) setState(uid, "failed")
                 }
                 _connected.value = up
             }
@@ -150,17 +171,27 @@ class VoiceChat(
         audio.mode = oldMode; audio.isSpeakerphoneOn = oldSpeaker
     }
 
-    private fun close(uid: String) {
+    private fun close(uid: String, keepIce: Boolean = false) {
         peers.remove(uid)?.let { runCatching { it.close(); it.dispose() } }
-        started.remove(uid); queuedIce.remove(uid)
+        started.remove(uid); if (!keepIce) queuedIce.remove(uid)
+        if (!keepIce) setState(uid, null)
     }
 
     private fun peer(uid: String): PeerConnection {
         peers[uid]?.let { return it }
-        val cfg = PeerConnection.RTCConfiguration(ICE).apply { sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN }
+        val cfg = PeerConnection.RTCConfiguration(iceServers()).apply {
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            iceCandidatePoolSize = 2
+        }
         val pc = factory.createPeerConnection(cfg, object : PeerConnection.Observer {
             override fun onSignalingChange(s: PeerConnection.SignalingState) {}
             override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {
+                setState(uid, when (s) {
+                    PeerConnection.IceConnectionState.CONNECTED, PeerConnection.IceConnectionState.COMPLETED -> "connected"
+                    PeerConnection.IceConnectionState.FAILED -> "failed"
+                    else -> "connecting"
+                })
                 _connected.value = peers.values.count { it.iceConnectionState() == PeerConnection.IceConnectionState.CONNECTED || it.iceConnectionState() == PeerConnection.IceConnectionState.COMPLETED }
             }
             override fun onIceConnectionReceivingChange(b: Boolean) {}
@@ -177,7 +208,7 @@ class VoiceChat(
             override fun onRenegotiationNeeded() {}
         })!!
         pc.addTrack(track, listOf("kiro"))
-        peers[uid] = pc; started[uid] = System.currentTimeMillis()
+        peers[uid] = pc; started[uid] = System.currentTimeMillis(); setState(uid, "connecting")
         return pc
     }
 
@@ -210,7 +241,7 @@ class VoiceChat(
         val sdp = p["sdp"]?.jsonPrimitive?.contentOrNull ?: return
         when (p["kind"]?.jsonPrimitive?.contentOrNull) {
             "offer" -> {
-                close(from) // a fresh offer always wins
+                close(from, keepIce = true) // a fresh offer always wins; candidates that came with it are kept
                 val pc = peer(from)
                 pc.setRemoteDescription(object : Sdp() {
                     override fun onSetSuccess() {

@@ -68,7 +68,10 @@ class RoomSession(private val context: Context, private val social: SocialReposi
     /** Start the voice call once the microphone is allowed. */
     fun ensureVoice() {
         val t = together ?: return
-        if (voice == null) voice = runCatching { VoiceChat(context.applicationContext, t, social.myId.orEmpty(), scope).also { it.start() } }.getOrNull()
+        if (voice == null) {
+            CallService.start(context.applicationContext)
+            voice = runCatching { VoiceChat(context.applicationContext, t, social.myId.orEmpty(), scope).also { it.start() } }.getOrNull()
+        }
     }
 
     /** The host moves everyone to another anime; the call and room stay as they are. */
@@ -81,6 +84,7 @@ class RoomSession(private val context: Context, private val social: SocialReposi
     fun leave(endForAll: Boolean) {
         together?.leave(endForAll)
         voice?.stop()
+        CallService.stop(context.applicationContext)
         jobs.forEach { it.cancel() }; jobs.clear()
         voice = null; together = null; room = null; prevMembers = null
     }

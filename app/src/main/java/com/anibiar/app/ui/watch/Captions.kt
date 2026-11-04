@@ -1,7 +1,7 @@
 package com.anibiar.app.ui.watch
 
 /** One caption line, in seconds. */
-data class Cue(val start: Double, val end: Double, val text: String)
+data class Cue(val start: Double, val end: Double, val text: String, val italic: Boolean = false)
 
 /** Parses WebVTT, SRT and ASS/SSA subtitle files (the formats the AniBiar TV servers hand out). */
 object Captions {
@@ -31,8 +31,8 @@ object Captions {
             if (i < 0) continue
             val m = arrow.find(lines[i]) ?: continue
             val g = m.groupValues
-            val body = clean(lines.drop(i + 1).joinToString("\n"))
-            out += Cue(time(g[1].ifEmpty { null }, g[2], g[3], g[4]), time(g[5].ifEmpty { null }, g[6], g[7], g[8]), body)
+            val rawBody = lines.drop(i + 1).joinToString("\n")
+            out += Cue(time(g[1].ifEmpty { null }, g[2], g[3], g[4]), time(g[5].ifEmpty { null }, g[6], g[7], g[8]), clean(rawBody), Regex("<i[ >]").containsMatchIn(rawBody))
         }
         return out
     }
@@ -56,10 +56,18 @@ object Captions {
                 val parts = t.substringAfter(':').trimStart().split(',', limit = format.size)
                 val s = format.indexOf("start"); val e = format.indexOf("end"); val tx = format.indexOf("text")
                 if (s < 0 || e < 0 || tx < 0 || parts.size <= tx) continue
-                runCatching { out += Cue(assTime(parts[s]), assTime(parts[e]), clean(parts[tx])) }
+                runCatching { out += Cue(assTime(parts[s]), assTime(parts[e]), clean(parts[tx]), parts[tx].contains("\\i1")) }
             }
         }
         return out
+    }
+
+    /** The caption to show now, and whether it is an italic line (thoughts, narration). */
+    fun activeLine(cues: List<Cue>, t: Double): Pair<String, Boolean>? {
+        if (cues.isEmpty()) return null
+        val now = cues.filter { t >= it.start && t < it.end }
+        if (now.isEmpty()) return null
+        return now.joinToString("\n") { it.text }.take(400) to now.all { it.italic }
     }
 
     fun active(cues: List<Cue>, t: Double): String? {

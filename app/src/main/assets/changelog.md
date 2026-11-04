@@ -1,3 +1,8 @@
+## 7 | Crunchyroll captions, mic fixes | 2026-11-05
+- New caption look: Trebuchet MS with a black outline and soft shadow, like Crunchyroll (Dark box still available in caption style); italics for thoughts and narration
+- Mic fix: call setup messages are now handled in order (they could be dropped before), the call keeps the mic alive in the background, and a working relay server helps on mobile data
+- Each friend's tile shows whether their voice is connected, connecting or failed
+
 ## 6 | Captions, host-mirrored player, wait-for-everyone | 2026-11-05
 - Captions now load reliably (retries, remembered per episode) and reload after you leave and come back
 - Everything the host does on the player shows for guests: captions on/off and language, caption size and style, speed, volume boost, seeking, play and pause

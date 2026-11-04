@@ -30,6 +30,12 @@ object Ani {
     val Amber = Color(0xFFFEA500)
 }
 
+/** Trebuchet MS, used for video captions (Crunchyroll-style). Bold is synthesized from the regular face. */
+val TrebuchetFamily = FontFamily(
+    Font(R.font.trebuchet_ms, FontWeight.Normal),
+    Font(R.font.trebuchet_ms_italic, FontWeight.Normal, androidx.compose.ui.text.font.FontStyle.Italic),
+)
+
 val InterFamily = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),
     Font(R.font.inter_medium, FontWeight.Medium),
