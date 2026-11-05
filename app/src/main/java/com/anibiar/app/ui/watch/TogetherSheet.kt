@@ -1,6 +1,7 @@
 package com.anibiar.app.ui.watch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.horizontalScroll
@@ -92,7 +93,7 @@ fun TogetherSheet(
                     items(friends, key = { it.uid }) { f ->
                         val here = f.uid in members
                         val sent = f.uid in invited
-                        Row(Modifier.fillMaxWidth().height(60.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Avatar(f.avatarUrl, f.shownName, 40.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
@@ -101,7 +102,7 @@ fun TogetherSheet(
                             }
                             if (isHost && !here) {
                                 Box(
-                                    Modifier.clip(RoundedCornerShape(50)).background(if (sent) Ani.ButtonDark else Ani.Lavender)
+                                    Modifier.clip(RoundedCornerShape(50)).background(if (sent) Color(0xFF232326) else Color(0xFFB7A9FF))
                                         .clickable {
                                             scope.launch {
                                                 runCatching { social.inviteToRoom(room, f.uid) }
@@ -137,12 +138,12 @@ fun TogetherSheet(
                 }
                 Spacer(Modifier.height(12.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Lavender).clickable(onClick = onPickAnime),
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFFB7A9FF)).clickable(onClick = onPickAnime),
                     contentAlignment = Alignment.Center,
                 ) { Text(if (isHost) "Change anime" else "Request an anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
                 Spacer(Modifier.height(8.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable(onClick = onLeave),
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onLeave),
                     contentAlignment = Alignment.Center,
                 ) { Text(if (isHost) "End room for everyone" else "Leave room", style = inter(14.5f, FontWeight.SemiBold), color = Color(0xFFFF6B6B)) }
             }

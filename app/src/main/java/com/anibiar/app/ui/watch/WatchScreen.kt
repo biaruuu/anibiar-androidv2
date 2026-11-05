@@ -460,9 +460,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
 
             // Watch together
             if (room == null) Row(
-                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if (room != null) Ani.Lime.copy(alpha = 0.14f) else Color(0x1AFFFFFF))
-                    .border(1.dp, if (room != null) Ani.Lime.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+                Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFF151517))
+                    .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp))
                     .clickable {
                         if (social.myId == null) android.widget.Toast.makeText(context, "Log in to watch together", android.widget.Toast.LENGTH_SHORT).show()
                         else if (!starting) withMic {
@@ -478,8 +478,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     }.padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(AniIcons.Person, null, tint = if (room != null) Ani.Lime else Color.White, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(10.dp))
+                Box(Modifier.size(30.dp).clip(CircleShape).background(WebAccent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) { Icon(AniIcons.PersonAdd, null, tint = WebAccent, modifier = Modifier.size(17.dp)) }
+                Spacer(Modifier.width(12.dp))
                 Text(
                     if (starting) "Starting…" else if (room == null) "Watch together" else "In a room · ${roomMembers.size} watching",
                     style = inter(14f, FontWeight.SemiBold), color = if (room != null) Ani.Lime else Color.White,

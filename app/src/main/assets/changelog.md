@@ -1,3 +1,7 @@
+## 25 | Watch together restyle, caption size in fullscreen | 2026-11-05
+- Captions no longer get too big in fullscreen
+- Watch together button, call screen, call bar and invite list restyled to match the watch page cards (dark panels, soft borders, lavender accents)
+
 ## 24 | Exact Crunchyroll caption outline | 2026-11-05
 - Caption outline and drop shadow now follow the Crunchyroll subtitle CSS: thicker solid black outline and a soft shadow
 

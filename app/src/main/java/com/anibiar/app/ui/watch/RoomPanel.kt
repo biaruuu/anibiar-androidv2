@@ -37,15 +37,15 @@ import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 
 private val Speaking = Color(0xFF23A559)
-private val Tile = Color(0xFF2B2B2D)
+private val Tile = Color(0xFF151517)
 private val Danger = Color(0xFFED4245)
 
 /** One person in the call: big avatar, green ring while talking, mic-off badge when muted. */
 @Composable
 private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean, host: Boolean, me: Boolean, link: String?, modifier: Modifier) {
     BoxWithConstraints(
-        modifier.clip(RoundedCornerShape(20.dp)).background(Tile)
-            .then(if (speaking) Modifier.border(3.dp, Speaking, RoundedCornerShape(20.dp)) else Modifier),
+        modifier.clip(RoundedCornerShape(18.dp)).background(Tile)
+            .border(if (speaking) 2.5.dp else 1.dp, if (speaking) Speaking else Color(0x1FFFFFFF), RoundedCornerShape(18.dp)),
         contentAlignment = Alignment.Center,
     ) {
         val d: Dp = (if (maxWidth < maxHeight) maxWidth else maxHeight) * 0.5f
@@ -71,7 +71,7 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
 
 @Composable
 private fun RoundButton(icon: ImageVector, bg: Color, tint: Color, onClick: () -> Unit) {
-    Box(Modifier.size(52.dp).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(48.dp).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(26.dp))
     }
 }
@@ -107,11 +107,11 @@ fun RoomPanel(
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-            RoundButton(if (!micOk || myMuted) AniIcons.MicOff else AniIcons.Mic, if (!micOk || myMuted) Color.White else Color(0xFF3A3A3D), if (!micOk || myMuted) Color.Black else Color.White, onMic)
-            RoundButton(AniIcons.Menu, Color(0xFF3A3A3D), Color.White, onEpisodes)
-            RoundButton(AniIcons.Search, Color(0xFF3A3A3D), Color.White, onAnime)
-            RoundButton(AniIcons.PersonAdd, Color(0xFF3A3A3D), Color.White, onInvite)
+        Row(Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(50)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
+            RoundButton(if (!micOk || myMuted) AniIcons.MicOff else AniIcons.Mic, if (!micOk || myMuted) Color.White else Color(0xFF232326), if (!micOk || myMuted) Color.Black else Color.White, onMic)
+            RoundButton(AniIcons.Menu, Color(0xFF232326), Color.White, onEpisodes)
+            RoundButton(AniIcons.Search, Color(0xFF232326), Color.White, onAnime)
+            RoundButton(AniIcons.PersonAdd, Color(0xFF232326), Color.White, onInvite)
             RoundButton(AniIcons.CallEnd, Danger, Color.White, onLeave)
         }
     }

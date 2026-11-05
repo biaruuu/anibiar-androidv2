@@ -39,15 +39,15 @@ fun CallBar(session: RoomSession, myId: String?, onOpen: () -> Unit, modifier: M
     val members by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val muted by (session.voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1E3A2A))
-            .border(1.dp, Color(0xFF23A559), RoundedCornerShape(16.dp)).clickable(onClick = onOpen).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517))
+            .border(1.dp, Color(0x66B7A9FF), RoundedCornerShape(16.dp)).clickable(onClick = onOpen).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(9.dp).clip(CircleShape).background(Color(0xFF23A559)))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("In call · ${members.size} here", style = inter(13f, FontWeight.Bold), color = Color.White)
-            Text(room.title.ifBlank { "Watch together" } + " · Tap to open", style = inter(11.5f), color = Color(0xFFB8E6C8), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(room.title.ifBlank { "Watch together" } + " · Tap to open", style = inter(11.5f), color = Color(0xFF9B98A0), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Box(Modifier.size(38.dp).clip(CircleShape).background(if (muted) Color.White else Color(0x33FFFFFF)).clickable { session.voice?.setMuted(!muted) }, contentAlignment = Alignment.Center) {
             Icon(if (muted) AniIcons.MicOff else AniIcons.Mic, null, tint = if (muted) Color.Black else Color.White, modifier = Modifier.size(20.dp))

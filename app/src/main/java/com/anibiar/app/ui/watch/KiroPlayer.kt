@@ -499,7 +499,7 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (w.value * 0.034f).coerceIn(12f, 36f) * (if (aCtl > 0.5f) 0.92f else 1f)
+            val base = (if (w.value < 360f) (w.value * 0.034f).coerceAtLeast(11f) else (12.2f + (w.value - 360f) * 0.014f).coerceAtMost(22f)) * (if (aCtl > 0.5f) 0.92f else 1f)
             val face = TextStyle(
                 fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.2f).sp, fontWeight = FontWeight.Normal,
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.sp,
