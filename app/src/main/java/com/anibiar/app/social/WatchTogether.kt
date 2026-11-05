@@ -19,7 +19,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0, val cap: String? = null, val capSize: Int = 0, val capStyle: Int = 0, val ui: Boolean? = null, val srv: String? = null, val menu: String? = null, val vol: Boolean? = null, val csrc: String? = null, val clabel: String? = null)
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0, val cap: String? = null, val capSize: Int = 0, val capStyle: Int = 0, val ui: Boolean? = null, val srv: String? = null, val menu: String? = null, val vol: Boolean? = null, val csrc: String? = null, val clabel: String? = null, val capOn: Boolean? = null)
 
 /** A guest asking the host for another anime or episode. */
 data class RoomRequest(val from: String, val animeId: Int?, val title: String, val cover: String?, val episode: Int)
@@ -122,6 +122,8 @@ class WatchTogether(
     @Volatile var menu = ""
     /** The caption file the host is showing, so a guest whose server has no captions can still show the same ones. */
     @Volatile var captionSrc = ""
+    /** Whether the host has captions switched on (guests follow this, so a momentary empty label never turns theirs off). */
+    @Volatile var captionOn = true
     @Volatile var volOpen = false
     @Volatile var audio = room.audio
 
@@ -209,7 +211,7 @@ class WatchTogether(
         p["fs"]?.jsonPrimitive?.contentOrNull?.let { noteFs(it == "true") }
         val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
         _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0,
-            cap = p["cap"]?.jsonPrimitive?.contentOrNull, capSize = p["cs"]?.jsonPrimitive?.intOrNull ?: 0, capStyle = p["cst"]?.jsonPrimitive?.intOrNull ?: 0, ui = p["ui"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }, srv = p["srv"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, menu = p["mn"]?.jsonPrimitive?.contentOrNull, vol = p["vo"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }, csrc = p["csr"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, clabel = p["cap"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }))
+            cap = p["cap"]?.jsonPrimitive?.contentOrNull, capSize = p["cs"]?.jsonPrimitive?.intOrNull ?: 0, capStyle = p["cst"]?.jsonPrimitive?.intOrNull ?: 0, ui = p["ui"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }, srv = p["srv"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, menu = p["mn"]?.jsonPrimitive?.contentOrNull, vol = p["vo"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }, csrc = p["csr"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, clabel = p["cap"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, capOn = p["cn"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }))
     }
 
     private fun send(event: String, extra: JsonObject) {
@@ -225,7 +227,7 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString()); put("srv", srv); put("mn", menu); put("vo", volOpen.toString()); put("csr", captionSrc)
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString()); put("srv", srv); put("mn", menu); put("vo", volOpen.toString()); put("csr", captionSrc); put("cn", captionOn.toString())
         })
     }
 
@@ -237,7 +239,7 @@ class WatchTogether(
         if ((leader && t - lastBeat > 1000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString()); put("srv", srv); put("mn", menu); put("vo", volOpen.toString()); put("csr", captionSrc)
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString()); put("srv", srv); put("mn", menu); put("vo", volOpen.toString()); put("csr", captionSrc); put("cn", captionOn.toString())
             })
         }
     }

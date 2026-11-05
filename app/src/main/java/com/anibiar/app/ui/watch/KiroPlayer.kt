@@ -206,7 +206,7 @@ fun KiroPlayer(
     LaunchedEffect(sortedSubs) {
         captionRetry[0] = 0
         val first = sortedSubs.firstOrNull()
-        if (first != null && !isEnglishTrack(first.srclang, first.label) && captionTrack == 0) captionTrack = -1
+        if (first != null && !readOnly && !isEnglishTrack(first.srclang, first.label) && captionTrack == 0) captionTrack = -1
     }
     fun say(text: String, err: Boolean = false) { notice = text to err }
 
@@ -246,11 +246,14 @@ fun KiroPlayer(
         if (c.boost != boost) boost = c.boost
         if (!capLocal && c.capSize != captionSize) captionSize = c.capSize
         if (!capLocal && c.capStyle != captionStyle) captionStyle = c.capStyle
-        if (!capLocal) c.cap?.let { label ->
-            val idx = if (label.isEmpty()) -1 else sortedSubs.indexOfFirst { it.label == label }
-            if (idx != captionTrack && (idx >= 0 || label.isEmpty())) captionTrack = idx
-            // Host has captions on but my server names its tracks differently (or I started with them off): use my English track.
-            else if (idx < 0 && label.isNotEmpty() && captionTrack < 0 && sortedSubs.isNotEmpty()) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
+        // Captions follow the host: off only when the host switched them off, otherwise on (matching track, else my English one).
+        if (!capLocal) {
+            if (c.capOn == false) { if (captionTrack != -1) captionTrack = -1 }
+            else if (sortedSubs.isNotEmpty()) {
+                val idx = c.cap?.let { label -> sortedSubs.indexOfFirst { it.label == label } } ?: -1
+                if (idx >= 0) { if (idx != captionTrack) captionTrack = idx }
+                else if (captionTrack < 0) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
+            }
         }
         if (readOnlyNow) {
             c.csrc?.let { src -> if (hostSub?.src != src) hostSub = StreamSubtitle(c.clabel ?: "English", "en", src, true) }
@@ -339,7 +342,7 @@ fun KiroPlayer(
     }
     LaunchedEffect(captionTrack, captionSize, captionStyle, sortedSubs) {
         togetherNow?.let { t ->
-            t.captionLabel = sortedSubs.getOrNull(captionTrack)?.label.orEmpty(); t.captionSrc = sortedSubs.getOrNull(captionTrack)?.src.orEmpty(); t.captionSize = captionSize; t.captionStyle = captionStyle
+            t.captionLabel = sortedSubs.getOrNull(captionTrack)?.label.orEmpty(); t.captionSrc = sortedSubs.getOrNull(captionTrack)?.src.orEmpty(); t.captionOn = captionTrack >= 0; t.captionSize = captionSize; t.captionStyle = captionStyle
             if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false)
         }
     }

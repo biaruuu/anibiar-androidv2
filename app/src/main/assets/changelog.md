@@ -1,3 +1,6 @@
+## 28 | Captions stay on for guests | 2026-11-05
+- Guests' captions now turn off only when the host turns them off
+
 ## 27 | Guests always get the host's captions | 2026-11-05
 - If a friend's server has no captions, they now show the host's captions automatically, so everyone sees the same subtitles
 
