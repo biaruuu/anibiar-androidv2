@@ -1,3 +1,6 @@
+## 29 | Fix guest captions not turning back on | 2026-11-06
+- When the host turned captions off and on again, guests stayed off; they now follow the host both ways
+
 ## 28 | Captions stay on for guests | 2026-11-05
 - Guests' captions now turn off only when the host turns them off
 - In a watch party, guests always use the host's caption style, so size and look match for everyone

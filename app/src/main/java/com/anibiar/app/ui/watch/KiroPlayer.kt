@@ -223,6 +223,8 @@ fun KiroPlayer(
     val driftJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     val lastHardSeek = remember { LongArray(1) }
     val speedNow by rememberUpdatedState(speed)
+    // applyCmd runs from a long-lived collector, so it must read the *current* caption tracks, not the ones from when it started.
+    val subsNow by rememberUpdatedState(sortedSubs)
     fun applyCmd(c: com.anibiar.app.social.SyncCommand) {
         remoteUntil[0] = System.currentTimeMillis() + 1000
         val nowMs = System.currentTimeMillis()
@@ -249,10 +251,10 @@ fun KiroPlayer(
         // Captions follow the host: off only when the host switched them off, otherwise on (matching track, else my English one).
         if (!capLocal) {
             if (c.capOn == false) { if (captionTrack != -1) captionTrack = -1 }
-            else if (sortedSubs.isNotEmpty()) {
-                val idx = c.cap?.let { label -> sortedSubs.indexOfFirst { it.label == label } } ?: -1
+            else if (subsNow.isNotEmpty()) {
+                val idx = c.cap?.let { label -> subsNow.indexOfFirst { it.label == label } } ?: -1
                 if (idx >= 0) { if (idx != captionTrack) captionTrack = idx }
-                else if (captionTrack < 0) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
+                else if (captionTrack < 0) captionTrack = subsNow.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
             }
         }
         if (readOnlyNow) {
