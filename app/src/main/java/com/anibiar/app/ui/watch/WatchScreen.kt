@@ -79,6 +79,9 @@ import com.anibiar.app.ui.home.rememberFav
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.VidIcons
+import com.anibiar.app.ui.theme.FeatherIcons
+import com.anibiar.app.ui.watch.WebAccent
+import androidx.compose.ui.unit.sp
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.launch
 
@@ -92,7 +95,7 @@ private fun prettyDate(iso: String?): String? = iso?.take(10)?.let { d ->
 /** The Watch page: player on top, then episode, audio + server pickers, episode navigation and the anime card. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit, joinRoom: com.anibiar.app.social.Room? = null, onRoomMoved: (com.anibiar.app.social.Room) -> Unit = {}) {
+fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) -> Unit, onWatch: (Int) -> Unit = {}, joinRoom: com.anibiar.app.social.Room? = null, onRoomMoved: (com.anibiar.app.social.Room) -> Unit = {}) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val scope = rememberCoroutineScope()
@@ -116,6 +119,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var watchTry by remember { mutableIntStateOf(0) }
     var streamName by remember { mutableStateOf<String?>(null) }
     var episodesOpen by remember { mutableStateOf(false) }
+    var providerPref by remember { mutableStateOf<String?>(null) }
     var synopsisEpisode by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
@@ -180,10 +184,12 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     val prev = list.getOrNull(position - 1)
     val next = if (position >= 0) list.getOrNull(position + 1) else null
 
-    LaunchedEffect(id, audio, current?.number, watchTry) {
+    LaunchedEffect(id, audio, current?.number, watchTry, providerPref) {
         val c = current ?: return@LaunchedEffect
         watchError = null; watch = null
-        runCatching { Streaming.watch(id, audio, c.number, c.providers) }
+        val first = providerPref?.let { p -> c.providers.firstOrNull { it.equals(p, true) } }
+        val servers = if (first != null) listOf(first) + c.providers.filter { it != first } else c.providers
+        runCatching { Streaming.watch(id, audio, c.number, servers) }
             .onSuccess { watch = it; if (streamName == null || it.streams.none { s -> s.name == streamName }) streamName = null }
             .onFailure { watchError = it.message ?: "Couldn't load this episode" }
     }
@@ -201,6 +207,16 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     val outro = if (own) stream?.outro else (watch?.outro ?: backup?.outro)
 
     val name = anime?.displayTitle ?: eps?.title ?: "Loading…"
+    val seasons by produceState(emptyList<com.anibiar.app.ui.watch.SeasonEntry>(), anime?.id) {
+        val m = anime ?: return@produceState
+        value = runCatching { com.anibiar.app.ui.watch.buildSeasons(m, app.repository.fetchFranchise(m)) }.getOrDefault(emptyList())
+    }
+    val watchedNumbers = remember(id, ep) {
+        val h = app.history.load().firstOrNull { it.mediaId == id }
+        if (h == null) emptySet() else (1 until h.episode).toSet() + (if (h.progress >= 0.9f) setOf(h.episode) else emptySet())
+    }
+    val subNumbers = remember(eps) { eps?.sub?.map { it.number }?.toSet().orEmpty() }
+    val dubNumbers = remember(eps) { eps?.dub?.map { it.number }?.toSet().orEmpty() }
     val poster = current?.image ?: anime?.bannerImage ?: anime?.posterUrl
 
     // Fullscreen: landscape + immersive.
@@ -275,6 +291,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.fillMaxSize(),
                 together = together,
                 readOnly = locked,
+                resumeFraction = if (together == null) remember(id, current?.number) { app.history.load().firstOrNull { it.mediaId == id && it.episode == current?.number }?.progress ?: 0f } else 0f,
             )
             if (room != null && fullscreen) {
                 com.anibiar.app.ui.watch.AvatarStrip(memberList, roomProfiles, speaking, mutedUsers, social.myId.orEmpty(), Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
@@ -302,7 +319,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
 
         // In a room the page is the call: tiles fill the screen under the video, controls pinned below.
-        if (!fullscreen && room != null) Column(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!fullscreen && !episodesOpen && room != null) Column(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             requests.firstOrNull()?.let { rq ->
                 val who = roomProfiles[rq.from]?.shownName ?: "Someone"
                 Row(
@@ -337,53 +354,92 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.weight(1f),
             )
         }
-        if (!fullscreen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (!fullscreen && episodesOpen) {
+            com.anibiar.app.ui.watch.EpisodeSheet(
+                title = name, episodes = list, current = ep, watched = watchedNumbers,
+                fallbackImage = anime?.bannerImage ?: anime?.posterUrl, subNumbers = subNumbers, dubNumbers = dubNumbers,
+                onSelect = { select(it) }, onClose = { episodesOpen = false },
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 2.dp),
+            )
+        }
+        if (!fullscreen && !episodesOpen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Episode heading
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    if (current != null) "Episode ${current.number}" + (prettyDate(current.airDate)?.let { " · $it" } ?: "") else " ",
-                    style = inter(14f), color = Color(0xFF949BA4),
-                )
-                Text(current?.title ?: "…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 27f), color = Color.White)
+            val generic = current?.title.isNullOrBlank() || Regex("^episode\\s*\\d+$", RegexOption.IGNORE_CASE).matches(current?.title.orEmpty().trim())
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (current != null) "Episode ${current.number}" else " ", style = inter(12f), color = Ani.Muted)
+                    prettyDate(current?.airDate)?.let { Text("·", style = inter(12f), color = Ani.Muted); Text(it, style = inter(12f), color = Ani.Muted) }
+                    if (current?.filler == true) { Text("·", style = inter(12f), color = Ani.Muted); Text("Filler", style = inter(12f), color = Ani.Muted) }
+                }
+                Text(if (generic) name else current?.title.orEmpty(), style = inter(17.5f, FontWeight.Bold, lineHeight = 23f), color = Color.White, modifier = Modifier.padding(top = 6.dp))
             }
 
-            // Audio + server
+            // Audio + provider + playback options
             var audioOpen by remember { mutableStateOf(false) }
             var serverOpen by remember { mutableStateOf(false) }
+            var optsOpen by remember { mutableStateOf(false) }
+            val menuBg = Modifier.background(Color(0xF716161C)).border(1.5.dp, Color(0x38FFFFFF), RoundedCornerShape(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) {
-                    PickerButton(if (audio == "sub") VidIcons.ClosedCaptions else null, if (audio == "sub") "Sub" else "Dub", audioOpen, audio == "dub") { audioOpen = true }
-                    DropdownMenu(audioOpen, { audioOpen = false }, modifier = Modifier.background(Ani.Panel)) {
+                    PickerButton(if (audio == "sub") VidIcons.ClosedCaptions else AniIcons.Mic, if (audio == "sub") "Sub" else "Dub", audioOpen) { audioOpen = true }
+                    DropdownMenu(audioOpen, { audioOpen = false }, modifier = menuBg) {
+                        MenuTitle("Audio")
                         listOf("sub" to "Sub", "dub" to "Dub").forEach { (k, label) ->
                             val available = if (k == "sub") !eps?.sub.isNullOrEmpty() else !eps?.dub.isNullOrEmpty()
                             DropdownMenuItem(
-                                text = { Text(label + (if (!available) "  ·  Unavailable" else "  ·  ${(if (k == "sub") eps?.sub?.size else eps?.dub?.size) ?: 0} eps"), style = inter(15f), color = if (available) Color.White else Ani.Muted) },
+                                text = { Text(label + (if (available) "  ·  ${(if (k == "sub") eps?.sub?.size else eps?.dub?.size) ?: 0} eps" else "  ·  Unavailable"), style = inter(14.5f), color = if (audio == k) WebAccent else if (available) Color.White else Ani.Muted) },
                                 enabled = available, onClick = { audioOpen = false; if (locked) hostOnly() else { audio = k; streamName = null } },
-                                trailingIcon = { if (audio == k && available) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(20.dp)) },
+                                trailingIcon = { if (audio == k && available) Icon(VidIcons.Check, null, tint = WebAccent, modifier = Modifier.size(20.dp)) },
                             )
                         }
                     }
                 }
                 Box(Modifier.weight(1f)) {
-                    PickerButton(null, stream?.name ?: "Server", serverOpen, false, zap = true) { serverOpen = true }
-                    DropdownMenu(serverOpen, { serverOpen = false }, modifier = Modifier.background(Ani.Panel)) {
-                        val all = watch?.streams.orEmpty()
-                        if (all.isEmpty()) DropdownMenuItem(text = { Text(if (watchError != null) "No server answered" else "Loading…", style = inter(14f), color = Ani.Muted) }, enabled = false, onClick = {})
-                        all.forEach { s ->
+                    PickerButton(FeatherIcons.Zap, (providerPref ?: stream?.name?.substringBefore(" ") ?: "Server").replaceFirstChar { it.uppercase() }, serverOpen) { serverOpen = true }
+                    DropdownMenu(serverOpen, { serverOpen = false }, modifier = menuBg) {
+                        MenuTitle("Provider")
+                        val provs = list.flatMap { it.providers }.distinct()
+                        val shown = (providerPref ?: stream?.name?.substringBefore(" ")).orEmpty()
+                        if (provs.isEmpty()) DropdownMenuItem(text = { Text("Loading…", style = inter(14f), color = Ani.Muted) }, enabled = false, onClick = {})
+                        provs.forEach { pv ->
+                            val on = pv.equals(shown, true)
                             DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(s.name, style = inter(15f), color = Color.White)
-                                        if (audio == "sub") {
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(if (s.kind == "soft") "s-sub" else "h-sub", style = inter(10.5f, FontWeight.SemiBold), color = if (s.kind == "soft") Ani.Lime else Ani.Amber,
-                                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x22FFFFFF)).padding(horizontal = 7.dp, vertical = 2.dp))
-                                        }
-                                    }
-                                },
-                                onClick = { streamName = s.name; serverOpen = false },
-                                trailingIcon = { if (stream?.id == s.id) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(20.dp)) },
+                                text = { Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(pv.replaceFirstChar { it.uppercase() }, style = inter(14.5f), color = if (on) WebAccent else Color.White, modifier = Modifier.weight(1f, fill = false))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("${list.count { e -> e.providers.contains(pv) }} eps", style = inter(10.5f, FontWeight.SemiBold), color = Ani.Muted,
+                                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(50)).background(Color(0x0DFFFFFF)).padding(horizontal = 8.dp, vertical = 2.dp))
+                                } },
+                                onClick = { serverOpen = false; if (locked) hostOnly() else { providerPref = pv; streamName = null } },
+                                trailingIcon = { if (on) Icon(VidIcons.Check, null, tint = WebAccent, modifier = Modifier.size(20.dp)) },
                             )
+                        }
+                        val all = watch?.streams.orEmpty()
+                        if (all.size > 1) {
+                            MenuTitle("Server")
+                            all.forEach { sv ->
+                                DropdownMenuItem(
+                                    text = { Text(sv.name + if (audio == "sub") (if (sv.kind == "soft") "  ·  s-sub" else "  ·  h-sub") else "", style = inter(14.5f), color = if (stream?.id == sv.id) WebAccent else Color.White) },
+                                    onClick = { streamName = sv.name; serverOpen = false },
+                                    trailingIcon = { if (stream?.id == sv.id) Icon(VidIcons.Check, null, tint = WebAccent, modifier = Modifier.size(20.dp)) },
+                                )
+                            }
+                        }
+                    }
+                }
+                Box {
+                    val shape = RoundedCornerShape(11.dp)
+                    Box(Modifier.size(38.dp).clip(shape).border(1.5.dp, Color(0x38FFFFFF), shape).background(Color(0x8C101014)).clickable { optsOpen = true }, contentAlignment = Alignment.Center) {
+                        Icon(FeatherIcons.MoreVertical, "Playback options", tint = Color.White, modifier = Modifier.size(17.dp))
+                    }
+                    DropdownMenu(optsOpen, { optsOpen = false }, modifier = menuBg) {
+                        MenuTitle("Playback")
+                        listOf(
+                            Triple("Autoplay", autoplay) { v: Boolean -> autoplay = v; prefsStore.edit().putBoolean("autoplay", v).apply() },
+                            Triple("Auto next", autoNext) { v: Boolean -> autoNext = v; prefsStore.edit().putBoolean("autoNext", v).apply() },
+                            Triple("Auto skip intro / outro", autoSkip) { v: Boolean -> autoSkip = v; prefsStore.edit().putBoolean("autoSkip", v).apply() },
+                        ).forEach { (label, on, set) ->
+                            DropdownMenuItem(text = { Text(label, style = inter(14.5f), color = Color.White) }, onClick = { set(!on) }, trailingIcon = { WebSwitch(on) })
                         }
                     }
                 }
@@ -428,70 +484,67 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             }
 
             // Previous / Episodes / Next
-            val edge = Color(0x33FFFFFF)
-            Row(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, edge, RoundedCornerShape(12.dp))) {
+            val edge = Color(0x38FFFFFF)
+            val barShape = RoundedCornerShape(13.dp)
+            Row(Modifier.fillMaxWidth().height(42.dp).clip(barShape).background(Color(0x8C101014)).border(1.5.dp, edge, barShape)) {
                 Row(Modifier.weight(1f).fillMaxSize().clickable(enabled = prev != null) { prev?.let { select(it.number) } }.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(VidIcons.ChevronLeft, null, tint = if (prev != null) Color(0xFF949BA4) else Color(0x55949BA4), modifier = Modifier.size(20.dp))
-                    if (prev != null) Text("Ep ${prev.number}", style = inter(14f), color = Color(0xFF949BA4))
+                    if (prev != null) { Icon(VidIcons.ChevronLeft, null, tint = Color.White, modifier = Modifier.size(19.dp)); Text(" Ep ${prev.number}", style = inter(14f), color = Ani.Muted) }
                 }
-                Box(Modifier.width(1.dp).fillMaxSize().background(edge))
+                Box(Modifier.width(1.5.dp).fillMaxSize().background(edge))
                 Row(Modifier.fillMaxSize().weight(1.15f).clickable { episodesOpen = true }, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                    Icon(AniIcons.Menu, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Icon(FeatherIcons.List, null, tint = Color.White, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Episodes", style = inter(14f, FontWeight.SemiBold), color = Color.White)
+                    Text("Episodes", style = inter(14f, FontWeight.Medium), color = Color.White)
                 }
-                Box(Modifier.width(1.dp).fillMaxSize().background(edge))
+                Box(Modifier.width(1.5.dp).fillMaxSize().background(edge))
                 Row(Modifier.weight(1f).fillMaxSize().clickable(enabled = next != null) { next?.let { select(it.number) } }.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                    if (next != null) Text("Ep ${next.number}", style = inter(14f), color = Color(0xFF949BA4))
-                    Icon(VidIcons.ChevronRight, null, tint = if (next != null) Color(0xFF949BA4) else Color(0x55949BA4), modifier = Modifier.size(20.dp))
+                    if (next != null) { Text("Ep ${next.number} ", style = inter(14f), color = Ani.Muted); Icon(VidIcons.ChevronRight, null, tint = Color.White, modifier = Modifier.size(19.dp)) }
                 }
             }
 
             // Anime card
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color(0xFF0B0B0D)).padding(14.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.width(76.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item).clickable { onOpenDetails(id) }) {
+            com.anibiar.app.ui.watch.WebCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val ps = RoundedCornerShape(10.dp)
+                    Box(Modifier.width(50.dp).aspectRatio(2f / 3f).clip(ps).border(1.5.dp, Color(0x38FFFFFF), ps).background(Ani.Item).clickable { onOpenDetails(id) }) {
                         anime?.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                     }
-                    Column(Modifier.weight(1f).padding(top = 2.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(name, style = inter(18f, FontWeight.Bold, lineHeight = 22f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { onOpenDetails(id) })
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            anime?.seasonLabel?.let { Text(it, style = inter(13.5f), color = Color(0xFF949BA4)); Text("·", color = Color(0xFF949BA4)) }
-                            eps?.let {
-                                Icon(VidIcons.ClosedCaptions, null, tint = Color(0xFF949BA4), modifier = Modifier.size(16.dp))
-                                Text("${it.sub.size}", style = inter(13.5f), color = Color(0xFF949BA4))
-                                Text("·", color = Color(0xFF949BA4))
-                                Icon(AniIcons.Person, null, tint = Color(0xFF949BA4), modifier = Modifier.size(15.dp))
-                                Text("${it.dub.size}", style = inter(13.5f), color = Color(0xFF949BA4))
-                            }
+                    Column(Modifier.weight(1f)) {
+                        Text(name, style = inter(15.2f, FontWeight.SemiBold, lineHeight = 20f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { onOpenDetails(id) })
+                        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            anime?.seasonLabel?.let { Text(it, style = inter(12f), color = Ani.Muted) }
+                            if (subNumbers.isNotEmpty()) { Text("·", color = Ani.Muted); Icon(VidIcons.ClosedCaptions, null, tint = Ani.Muted, modifier = Modifier.size(14.dp)); Text("${subNumbers.size}", style = inter(12f), color = Ani.Muted) }
+                            if (dubNumbers.isNotEmpty()) { Text("·", color = Ani.Muted); Icon(AniIcons.Mic, null, tint = Ani.Muted, modifier = Modifier.size(13.dp)); Text("${dubNumbers.size}", style = inter(12f), color = Ani.Muted) }
                         }
                     }
                     anime?.let { m ->
                         val (fav, toggle) = rememberFav(m)
                         val shape = RoundedCornerShape(12.dp)
-                        Box(Modifier.size(44.dp).clip(shape).background(Color(0x0FFFFFFF)).border(1.dp, if (fav) FavYellow.copy(alpha = 0.6f) else Color(0x40FFFFFF), shape).clickable(onClick = toggle), contentAlignment = Alignment.Center) {
-                            Icon(if (fav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (fav) "Remove from favorites" else "Add to favorites", tint = if (fav) FavYellow else Color.White, modifier = Modifier.size(22.dp))
+                        Box(Modifier.size(44.dp).clip(shape).background(Color(0xFF2A2A2E)).border(1.dp, if (fav) FavYellow.copy(alpha = 0.6f) else Color.Transparent, shape).clickable(onClick = toggle), contentAlignment = Alignment.Center) {
+                            if (fav) Icon(AniIcons.BookmarkFilled, "Remove from favorites", tint = FavYellow, modifier = Modifier.size(22.dp))
+                            else Icon(FeatherIcons.Plus, "Add to favorites", tint = Color.White, modifier = Modifier.size(22.dp))
                         }
                     }
                 }
                 val desc = remember(anime?.id) { anime?.description?.replace(Regex("<[^>]*>"), " ")?.replace(Regex("\\s+"), " ")?.trim().orEmpty() }
-                val shown = if (synopsisEpisode && !current?.description.isNullOrBlank()) current?.description.orEmpty() else desc
+                val shown = if (synopsisEpisode && !current?.description.isNullOrBlank()) current?.description.orEmpty() else if (!current?.description.isNullOrBlank()) current?.description.orEmpty() else desc
+                val isEpisode = !current?.description.isNullOrBlank()
                 if (shown.isNotBlank()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text(shown, style = inter(14.5f, lineHeight = 23f), color = Color(0xFFC3BFC7), maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val canSwitch = !current?.description.isNullOrBlank() && desc.isNotBlank()
-                        Text(
-                            if (synopsisEpisode) "Episode synopsis" else "Anime synopsis", style = inter(13.5f), color = if (canSwitch) Color(0xFFB9A1DF) else Color(0xFF6B6870),
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = canSwitch) { synopsisEpisode = !synopsisEpisode }.padding(vertical = 4.dp),
-                        )
+                    Text(shown, style = inter(12.8f, lineHeight = 20.5f), color = Color(0xADFFFFFF), maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 14.dp))
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (isEpisode) "Episode synopsis" else "Synopsis", style = inter(12.8f), color = Ani.Muted)
                         Spacer(Modifier.weight(1f))
-                        Text(if (expanded) "Show less" else "Show more", style = inter(14f, FontWeight.Medium), color = Color.White,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { expanded = !expanded }.padding(vertical = 4.dp))
+                        Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { expanded = !expanded }.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (expanded) "Show less" else "Show more", style = inter(13f, FontWeight.Medium), color = Color.White)
+                            Spacer(Modifier.width(4.dp))
+                            Icon(FeatherIcons.ChevronDown, null, tint = Color.White, modifier = Modifier.size(17.dp).rotate(if (expanded) 180f else 0f))
+                        }
                     }
                 }
             }
+
+            if (seasons.size > 1) com.anibiar.app.ui.watch.SeasonsCard(seasons, id) { sid -> onWatch(sid) }
+            com.anibiar.app.ui.watch.RelatedSections(anime) { aid -> onOpenDetails(aid) }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -534,56 +587,32 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             },
         )
     }
-    if (episodesOpen) {
-        val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        var reverse by remember { mutableStateOf(false) }
-        val shown = if (reverse) list.reversed() else list
-        ModalBottomSheet(onDismissRequest = { episodesOpen = false }, sheetState = state, containerColor = Ani.Panel) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Episodes", style = inter(18f, FontWeight.Bold), color = Color.White)
-                Text("  ${list.size}", style = inter(14f), color = Ani.Muted)
-                Spacer(Modifier.weight(1f))
-                Text(if (reverse) "Newest first" else "Oldest first", style = inter(13f, FontWeight.Medium), color = Ani.Soft,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.Item).clickable { reverse = !reverse }.padding(horizontal = 12.dp, vertical = 6.dp))
-            }
-            val listState = rememberLazyListState()
-            LaunchedEffect(Unit) { shown.indexOfFirst { it.number == ep }.takeIf { it > 2 }?.let { listState.scrollToItem(it - 1) } }
-            LazyColumn(state = listState, modifier = Modifier.navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                itemsIndexed(shown, key = { _, e -> e.number }) { _, e ->
-                    val active = e.number == ep
-                    Row(
-                        Modifier.fillMaxWidth().clickable { select(e.number) }.background(if (active) Color(0x1FFFFFFF) else Color.Transparent).padding(horizontal = 18.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.width(112.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(Ani.Item)) {
-                            (e.image ?: anime?.bannerImage ?: anime?.posterUrl)?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                            Text("${e.number}", style = inter(11f, FontWeight.Bold), color = Color.White,
-                                modifier = Modifier.align(Alignment.BottomStart).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xB3000000)).padding(horizontal = 6.dp, vertical = 1.dp))
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(e.title.ifBlank { "Episode ${e.number}" }, style = inter(14.5f, FontWeight.SemiBold, lineHeight = 18f), color = if (active) Ani.Lavender else Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            val meta = listOfNotNull(prettyDate(e.airDate), if (e.filler) "Filler" else null).joinToString(" · ")
-                            if (meta.isNotEmpty()) Text(meta, style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 2.dp))
-                        }
-                    }
-                }
-            }
-        }
+}
+
+@Composable
+private fun PickerButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, open: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(11.dp)
+    Row(
+        Modifier.fillMaxWidth().height(38.dp).clip(shape).border(1.5.dp, Color(0x38FFFFFF), shape).background(Color(0x8C101014)).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = inter(12.8f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        Spacer(Modifier.width(8.dp))
+        Icon(FeatherIcons.ChevronDown, null, tint = Ani.Muted, modifier = Modifier.size(16.dp).rotate(if (open) 180f else 0f))
     }
 }
 
 @Composable
-private fun PickerButton(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, open: Boolean, mic: Boolean, zap: Boolean = false, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
-    Row(
-        Modifier.fillMaxWidth().height(52.dp).clip(shape).border(1.dp, Color(0x40FFFFFF), shape).background(Color(0x0DFFFFFF)).clickable(onClick = onClick).padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (zap) Text("⚡", style = inter(17f)) else if (mic) Icon(AniIcons.Person, null, tint = Color.White, modifier = Modifier.size(20.dp)) else if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(label, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Icon(AniIcons.ArrowDown, null, tint = Color.White, modifier = Modifier.size(20.dp).then(if (open) Modifier.rotateHalf() else Modifier))
+private fun MenuTitle(t: String) {
+    Text(t.uppercase(), style = inter(10.8f, FontWeight.SemiBold).copy(letterSpacing = 1.5.sp), color = Ani.Muted, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp))
+}
+
+@Composable
+private fun WebSwitch(on: Boolean) {
+    Box(Modifier.width(35.dp).height(20.dp).clip(RoundedCornerShape(50)).background(if (on) WebAccent else Color(0x29FFFFFF))) {
+        Box(Modifier.padding(start = if (on) 17.dp else 2.5.dp, top = 2.5.dp).size(15.dp).clip(CircleShape).background(Color.White))
     }
 }
 

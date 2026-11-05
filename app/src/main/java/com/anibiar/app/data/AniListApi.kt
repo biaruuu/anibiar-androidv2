@@ -133,7 +133,7 @@ object Queries {
     """.trimIndent()
 
     private const val MINI_MEDIA = """
-        id type format status episodes seasonYear
+        id type format status episodes seasonYear averageScore
         title { romaji english }
         coverImage { extraLarge large color }
         startDate { year month day }

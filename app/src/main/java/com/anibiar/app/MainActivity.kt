@@ -287,6 +287,7 @@ private fun AppNavigation() {
                         id = watchId, startEp = watchEp, onBack = { watchId = 0 }, joinRoom = joinRoom,
                         onRoomMoved = { r -> joinRoom = r; watchEp = r.episode; watchId = r.animeId },
                         onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
+                        onWatch = { aid -> joinRoom = null; watchEp = 1; watchId = aid },
                     )
                 }
             }

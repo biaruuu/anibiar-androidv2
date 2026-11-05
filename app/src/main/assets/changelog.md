@@ -1,3 +1,9 @@
+## 13 | New watch page like the web app | 2026-11-05
+- Episode sheet redesigned: thumbnail cards, sort / hide-spoilers / grid buttons, dub and sub marks, episode ranges
+- Watch page: Episode heading, Sub / Provider / options row, Seasons, Related and Recommendations cards in the new web style
+- Continue watching prompt: "Continue from 0:05" or start from the beginning
+- Provider picker lists every source with its episode count
+
 ## 12 | Faster streams, mic before joining | 2026-11-05
 - Joining or starting a watch party now asks for the microphone first; once you're in you can mute yourself any time
 - Episodes and streams now load through the Kiro-WebApp gateway: several servers are asked at once and the first one to answer plays, with the old server as backup

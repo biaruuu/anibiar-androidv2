@@ -140,6 +140,8 @@ fun KiroPlayer(
     together: com.anibiar.app.social.WatchTogether? = null,
     /** Guests in a room: no play/pause, seeking, skipping or speed (the host controls those). */
     readOnly: Boolean = false,
+    /** Solo viewing: where you stopped last time (0..1). Asks "Continue watching?" before playing. */
+    resumeFraction: Float = 0f,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -170,6 +172,9 @@ fun KiroPlayer(
     var userQuality by remember { mutableStateOf(false) }
     var heights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var captionTrack by remember { mutableIntStateOf(0) }
+    var resumePrompt by remember { mutableStateOf(false) }
+    val resumeDecided = remember { BooleanArray(1) }
+    val resumeFracNow by rememberUpdatedState(resumeFraction)
     var captionTry by remember { mutableIntStateOf(0) }
     var captionState by remember { mutableStateOf("") }
     var captionSize by remember { mutableIntStateOf(0) }
@@ -269,6 +274,7 @@ fun KiroPlayer(
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
+                    if (!resumeDecided[0] && resumeFracNow in 0.02f..0.95f && player.duration > 0) { resumeDecided[0] = true; resumePrompt = true; player.playWhenReady = false }
                     playedOnce[0] = true
                     if (bufSent[0] != 0L) { bufSent[0] = 0; if (readOnlyNow) togetherNow?.reportBuffering(false) }
                 } else if (state == Player.STATE_BUFFERING && playedOnce[0] && readOnlyNow && bufSent[0] == 0L) {
@@ -301,6 +307,7 @@ fun KiroPlayer(
 
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
+        resumeDecided[0] = false; resumePrompt = false
         error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
@@ -499,6 +506,17 @@ fun KiroPlayer(
         // Buffering / error
         if (buffering && playing.not() && error == null && src != null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(playSize * 0.6f), color = Color.White, strokeWidth = 2.5.dp)
+        }
+        if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text("Continue watching?", style = inter(19f, FontWeight.Bold), color = Color.White)
+                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(15f, FontWeight.SemiBold), color = Color.Black,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable {
+                        resumePrompt = false; player.seekTo((resumeFraction * player.duration).toLong()); player.playWhenReady = true
+                    }.padding(horizontal = 30.dp, vertical = 13.dp))
+                Text("Start from the beginning", style = inter(15f, FontWeight.SemiBold), color = Color(0xCCFFFFFF),
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.playWhenReady = true }.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
         }
         error?.let { e ->
             Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
