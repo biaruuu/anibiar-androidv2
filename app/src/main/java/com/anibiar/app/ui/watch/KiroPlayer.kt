@@ -180,7 +180,7 @@ fun KiroPlayer(
     var resumePrompt by remember { mutableStateOf(false) }
     var volOpen by remember { mutableStateOf(false) }
     var volTick by remember { mutableIntStateOf(0) }
-    LaunchedEffect(volOpen, volTick) { if (volOpen) { delay(3000); volOpen = false } }
+    LaunchedEffect(volOpen, volTick) { if (volOpen && !readOnly) { delay(3000); volOpen = false } }
     val resumeDecided = remember { BooleanArray(1) }
     val resumeFracNow by rememberUpdatedState(resumeFraction)
     var captionTry by remember { mutableIntStateOf(0) }
@@ -251,7 +251,11 @@ fun KiroPlayer(
             // Host has captions on but my server names its tracks differently (or I started with them off): use my English track.
             else if (idx < 0 && label.isNotEmpty() && captionTrack < 0 && sortedSubs.isNotEmpty()) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
         }
-        if (c.ui != null && readOnlyNow) showControls = c.ui
+        if (readOnlyNow) {
+            if (c.ui != null) showControls = c.ui
+            c.menu?.let { m -> if (m.isEmpty()) menuOpen = false else { menuView = m; menuOpen = true } }
+            c.vol?.let { volOpen = it }
+        }
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
     }
     // Host: someone's video is stalling, so wait for them; carry on when they're ready (or after 8 s).
@@ -447,6 +451,12 @@ fun KiroPlayer(
         val t = togetherNow ?: return@LaunchedEffect
         if (readOnlyNow) return@LaunchedEffect
         t.controls = controlsVisible
+        if (player.duration > 0) t.announce(player.playWhenReady, player.currentPosition, hard = false)
+    }
+    LaunchedEffect(menuOpen, menuView, volOpen, together) {
+        val t = togetherNow ?: return@LaunchedEffect
+        if (readOnlyNow) return@LaunchedEffect
+        t.menu = if (menuOpen) menuView else ""; t.volOpen = volOpen
         if (player.duration > 0) t.announce(player.playWhenReady, player.currentPosition, hard = false)
     }
     val aCtl by animateFloatAsState(if (controlsVisible && !resumePrompt) 1f else 0f, label = "ctl")

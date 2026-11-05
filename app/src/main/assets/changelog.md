@@ -1,3 +1,6 @@
+## 21 | Host settings shown live to everyone | 2026-11-05
+- When the host opens the settings menu or the volume slider, everyone in the room sees it open on their player too
+
 ## 20 | Captions for friends who join late | 2026-11-05
 - A friend joining mid-episode now switches to the host's server and picks the matching English captions
 - Captions that fail to load retry on their own
