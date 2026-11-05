@@ -1,3 +1,7 @@
+## 26 | Crunchyroll caption size, new invite card | 2026-11-05
+- Captions are sized like Crunchyroll's, by the height of the picture, so they are bigger and stay the same size when the controls show
+- The invite you get from a host is now a card with the anime cover, who invited you, and Join / Not now buttons
+
 ## 25 | Watch together restyle, caption size in fullscreen | 2026-11-05
 - Captions no longer get too big in fullscreen
 - Watch together button, call screen, call bar and invite list restyled to match the watch page cards (dark panels, soft borders, lavender accents)

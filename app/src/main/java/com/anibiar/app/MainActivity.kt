@@ -33,6 +33,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clip
 import kotlinx.serialization.json.contentOrNull
@@ -304,22 +305,33 @@ private fun AppNavigation() {
         }
         // Live "join my room" invite
         banner?.let { (r, who) ->
+            val edge = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
             Row(
                 Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(12.dp).fillMaxWidth()
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(Ani.Panel)
-                    .border(1.dp, Ani.Lime.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).padding(14.dp),
+                    .clip(edge).background(androidx.compose.ui.graphics.Color(0xFF151517)).border(1.dp, androidx.compose.ui.graphics.Color(0x40B7A9FF), edge).padding(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
-                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text("$who invited you to watch together", style = com.anibiar.app.ui.theme.inter(14f, androidx.compose.ui.text.font.FontWeight.SemiBold), color = androidx.compose.ui.graphics.Color.White, maxLines = 2)
-                    androidx.compose.material3.Text("${r.title} · Episode ${r.episode}", style = com.anibiar.app.ui.theme.inter(12.5f), color = Ani.Muted, maxLines = 1)
-                }
-                androidx.compose.foundation.layout.Spacer(Modifier.width(10.dp))
-                androidx.compose.material3.Text("Dismiss", style = com.anibiar.app.ui.theme.inter(13f), color = Ani.Muted, modifier = Modifier.clickable { banner = null }.padding(8.dp))
-                androidx.compose.material3.Text(
-                    "Join", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.Black,
-                    modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(Ani.Lime).clickable { joinRoomById(r.id) }.padding(horizontal = 18.dp, vertical = 9.dp),
+                if (r.cover != null) coil.compose.AsyncImage(
+                    r.cover, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.width(48.dp).height(66.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(androidx.compose.ui.graphics.Color(0xFF1A1A1C)),
                 )
+                androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text("WATCH TOGETHER", style = com.anibiar.app.ui.theme.inter(10.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color(0xFFB7A9FF))
+                    androidx.compose.material3.Text("$who invited you", style = com.anibiar.app.ui.theme.inter(15f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    androidx.compose.material3.Text("${r.title} · Episode ${r.episode}", style = com.anibiar.app.ui.theme.inter(12.5f), color = Ani.Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.Text(
+                            "Join", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.Black,
+                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Color(0xFFB7A9FF)).clickable { joinRoomById(r.id) }.padding(horizontal = 22.dp, vertical = 8.dp),
+                        )
+                        androidx.compose.material3.Text(
+                            "Not now", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.SemiBold), color = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(androidx.compose.ui.graphics.Color(0xFF232326)).clickable { banner = null }.padding(horizontal = 18.dp, vertical = 8.dp),
+                        )
+                    }
+                }
             }
         }
 
