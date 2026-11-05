@@ -518,14 +518,14 @@ fun KiroPlayer(
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(playSize * 0.6f), color = Color.White, strokeWidth = 2.5.dp)
         }
         if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0x59000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
-            val fs = (w.value * 0.042f).coerceIn(13f, 24f)
+            val fs = (w.value * 0.024f).coerceIn(11f, 16f)
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((fs * 0.7f).dp)) {
-                Text("Continue watching?", style = inter(fs * 1.25f, FontWeight.Bold), color = Color.White)
+                Text("Continue watching?", style = inter(fs * 1.15f, FontWeight.Bold), color = Color.White)
                 Row(horizontalArrangement = Arrangement.spacedBy((fs * 0.8f).dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(fs, FontWeight.Medium), color = Color(0xFF111111), maxLines = 1,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xF2FFFFFF)).clickable {
                             resumePrompt = false; player.playWhenReady = true
-                        }.padding(horizontal = (fs * 1.2f).dp, vertical = (fs * 0.55f).dp))
+                        }.padding(horizontal = (fs * 1.1f).dp, vertical = (fs * 0.5f).dp))
                     Text("Start from the beginning", style = inter(fs, FontWeight.Medium), color = Color(0xE6FFFFFF), maxLines = 1,
                         modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.seekTo(0); player.playWhenReady = true }.padding(horizontal = 6.dp, vertical = (fs * 0.4f).dp))
                 }

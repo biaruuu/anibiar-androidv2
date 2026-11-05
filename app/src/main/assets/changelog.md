@@ -1,3 +1,7 @@
+## 17 | Gateway server, tidier Continue watching | 2026-11-05
+- Episodes and streams now come from the Kiro-WebApp gateway, with caching and next-episode loading done in the app
+- Continue watching prompt resized so it fits the player
+
 ## 16 | Faster episodes, bigger Continue watching | 2026-11-05
 - Episode lists and streams are cached, and the next episode is loaded ahead of time
 - Continue watching: bigger text, buttons side by side, and the frame where you stopped shows behind it
