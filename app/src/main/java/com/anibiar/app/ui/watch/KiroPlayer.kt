@@ -631,7 +631,7 @@ fun KiroPlayer(
                         } else say("This server only streams. Pick another one to download.", true)
                     }
                     if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
-                        if (readOnly) { say("Only the host controls captions"); return@BarButton }; capLocal = true; captionTrack = if (captionTrack >= 0) -1 else 0
+                        if (readOnly) { say("Only the host controls captions"); return@BarButton }; capLocal = false; captionTrack = if (captionTrack >= 0) -1 else 0
                     }
                     BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
                 }
@@ -708,11 +708,11 @@ fun KiroPlayer(
                     }
                     "boost" -> BOOST_MB.indices.forEach { i -> OptionRow(boostLabel(i), boost == i) { boost = i; menuView = "main" } }
                     "captions" -> {
-                        OptionRow("Off", captionTrack < 0) { capLocal = true; captionTrack = -1; menuView = "main" }
-                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = true; captionTrack = i; menuView = "main" } }
+                        OptionRow("Off", captionTrack < 0) { capLocal = false; captionTrack = -1; menuView = "main" }
+                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = false; captionTrack = i; menuView = "main" } }
                     }
                     "style" -> {
-                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = true; captionStyle = i } }
+                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = false; captionStyle = i } }
                     }
                     else -> SPEEDS.forEach { s -> OptionRow(if (s == 1f) "Normal" else "${s}x", speed == s) { speed = s; menuView = "main" } }
                 }
