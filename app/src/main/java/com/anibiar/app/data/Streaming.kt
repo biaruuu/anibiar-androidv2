@@ -34,6 +34,10 @@ object Streaming {
 
     fun abs(path: String) = if (path.startsWith("http")) path else BASE + path
 
+    private class Cached<T>(val at: Long, val v: T)
+    private val epsCache = java.util.concurrent.ConcurrentHashMap<Int, Cached<EpisodesPayload>>()
+    private val watchCache = java.util.concurrent.ConcurrentHashMap<String, Cached<WatchPayload>>()
+
     private suspend fun get(path: String): String = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(BASE + path).header("Accept", "application/json").build()
         client.newCall(request).execute().use { r ->
@@ -122,11 +126,24 @@ object Streaming {
         }
     }
 
-    suspend fun episodes(id: Int): EpisodesPayload = gatewayEpisodes(id) ?: json.decodeFromString(get("/api/anime/$id/episodes"))
+    suspend fun episodes(id: Int): EpisodesPayload {
+        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 120_000 }?.let { return it.v }
+        val r = gatewayEpisodes(id) ?: json.decodeFromString(get("/api/anime/$id/episodes"))
+        epsCache[id] = Cached(System.currentTimeMillis(), r)
+        return r
+    }
 
-    suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload =
-        gatewayWatch(id, audio, ep, servers)
-            ?: json.decodeFromString(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + if (servers.isNotEmpty()) "&p=" + servers.joinToString(",") else ""))
+    suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
+        val key = "$id|$audio|$ep|${servers.firstOrNull()}"
+        watchCache[key]?.takeIf { System.currentTimeMillis() - it.at < 240_000 }?.let { return it.v }
+        val r = gatewayWatch(id, audio, ep, servers)
+            ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + if (servers.isNotEmpty()) "&p=" + servers.joinToString(",") else ""))
+        watchCache[key] = Cached(System.currentTimeMillis(), r)
+        return r
+    }
+
+    /** Warms the cache for the next episode so pressing Next starts at once. */
+    suspend fun prefetch(id: Int, audio: String, ep: Int, servers: List<String>) { runCatching { watch(id, audio, ep, servers) } }
 
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =
         runCatching { json.decodeFromString<SkipPayload>(get("/api/skip?mal=$mal&ep=$ep")) }.getOrNull()

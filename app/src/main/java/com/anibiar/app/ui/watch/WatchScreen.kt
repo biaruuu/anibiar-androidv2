@@ -196,6 +196,12 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     val stream = watch?.streams?.let { all -> all.firstOrNull { it.name == streamName } ?: all.firstOrNull() }
     val ready = watch != null && watch?.episode == current?.number && watch?.audio == audio
 
+    // Quietly load the next episode's streams while this one plays.
+    LaunchedEffect(ready, next?.number, audio) {
+        val n = next ?: return@LaunchedEffect
+        if (ready) Streaming.prefetch(id, audio, n.number, n.providers)
+    }
+
     // Backup intro/outro times (AniSkip) when the server has none.
     val backup by produceState<SkipPayload?>(null, anime?.idMal, current?.number) {
         value = null

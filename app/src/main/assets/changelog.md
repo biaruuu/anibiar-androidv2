@@ -1,3 +1,7 @@
+## 16 | Faster episodes, bigger Continue watching | 2026-11-05
+- Episode lists and streams are cached, and the next episode is loaded ahead of time
+- Continue watching: bigger text, buttons side by side, and the frame where you stopped shows behind it
+
 ## 15 | Dark glass player | 2026-11-05
 - Player buttons use soft dark glass (like YouTube) so icons stay visible on bright scenes
 - Volume slider only opens when you tap the speaker (tap again to mute)

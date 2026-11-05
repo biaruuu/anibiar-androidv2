@@ -281,7 +281,7 @@ fun KiroPlayer(
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
                 if (state == Player.STATE_READY) {
-                    if (!resumeDecided[0] && resumeFracNow in 0.02f..0.95f && player.duration > 0) { resumeDecided[0] = true; resumePrompt = true; player.playWhenReady = false }
+                    if (!resumeDecided[0] && resumeFracNow in 0.02f..0.95f && player.duration > 0) { resumeDecided[0] = true; resumePrompt = true; player.playWhenReady = false; player.seekTo((resumeFracNow * player.duration).toLong()) }
                     playedOnce[0] = true
                     if (bufSent[0] != 0L) { bufSent[0] = 0; if (readOnlyNow) togetherNow?.reportBuffering(false) }
                 } else if (state == Player.STATE_BUFFERING && playedOnce[0] && readOnlyNow && bufSent[0] == 0L) {
@@ -517,16 +517,18 @@ fun KiroPlayer(
         if (buffering && playing.not() && error == null && src != null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(playSize * 0.6f), color = Color.White, strokeWidth = 2.5.dp)
         }
-        if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0x8C000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
-            val small = h < 240.dp
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (small) 3.dp else 8.dp)) {
-                Text("Continue watching?", style = inter(if (small) 12.5f else 15f, FontWeight.Bold), color = Color.White)
-                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(if (small) 11.5f else 12.5f, FontWeight.SemiBold), color = Color.Black,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable {
-                        resumePrompt = false; player.seekTo((resumeFraction * player.duration).toLong()); player.playWhenReady = true
-                    }.padding(horizontal = if (small) 16.dp else 20.dp, vertical = if (small) 5.dp else 8.dp))
-                Text("Start from the beginning", style = inter(if (small) 11.5f else 12.5f, FontWeight.SemiBold), color = Color(0xE6FFFFFF),
-                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.playWhenReady = true }.padding(horizontal = 12.dp, vertical = if (small) 3.dp else 6.dp))
+        if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0x59000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
+            val fs = (w.value * 0.042f).coerceIn(13f, 24f)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((fs * 0.7f).dp)) {
+                Text("Continue watching?", style = inter(fs * 1.25f, FontWeight.Bold), color = Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy((fs * 0.8f).dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(fs, FontWeight.Medium), color = Color(0xFF111111), maxLines = 1,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xF2FFFFFF)).clickable {
+                            resumePrompt = false; player.playWhenReady = true
+                        }.padding(horizontal = (fs * 1.2f).dp, vertical = (fs * 0.55f).dp))
+                    Text("Start from the beginning", style = inter(fs, FontWeight.Medium), color = Color(0xE6FFFFFF), maxLines = 1,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.seekTo(0); player.playWhenReady = true }.padding(horizontal = 6.dp, vertical = (fs * 0.4f).dp))
+                }
             }
         }
         error?.let { e ->
