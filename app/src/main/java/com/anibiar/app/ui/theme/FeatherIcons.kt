@@ -28,5 +28,8 @@ object FeatherIcons {
     val ChevronRight by lazy { icon("ChevronRight", "M9,18L15,12L9,6") }
     val Calendar by lazy { icon("Calendar", "M5,4h14a2,2 0 0 1 2,2v14a2,2 0 0 1 -2,2H5a2,2 0 0 1 -2,-2V6a2,2 0 0 1 2,-2z M16,2L16,6 M8,2L8,6 M3,10L21,10") }
     val Star by lazy { icon("Star", "M12,2L15.09,8.26L22,9.27L17,14.14L18.18,21.02L12,17.77L5.82,21.02L7,14.14L2,9.27L8.91,8.26Z") }
+    val Play by lazy { icon("Play", "M5,3L19,12L5,21Z") }
+    val FastForward by lazy { icon("FastForward", "M13,19L22,12L13,5Z M2,19L11,12L2,5Z") }
+    val SkipForward by lazy { icon("SkipForward", "M5,4L15,12L5,20Z M19,5L19,19") }
     val Plus by lazy { icon("Plus", "M12,5L12,19 M5,12L19,12") }
 }

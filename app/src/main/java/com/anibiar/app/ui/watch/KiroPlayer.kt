@@ -16,6 +16,7 @@ import android.view.TextureView
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -65,6 +66,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -100,14 +102,15 @@ import androidx.compose.ui.text.font.FontStyle
 import com.anibiar.app.ui.theme.TrebuchetFamily
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.VidIcons
+import com.anibiar.app.ui.theme.FeatherIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Glass = Color(0x3A1B1B20)
-private val GlassEdge = Color(0x26FFFFFF)
+private val Glass = Color(0x1FFFFFFF)
+private val GlassEdge = Color(0x66FFFFFF)
 private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
@@ -573,8 +576,12 @@ fun KiroPlayer(
                     BarButton(btn, VidIcons.Chromecast, ico, live) { openCastSettings(context) }
                 }
                 GlassPill {
+                    val sw = (w * 0.1f).coerce(27.dp, 38.dp); val sh = (w * 0.0525f).coerce(14.dp, 20.dp)
+                    GlassSwitch(autoplay, FeatherIcons.Play, sw, sh, live) { onAutoplay(!autoplay); say("Autoplay ${if (!autoplay) "on" else "off"}") }
+                    GlassSwitch(autoSkip, FeatherIcons.FastForward, sw, sh, live) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}") }
+                    GlassSwitch(autoNext, FeatherIcons.SkipForward, sw, sh, live) { onAutoNext(!autoNext); say("Auto next ${if (!autoNext) "on" else "off"}") }
                     BarButton(btn, VidIcons.Camera, ico, live) { screenshot(context, textureView) { say(it.first, it.second) } }
-                    BarButton(btn, VidIcons.Download, ico, live) {
+                    if (format == "file") BarButton(btn, VidIcons.Download, ico, live) {
                         if (src != null && format == "file") {
                             runCatching {
                                 val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -688,7 +695,22 @@ private fun buildTime(t: Double, d: Double, title: String?) =
     }
 
 @Composable private fun GlassPill(content: @Composable () -> Unit) {
-    Row(Modifier.clip(RoundedCornerShape(50)).background(Glass).border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(2.dp), verticalAlignment = Alignment.CenterVertically) { content() }
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(Glass).background(Brush.verticalGradient(0f to Color(0x2EFFFFFF), 0.5f to Color.Transparent))
+            .border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) { content() }
+}
+
+/** The web player's little glass switch with an icon on its knob. */
+@Composable private fun GlassSwitch(on: Boolean, icon: ImageVector, w: Dp, h: Dp, enabled: Boolean, onClick: () -> Unit) {
+    val knob = h - 4.dp
+    val x by animateDpAsState(if (on) w - h + 2.dp else 2.dp, label = "knob")
+    Box(Modifier.padding(horizontal = 3.dp).size(w, h).clip(RoundedCornerShape(50)).background(if (on) Color(0x61FFFFFF) else Color(0x80000000)).clickable(enabled = enabled, onClick = onClick)) {
+        Box(Modifier.offset(x = x).align(Alignment.CenterStart).size(knob).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = Color(0xFF17171A), modifier = Modifier.size(knob * 0.62f))
+        }
+    }
 }
 
 @Composable private fun BarButton(size: Dp, icon: ImageVector, iconSize: Dp, enabled: Boolean, rotate: Boolean = false, visible: Boolean = true, onClick: () -> Unit) {

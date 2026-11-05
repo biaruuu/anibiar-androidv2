@@ -3,6 +3,7 @@
 - Watch page: Episode heading, Sub / Provider / options row, Seasons, Related and Recommendations cards in the new web style
 - Continue watching prompt: "Continue from 0:05" or start from the beginning
 - Provider picker lists every source with its episode count
+- Player: glass top bar with Autoplay / Auto skip / Auto next switches, stronger glass look like the web player
 
 ## 12 | Faster streams, mic before joining | 2026-11-05
 - Joining or starting a watch party now asks for the microphone first; once you're in you can mute yourself any time
