@@ -182,17 +182,18 @@ private fun AppNavigation() {
         if (androidx.core.content.ContextCompat.checkSelfPermission(toastCtx, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) doJoin(roomId)
         else { pendingRoom = roomId; micAsk.launch(android.Manifest.permission.RECORD_AUDIO) }
     }
+    var bannerTick by androidx.compose.runtime.remember { mutableStateOf(0) }
     // Invites arrive live over realtime; each one is checked against the database before it is shown.
     androidx.compose.runtime.LaunchedEffect(authState?.uid) {
         social.inviteStream().collect { b ->
             val rid = b.payload["room"]?.jsonPrimitive?.contentOrNull ?: return@collect
             val r = runCatching { social.fetchRoom(rid) }.getOrNull() ?: return@collect
-            if (r.ended || joinRoom?.id == r.id || r.hostId == social.myId) return@collect
+            if (r.ended || roomSession.room?.id == r.id || r.hostId == social.myId) return@collect
             val who = runCatching { social.profiles(listOf(r.hostId)).firstOrNull()?.shownName }.getOrNull() ?: "A friend"
-            banner = r to who
+            banner = r to who; bannerTick++
         }
     }
-    androidx.compose.runtime.LaunchedEffect(banner) { if (banner != null) { kotlinx.coroutines.delay(20_000); banner = null } }
+    androidx.compose.runtime.LaunchedEffect(banner, bannerTick) { if (banner != null) { kotlinx.coroutines.delay(20_000); banner = null } }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {

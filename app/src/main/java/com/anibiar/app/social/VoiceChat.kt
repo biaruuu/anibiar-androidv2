@@ -100,7 +100,7 @@ class VoiceChat(
             inited = true
         }
         factory = PeerConnectionFactory.builder()
-            .setAudioDeviceModule(JavaAudioDeviceModule.builder(app).setUseHardwareAcousticEchoCanceler(false).setUseHardwareNoiseSuppressor(false).createAudioDeviceModule())
+            .setAudioDeviceModule(JavaAudioDeviceModule.builder(app).setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build()).setUseHardwareAcousticEchoCanceler(false).setUseHardwareNoiseSuppressor(false).createAudioDeviceModule())
             .createPeerConnectionFactory()
         val constraints = MediaConstraints().apply {
             for (k in listOf("googEchoCancellation", "googNoiseSuppression", "googAutoGainControl", "googHighpassFilter", "googEchoCancellation2", "googNoiseSuppression2"))
@@ -112,8 +112,7 @@ class VoiceChat(
 
     fun start() {
         oldMode = audio.mode; oldSpeaker = audio.isSpeakerphoneOn
-        audio.mode = AudioManager.MODE_IN_COMMUNICATION
-        audio.isSpeakerphoneOn = true
+        // Stay in normal audio mode and play friends on the media stream, so the volume buttons control everything (video + voices) together.
         tg.rtcListener = { p -> signals.trySend(p) }
         // Tell everyone I'm ready, so offers that were sent before I was listening get sent again.
         jobs += scope.launch { repeat(3) { tg.sendRtc(buildJsonObject { put("kind", "ready"); put("to", "*") }); delay(2500) } }

@@ -677,10 +677,14 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val (code, text) = raw("POST", "/rest/v1/watch_invites", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"))
         if (code !in 200..299) fail(code, text)
         val chan = "inv-$userId"
+        // A second invite must not be cut off by the first one's cleanup.
+        inviteLeave.remove(chan)?.cancel()
         realtime.join(chan)
-        realtime.send(chan, "invite", buildJsonObject { put("room", room.id); put("from", me); put("title", room.title); put("ep", room.episode) })
-        scope.launch { delay(4000); realtime.leave(chan) }
+        delay(400)
+        realtime.send(chan, "invite", buildJsonObject { put("room", room.id); put("from", me); put("title", room.title); put("ep", room.episode); put("n", System.currentTimeMillis()) })
+        inviteLeave[chan] = scope.launch { delay(5000); realtime.leave(chan); inviteLeave.remove(chan) }
     }
+    private val inviteLeave = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
     suspend fun updateRoom(id: String, episode: Int, audio: String) = runCatching {
         raw("PATCH", "/rest/v1/watch_rooms?id=eq.$id", buildJsonObject { put("episode", episode); put("audio", audio) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))

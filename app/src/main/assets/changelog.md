@@ -1,3 +1,8 @@
+## 19 | Call volume, invites, captions | 2026-11-05
+- Volume buttons now control the video and your friends' voices together, so the call no longer makes the video quiet
+- Invite again works: it shows "Invite sent", and the invited friend gets the banner even after leaving a room
+- Subtitles a little smaller and fit the player size better
+
 ## 18 | Watch party sync fixes | 2026-11-05
 - Guests now catch up automatically if they missed an episode or anime change, so nobody is stuck loading
 - Joining the call asks whether you want your mic on or muted; the "Voice connected" label is gone

@@ -64,6 +64,7 @@ fun TogetherSheet(
     val members by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     var friends by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     val invited = remember { mutableStateListOf<String>() }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var failed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(friendIds) { friends = social.profiles(friendIds) }
     LaunchedEffect(room?.id) { room?.let { r -> runCatching { invited.clear(); invited.addAll(social.invitedIds(r.id)) } } }
@@ -104,7 +105,7 @@ fun TogetherSheet(
                                         .clickable {
                                             scope.launch {
                                                 runCatching { social.inviteToRoom(room, f.uid) }
-                                                    .onSuccess { if (f.uid !in invited) invited.add(f.uid); failed = null }
+                                                    .onSuccess { if (f.uid !in invited) invited.add(f.uid); failed = null; android.widget.Toast.makeText(ctx, "Invite sent to ${f.shownName}", android.widget.Toast.LENGTH_SHORT).show() }
                                                     .onFailure { failed = it.message ?: "Couldn't send the invite" }
                                             }
                                         }.padding(horizontal = 16.dp, vertical = 8.dp),
