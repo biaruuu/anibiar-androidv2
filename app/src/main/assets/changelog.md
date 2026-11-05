@@ -1,3 +1,6 @@
+## 24 | Exact Crunchyroll caption outline | 2026-11-05
+- Caption outline and drop shadow now follow the Crunchyroll subtitle CSS: thicker solid black outline and a soft shadow
+
 ## 23 | Bigger captions, host-only caption button | 2026-11-05
 - Captions a bit bigger
 - The captions button on the top bar is host-only in a watch party

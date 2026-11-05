@@ -510,12 +510,12 @@ fun KiroPlayer(
             val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
                 if (captionStyle == 0) {
-                    // Crunchyroll look: regular-weight Trebuchet, white with a thin dark outline and a soft shadow, no box.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.14f).sp.toPx() }
+                    // Crunchyroll look (from their CSS): Trebuchet, white, solid black outline ~4px at a ~32px font, plus a soft offset drop shadow.
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.24f).sp.toPx() }
                     Text(
                         line, style = face.copy(
-                            color = Color(0xEB141414), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
-                            shadow = Shadow(Color(0x99000000), Offset(0f, 1.5f), 3f),
+                            color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
+                            shadow = Shadow(Color.Black, Offset(base * 0.17f, base * 0.17f), base * 0.45f),
                         ),
                     )
                     Text(line, style = face.copy(color = Color.White))
