@@ -144,7 +144,7 @@ fun MiniRow(m: Media, relation: String?, onClick: () -> Unit) {
     val s = RoundedCornerShape(13.dp)
     Box(Modifier.fillMaxWidth().heightIn(min = 90.dp).height(IntrinsicSize.Min).clip(s).background(Color(0xFF18181C)).clickable(onClick = onClick)) {
         m.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
-        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(0f to Color(0xFA18181C), 0.38f to Color(0xFA18181C), 1f to Color(0xD118181C)))))
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(0f to Color(0xFA18181C), 0.38f to Color(0xFA18181C), 1f to Color(0xD118181C))))
         Row(Modifier.fillMaxWidth()) {
             Box(Modifier.width(66.dp).fillMaxHeight().background(Color(0xFF2A2A2E))) {
                 m.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
