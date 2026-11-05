@@ -499,7 +499,7 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (w.value * 0.026f).coerceIn(10.5f, 32f) * (if (aCtl > 0.5f) 0.92f else 1f)
+            val base = (w.value * 0.034f).coerceIn(12f, 36f) * (if (aCtl > 0.5f) 0.92f else 1f)
             val face = TextStyle(
                 fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.2f).sp, fontWeight = FontWeight.Normal,
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.sp,
@@ -625,7 +625,7 @@ fun KiroPlayer(
                         } else say("This server only streams. Pick another one to download.", true)
                     }
                     if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
-                        capLocal = true; captionTrack = if (captionTrack >= 0) -1 else 0
+                        if (readOnly) { say("Only the host controls captions"); return@BarButton }; capLocal = true; captionTrack = if (captionTrack >= 0) -1 else 0
                     }
                     BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
                 }

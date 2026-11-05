@@ -1,3 +1,7 @@
+## 23 | Bigger captions, host-only caption button | 2026-11-05
+- Captions a bit bigger
+- The captions button on the top bar is host-only in a watch party
+
 ## 22 | One caption size, Crunchyroll look | 2026-11-05
 - Removed the Small / Medium / Large caption sizes; captions use one default size that scales with the player
 - Default caption style matches Crunchyroll: Trebuchet, white with a black outline
