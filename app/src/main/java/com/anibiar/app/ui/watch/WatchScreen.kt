@@ -243,7 +243,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 Text(name, style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Box(if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
+        val landscape = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
+        Box(if (fullscreen) Modifier.fillMaxSize() else if (landscape && room != null) Modifier.fillMaxWidth().weight(1.6f, fill = false).aspectRatio(16f / 9f, matchHeightConstraintsFirst = true).align(Alignment.CenterHorizontally).background(Color.Black) else Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
             KiroPlayer(
                 src = if (ready) stream?.src else null, format = stream?.format ?: "hls",
                 title = current?.let { "$name · Episode ${it.number}" } ?: name, poster = poster,
@@ -269,7 +270,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 together = together,
                 readOnly = locked,
             )
-            if (room != null) com.anibiar.app.ui.watch.ReactionOverlay(together, Modifier.fillMaxSize())
             if (room != null && fullscreen) {
                 com.anibiar.app.ui.watch.AvatarStrip(memberList, roomProfiles, speaking, mutedUsers, social.myId.orEmpty(), Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
             }
@@ -320,7 +320,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                         }.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
             }
-            com.anibiar.app.ui.watch.ReactionBar(onReact = { together?.react(it) })
             com.anibiar.app.ui.watch.RoomPanel(
                 members = memberList, profiles = roomProfiles, hostId = room?.hostId.orEmpty(), myId = social.myId.orEmpty(),
                 speaking = speaking, muted = mutedUsers, micOk = micOk, myMuted = vMuted, links = voiceLinks,

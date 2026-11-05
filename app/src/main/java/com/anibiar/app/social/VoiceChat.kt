@@ -60,6 +60,8 @@ class VoiceChat(
                 PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
                 PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer(),
                 PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer(),
+                PeerConnection.IceServer.builder(listOf("turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp"))
+                    .setUsername("openrelayproject").setPassword("openrelayproject").createIceServer(),
                 turn("turn:staticauth.openrelay.metered.ca:80"),
                 turn("turn:staticauth.openrelay.metered.ca:443"),
                 turn("turn:staticauth.openrelay.metered.ca:443?transport=tcp"),
@@ -113,6 +115,8 @@ class VoiceChat(
         audio.mode = AudioManager.MODE_IN_COMMUNICATION
         audio.isSpeakerphoneOn = true
         tg.rtcListener = { p -> signals.trySend(p) }
+        // Tell everyone I'm ready, so offers that were sent before I was listening get sent again.
+        jobs += scope.launch { repeat(3) { tg.sendRtc(buildJsonObject { put("kind", "ready"); put("to", "*") }); delay(2500) } }
         jobs += scope.launch { for (p in signals) runCatching { onSignal(p) } }
         jobs += scope.launch {
             tg.members.collect { members ->
@@ -236,8 +240,12 @@ class VoiceChat(
 
     private fun onSignal(p: JsonObject) {
         if (stopped) return
-        if (p["to"]?.jsonPrimitive?.contentOrNull != me) return
         val from = p["from"]?.jsonPrimitive?.contentOrNull ?: return
+        if (p["kind"]?.jsonPrimitive?.contentOrNull == "ready") {
+            if (me < from && from in tg.members.value && peers[from]?.iceConnectionState().let { it != PeerConnection.IceConnectionState.CONNECTED && it != PeerConnection.IceConnectionState.COMPLETED }) { close(from); offerTo(from) }
+            return
+        }
+        if (p["to"]?.jsonPrimitive?.contentOrNull != me) return
         val sdp = p["sdp"]?.jsonPrimitive?.contentOrNull ?: return
         when (p["kind"]?.jsonPrimitive?.contentOrNull) {
             "offer" -> {

@@ -1,3 +1,9 @@
+## 11 | Captions yours, reactions removed, voice fix | 2026-11-05
+- Caption language, size and style can now be changed by everyone in a watch party and apply right away for you (the host's settings are the starting point)
+- Removed the emoji reactions
+- Voice: people now announce when they're ready so call setup can't be missed, plus more relay servers for mobile data
+- Landscape: the video no longer takes the whole screen in a room
+
 ## 10 | Reactions and bolder captions | 2026-11-05
 - Watch together: tap an emoji under the video and everyone in the room sees it float up over the video
 - Captions are bolder and easier to read, still in the Crunchyroll style

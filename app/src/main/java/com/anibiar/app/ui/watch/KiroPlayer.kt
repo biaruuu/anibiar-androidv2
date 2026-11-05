@@ -174,6 +174,8 @@ fun KiroPlayer(
     var captionState by remember { mutableStateOf("") }
     var captionSize by remember { mutableIntStateOf(0) }
     var captionStyle by remember { mutableIntStateOf(0) }
+    // Once you change captions yourself, the host's caption settings stop overriding yours.
+    var capLocal by remember { mutableStateOf(false) }
     var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
     var menuOpen by remember { mutableStateOf(false) }
     var menuView by remember { mutableStateOf("main") }
@@ -227,9 +229,9 @@ fun KiroPlayer(
         }
         if (c.speed != speedNow) speed = c.speed
         if (c.boost != boost) boost = c.boost
-        if (c.capSize != captionSize) captionSize = c.capSize
-        if (c.capStyle != captionStyle) captionStyle = c.capStyle
-        c.cap?.let { label ->
+        if (!capLocal && c.capSize != captionSize) captionSize = c.capSize
+        if (!capLocal && c.capStyle != captionStyle) captionStyle = c.capStyle
+        if (!capLocal) c.cap?.let { label ->
             val idx = if (label.isEmpty()) -1 else sortedSubs.indexOfFirst { it.label == label }
             if (idx != captionTrack && (idx >= 0 || label.isEmpty())) captionTrack = idx
         }
@@ -564,7 +566,7 @@ fun KiroPlayer(
                         } else say("This server only streams. Pick another one to download.", true)
                     }
                     if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
-                        if (!readOnly) captionTrack = if (captionTrack >= 0) -1 else 0
+                        capLocal = true; captionTrack = if (captionTrack >= 0) -1 else 0
                     }
                     BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
                 }
@@ -630,8 +632,8 @@ fun KiroPlayer(
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
                         MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost) + if (readOnly) " · host" else "") { if (!readOnly) menuView = "boost" }
                         if (sortedSubs.isNotEmpty()) {
-                            MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off") + if (readOnly) " · host" else "") { if (captionState == "error") captionTry++ else if (!readOnly) menuView = "captions" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first + if (readOnly) " · host" else "") { if (!readOnly) menuView = "style" }
+                            MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { if (captionState == "error") captionTry++ else menuView = "captions" }
+                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                         MenuRow(VidIcons.Play, "Autoplay", if (autoplay) "On" else "Off", chevron = false) { onAutoplay(!autoplay) }
@@ -644,13 +646,13 @@ fun KiroPlayer(
                     }
                     "boost" -> BOOST_MB.indices.forEach { i -> OptionRow(boostLabel(i), boost == i) { boost = i; menuView = "main" } }
                     "captions" -> {
-                        OptionRow("Off", captionTrack < 0) { captionTrack = -1; menuView = "main" }
-                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { captionTrack = i; menuView = "main" } }
+                        OptionRow("Off", captionTrack < 0) { capLocal = true; captionTrack = -1; menuView = "main" }
+                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = true; captionTrack = i; menuView = "main" } }
                     }
                     "style" -> {
-                        CAPTION_SIZES.forEachIndexed { i, s -> OptionRow(s.first, captionSize == i) { captionSize = i } }
+                        CAPTION_SIZES.forEachIndexed { i, s -> OptionRow(s.first, captionSize == i) { capLocal = true; captionSize = i } }
                         Spacer(Modifier.height(2.dp))
-                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { captionStyle = i } }
+                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = true; captionStyle = i } }
                     }
                     else -> SPEEDS.forEach { s -> OptionRow(if (s == 1f) "Normal" else "${s}x", speed == s) { speed = s; menuView = "main" } }
                 }

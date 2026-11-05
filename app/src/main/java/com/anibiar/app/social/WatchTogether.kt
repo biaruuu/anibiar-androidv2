@@ -52,9 +52,6 @@ class WatchTogether(
     /** Fullscreen belongs to the host: it is shared with everyone. */
     @Volatile var fullscreen = false
     private var remoteFs = false
-    private val _react = MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 16)
-    val reactions: SharedFlow<Pair<String, String>> = _react
-    fun react(emoji: String) { _react.tryEmit(me to emoji); send("react", buildJsonObject { put("e", emoji) }) }
     private val _fs = MutableSharedFlow<Boolean>(extraBufferCapacity = 4)
     val fsEvents: SharedFlow<Boolean> = _fs
     fun shareFullscreen(on: Boolean) { fullscreen = on; send("fs", buildJsonObject { put("on", on.toString()) }) }
@@ -143,7 +140,6 @@ class WatchTogether(
                         _changes.tryEmit(RoomChange(ep, au))
                     }
                     "buf" -> { if (p["on"]?.jsonPrimitive?.contentOrNull == "true") buffering[from] = System.currentTimeMillis() else buffering.remove(from); refreshWaiting() }
-                    "react" -> p["e"]?.jsonPrimitive?.contentOrNull?.take(8)?.let { _react.tryEmit(from to it) }
                     "fs" -> noteFs(p["on"]?.jsonPrimitive?.contentOrNull == "true")
                     "rtc" -> rtcListener?.invoke(p)
                     "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
