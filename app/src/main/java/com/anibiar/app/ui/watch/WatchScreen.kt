@@ -374,10 +374,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 Text(if (generic) name else current?.title.orEmpty(), style = inter(17.5f, FontWeight.Bold, lineHeight = 23f), color = Color.White, modifier = Modifier.padding(top = 6.dp))
             }
 
-            // Audio + provider + playback options
+            // Audio + provider
             var audioOpen by remember { mutableStateOf(false) }
             var serverOpen by remember { mutableStateOf(false) }
-            var optsOpen by remember { mutableStateOf(false) }
             val menuBg = Modifier.background(Color(0xF716161C)).border(1.5.dp, Color(0x38FFFFFF), RoundedCornerShape(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) {
@@ -424,22 +423,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                                     trailingIcon = { if (stream?.id == sv.id) Icon(VidIcons.Check, null, tint = WebAccent, modifier = Modifier.size(20.dp)) },
                                 )
                             }
-                        }
-                    }
-                }
-                Box {
-                    val shape = RoundedCornerShape(11.dp)
-                    Box(Modifier.size(38.dp).clip(shape).border(1.5.dp, Color(0x38FFFFFF), shape).background(Color(0x8C101014)).clickable { optsOpen = true }, contentAlignment = Alignment.Center) {
-                        Icon(FeatherIcons.MoreVertical, "Playback options", tint = Color.White, modifier = Modifier.size(17.dp))
-                    }
-                    DropdownMenu(optsOpen, { optsOpen = false }, modifier = menuBg) {
-                        MenuTitle("Playback")
-                        listOf(
-                            Triple("Autoplay", autoplay) { v: Boolean -> autoplay = v; prefsStore.edit().putBoolean("autoplay", v).apply() },
-                            Triple("Auto next", autoNext) { v: Boolean -> autoNext = v; prefsStore.edit().putBoolean("autoNext", v).apply() },
-                            Triple("Auto skip intro / outro", autoSkip) { v: Boolean -> autoSkip = v; prefsStore.edit().putBoolean("autoSkip", v).apply() },
-                        ).forEach { (label, on, set) ->
-                            DropdownMenuItem(text = { Text(label, style = inter(14.5f), color = Color.White) }, onClick = { set(!on) }, trailingIcon = { WebSwitch(on) })
                         }
                     }
                 }
@@ -520,9 +503,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     anime?.let { m ->
                         val (fav, toggle) = rememberFav(m)
                         val shape = RoundedCornerShape(12.dp)
-                        Box(Modifier.size(44.dp).clip(shape).background(Color(0xFF2A2A2E)).border(1.dp, if (fav) FavYellow.copy(alpha = 0.6f) else Color.Transparent, shape).clickable(onClick = toggle), contentAlignment = Alignment.Center) {
-                            if (fav) Icon(AniIcons.BookmarkFilled, "Remove from favorites", tint = FavYellow, modifier = Modifier.size(22.dp))
-                            else Icon(FeatherIcons.Plus, "Add to favorites", tint = Color.White, modifier = Modifier.size(22.dp))
+                        Box(Modifier.size(44.dp).clip(shape).background(Color(0x0FFFFFFF)).border(1.dp, if (fav) FavYellow.copy(alpha = 0.6f) else Color(0x40FFFFFF), shape).clickable(onClick = toggle), contentAlignment = Alignment.Center) {
+                            Icon(if (fav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (fav) "Remove from favorites" else "Add to favorites", tint = if (fav) FavYellow else Color.White, modifier = Modifier.size(22.dp))
                         }
                     }
                 }

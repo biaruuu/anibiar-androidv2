@@ -65,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -109,8 +110,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val Glass = Color(0x1FFFFFFF)
-private val GlassEdge = Color(0x66FFFFFF)
+private val Glass = Color(0x73000000)
+private val GlassEdge = Color(0x24FFFFFF)
 private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
@@ -176,6 +177,9 @@ fun KiroPlayer(
     var heights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var captionTrack by remember { mutableIntStateOf(0) }
     var resumePrompt by remember { mutableStateOf(false) }
+    var volOpen by remember { mutableStateOf(false) }
+    var volTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(volOpen, volTick) { if (volOpen) { delay(3000); volOpen = false } }
     val resumeDecided = remember { BooleanArray(1) }
     val resumeFracNow by rememberUpdatedState(resumeFraction)
     var captionTry by remember { mutableIntStateOf(0) }
@@ -513,15 +517,16 @@ fun KiroPlayer(
         if (buffering && playing.not() && error == null && src != null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(playSize * 0.6f), color = Color.White, strokeWidth = 2.5.dp)
         }
-        if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Continue watching?", style = inter(15f, FontWeight.Bold), color = Color.White)
-                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(12.5f, FontWeight.SemiBold), color = Color.Black,
+        if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0x8C000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
+            val small = h < 240.dp
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(if (small) 3.dp else 8.dp)) {
+                Text("Continue watching?", style = inter(if (small) 12.5f else 15f, FontWeight.Bold), color = Color.White)
+                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(if (small) 11.5f else 12.5f, FontWeight.SemiBold), color = Color.Black,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable {
                         resumePrompt = false; player.seekTo((resumeFraction * player.duration).toLong()); player.playWhenReady = true
-                    }.padding(horizontal = 20.dp, vertical = 8.dp))
-                Text("Start from the beginning", style = inter(12.5f, FontWeight.SemiBold), color = Color(0xCCFFFFFF),
-                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.playWhenReady = true }.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }.padding(horizontal = if (small) 16.dp else 20.dp, vertical = if (small) 5.dp else 8.dp))
+                Text("Start from the beginning", style = inter(if (small) 11.5f else 12.5f, FontWeight.SemiBold), color = Color(0xE6FFFFFF),
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.playWhenReady = true }.padding(horizontal = 12.dp, vertical = if (small) 3.dp else 6.dp))
             }
         }
         error?.let { e ->
@@ -570,11 +575,13 @@ fun KiroPlayer(
             // Top bar
             Row(Modifier.fillMaxWidth().padding(pad), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 GlassPill {
-                    BarButton(btn, if (muted || volume == 0f) VidIcons.Mute else if (volume < 0.5f) VidIcons.VolumeLow else VidIcons.VolumeHigh, ico, live) { muted = !muted }
-                    if (wide) {
-                        Box(Modifier.width(96.dp).height(btn).padding(horizontal = 8.dp)) {
-                            TrackBar(if (muted) 0f else volume, 0f, live, Modifier.align(Alignment.Center), thumb = false, onSeek = { volume = it; muted = false })
-                        }
+                    BarButton(btn, if (muted || volume == 0f) VidIcons.Mute else if (volume < 0.5f) VidIcons.VolumeLow else VidIcons.VolumeHigh, ico, live) {
+                        // First tap opens the volume slider; tapping again mutes / unmutes.
+                        if (!volOpen) volOpen = true else { muted = !muted; volOpen = true }
+                    }
+                    val volW by animateDpAsState(if (volOpen && live) (w * 0.26f).coerce(80.dp, 120.dp) else 0.dp, label = "volW")
+                    if (volW > 1.dp) Box(Modifier.width(volW).height(btn).padding(horizontal = 8.dp).clipToBounds()) {
+                        TrackBar(if (muted) 0f else volume, 0f, live, Modifier.align(Alignment.Center), thumb = true, onSeek = { volume = it; muted = false; volTick++ }, onScrub = { volume = it; muted = false; volTick++ })
                     }
                     BarButton(btn, VidIcons.Chromecast, ico, live) { openCastSettings(context) }
                 }
@@ -696,7 +703,7 @@ private fun buildTime(t: Double, d: Double, title: String?) =
 
 @Composable private fun GlassPill(content: @Composable () -> Unit) {
     Row(
-        Modifier.clip(RoundedCornerShape(50)).background(Glass).background(Brush.verticalGradient(0f to Color(0x2EFFFFFF), 0.5f to Color.Transparent))
+        Modifier.clip(RoundedCornerShape(50)).background(Glass)
             .border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) { content() }
@@ -706,7 +713,7 @@ private fun buildTime(t: Double, d: Double, title: String?) =
 @Composable private fun GlassSwitch(on: Boolean, icon: ImageVector, w: Dp, h: Dp, enabled: Boolean, onClick: () -> Unit) {
     val knob = h - 4.dp
     val x by animateDpAsState(if (on) w - h + 2.dp else 2.dp, label = "knob")
-    Box(Modifier.padding(horizontal = 3.dp).size(w, h).clip(RoundedCornerShape(50)).background(if (on) Color(0x61FFFFFF) else Color(0x80000000)).clickable(enabled = enabled, onClick = onClick)) {
+    Box(Modifier.padding(horizontal = 3.dp).size(w, h).clip(RoundedCornerShape(50)).background(if (on) Color(0x80FFFFFF) else Color(0x66808080)).clickable(enabled = enabled, onClick = onClick)) {
         Box(Modifier.offset(x = x).align(Alignment.CenterStart).size(knob).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = Color(0xFF17171A), modifier = Modifier.size(knob * 0.62f))
         }

@@ -1,3 +1,9 @@
+## 15 | Dark glass player | 2026-11-05
+- Player buttons use soft dark glass (like YouTube) so icons stay visible on bright scenes
+- Volume slider only opens when you tap the speaker (tap again to mute)
+- "Continue watching?" fits small players and lets the video show through
+- Watch page: bookmark icon is back, extra playback menu removed (switches are on the player)
+
 ## 14 | Smaller player, Crunchyroll captions | 2026-11-05
 - Player controls are smaller and fit better on phones; settings menu is more compact
 - Captions sit right above the seek slider while controls are showing, and drop to the bottom when they hide
