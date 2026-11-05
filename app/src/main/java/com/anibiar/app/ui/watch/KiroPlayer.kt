@@ -116,7 +116,7 @@ private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
 private fun boostLabel(i: Int) = "${i * 100}%"
-private val CAPTION_SIZES = listOf("Small" to 1.0f, "Medium" to 1.22f, "Large" to 1.5f)
+private val CAPTION_SIZES = listOf("Small" to 1.12f, "Medium" to 1.22f, "Large" to 1.5f)
 private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
@@ -247,6 +247,7 @@ fun KiroPlayer(
             val idx = if (label.isEmpty()) -1 else sortedSubs.indexOfFirst { it.label == label }
             if (idx != captionTrack && (idx >= 0 || label.isEmpty())) captionTrack = idx
         }
+        if (c.ui != null && readOnlyNow) showControls = c.ui
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
     }
     // Host: someone's video is stalling, so wait for them; carry on when they're ready (or after 8 s).
@@ -421,7 +422,7 @@ fun KiroPlayer(
 
     // Auto-hide the controls while playing.
     LaunchedEffect(showControls, playing, menuOpen, scrubFrac, timeMs / 3000) {
-        if (showControls && playing && !menuOpen && scrubFrac == null) { delay(3000); showControls = false }
+        if (showControls && playing && !menuOpen && scrubFrac == null && !readOnlyNow) { delay(3000); showControls = false }
     }
 
     fun seekBy(sec: Int) {
@@ -436,6 +437,13 @@ fun KiroPlayer(
     }
 
     val controlsVisible = showControls || !playing || menuOpen
+    // Host: tell everyone when my controls appear or hide, so their screens show the same thing.
+    LaunchedEffect(controlsVisible, together) {
+        val t = togetherNow ?: return@LaunchedEffect
+        if (readOnlyNow) return@LaunchedEffect
+        t.controls = controlsVisible
+        if (player.duration > 0) t.announce(player.playWhenReady, player.currentPosition, hard = false)
+    }
     val aCtl by animateFloatAsState(if (controlsVisible && !resumePrompt) 1f else 0f, label = "ctl")
 
     BoxWithConstraints(modifier.background(Color.Black)) {
@@ -454,11 +462,11 @@ fun KiroPlayer(
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 detectTapGestures(
-                    onTap = { if (menuOpen) menuOpen = false else showControls = !showControls },
+                    onTap = { if (readOnlyNow) Unit else if (menuOpen) menuOpen = false else showControls = !showControls },
                     onDoubleTap = { o ->
                         val f = o.x / size.width
-                        if (f < 0.33f) { if (!readOnly) seekBy(-10) } else if (f > 0.67f) { if (!readOnly) seekBy(10) } else onFullscreen(!fullscreen)
-                        showControls = true
+                        if (f < 0.33f) { if (!readOnly) seekBy(-10) } else if (f > 0.67f) { if (!readOnly) seekBy(10) } else if (!readOnly) onFullscreen(!fullscreen)
+                        if (!readOnly) showControls = true
                     },
                 )
             },

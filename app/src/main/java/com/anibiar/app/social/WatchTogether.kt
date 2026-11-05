@@ -19,7 +19,7 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 /** What the player should do right now, already compensated for network delay. */
-data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0, val cap: String? = null, val capSize: Int = 0, val capStyle: Int = 0)
+data class SyncCommand(val playing: Boolean, val positionMs: Long, val hard: Boolean, val at: Long = System.currentTimeMillis(), val speed: Float = 1f, val boost: Int = 0, val cap: String? = null, val capSize: Int = 0, val capStyle: Int = 0, val ui: Boolean? = null)
 
 /** A guest asking the host for another anime or episode. */
 data class RoomRequest(val from: String, val animeId: Int?, val title: String, val cover: String?, val episode: Int)
@@ -113,6 +113,9 @@ class WatchTogether(
     @Volatile var leader = room.hostId == me
         private set
     @Volatile var episode = room.episode
+    @Volatile var animeId = room.animeId
+    /** Whether the host currently has the player controls showing; guests mirror it. */
+    @Volatile var controls = false
     @Volatile var audio = room.audio
 
     private fun now() = System.currentTimeMillis() + offset
@@ -145,6 +148,7 @@ class WatchTogether(
                     "request" -> if (room.hostId == me) _requests.tryEmit(RoomRequest(from, p["id"]?.jsonPrimitive?.intOrNull, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, p["ep"]?.jsonPrimitive?.intOrNull ?: 1))
                     "anime" -> {
                         val id = p["id"]?.jsonPrimitive?.intOrNull ?: return@collect
+                        animeId = id
                         episode = p["ep"]?.jsonPrimitive?.intOrNull ?: 1; audio = p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub"
                         _moved.tryEmit(Room(room.id, room.hostId, id, p["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), p["cover"]?.jsonPrimitive?.contentOrNull,
                             p["ep"]?.jsonPrimitive?.intOrNull ?: 1, p["audio"]?.jsonPrimitive?.contentOrNull ?: "sub", false))
@@ -180,7 +184,15 @@ class WatchTogether(
 
     private fun onState(p: JsonObject) {
         val ep = p["ep"]?.jsonPrimitive?.intOrNull ?: episode
-        if (ep != episode) return // different episode: wait for its "change"
+        val au = p["au"]?.jsonPrimitive?.contentOrNull ?: audio
+        val aid = p["aid"]?.jsonPrimitive?.intOrNull
+        // The host's heartbeat is the truth: if I missed an "anime" or "change" message (refresh, slow load), catch up from it.
+        if (aid != null && aid != animeId) {
+            animeId = aid; episode = ep; audio = au
+            _moved.tryEmit(Room(room.id, room.hostId, aid, "", null, ep, au, false))
+            return
+        }
+        if (ep != episode || au != audio) { episode = ep; audio = au; _changes.tryEmit(RoomChange(ep, au)); return }
         val playing = p["playing"]?.jsonPrimitive?.contentOrNull == "true"
         val pos = p["pos"]?.jsonPrimitive?.longOrNull ?: return
         val ts = p["ts"]?.jsonPrimitive?.longOrNull ?: now()
@@ -190,7 +202,7 @@ class WatchTogether(
         p["fs"]?.jsonPrimitive?.contentOrNull?.let { noteFs(it == "true") }
         val spd = p["spd"]?.jsonPrimitive?.contentOrNull?.toFloatOrNull() ?: 1f
         _commands.tryEmit(SyncCommand(playing, target, hard, speed = spd, boost = p["bst"]?.jsonPrimitive?.intOrNull ?: 0,
-            cap = p["cap"]?.jsonPrimitive?.contentOrNull, capSize = p["cs"]?.jsonPrimitive?.intOrNull ?: 0, capStyle = p["cst"]?.jsonPrimitive?.intOrNull ?: 0))
+            cap = p["cap"]?.jsonPrimitive?.contentOrNull, capSize = p["cs"]?.jsonPrimitive?.intOrNull ?: 0, capStyle = p["cst"]?.jsonPrimitive?.intOrNull ?: 0, ui = p["ui"]?.jsonPrimitive?.contentOrNull?.let { it == "true" }))
     }
 
     private fun send(event: String, extra: JsonObject) {
@@ -206,7 +218,7 @@ class WatchTogether(
         leader = true
         lastPlaying = playing; lastPos = positionMs
         send("state", buildJsonObject {
-            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle)
+            put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", hard.toString()); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString())
         })
     }
 
@@ -218,7 +230,7 @@ class WatchTogether(
         if ((leader && t - lastBeat > 1000) || requestAnnounce) {
             lastBeat = t; requestAnnounce = false
             send("state", buildJsonObject {
-                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle)
+                put("playing", playing.toString()); put("pos", positionMs); put("ts", now()); put("ep", episode); put("hard", "false"); put("spd", speed.toString()); put("bst", boost); put("fs", fullscreen.toString()); put("cap", captionLabel); put("cs", captionSize); put("cst", captionStyle); put("au", audio); put("aid", animeId); put("ui", controls.toString())
             })
         }
     }
@@ -232,7 +244,7 @@ class WatchTogether(
 
     /** Host moves everyone to another anime. */
     fun changeAnime(next: Room) {
-        episode = next.episode; audio = next.audio
+        episode = next.episode; audio = next.audio; animeId = next.animeId
         send("anime", buildJsonObject {
             put("id", next.animeId); put("title", next.title); put("ep", next.episode); put("audio", next.audio)
             put("cover", next.cover.orEmpty())

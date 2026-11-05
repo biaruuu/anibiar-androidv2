@@ -150,7 +150,17 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     fun withMic(action: () -> Unit) { if (micOk) action() else { pendingJoin = action; micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) } }
     val vMuted by (voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     LaunchedEffect(joinRoom?.id) { joinRoom?.let { session.enter(it) } }
-    LaunchedEffect(together, micOk) { if (together != null && micOk) session.ensureVoice() }
+    // Once the microphone is allowed, ask whether to join with the mic on or muted (nothing is sent before they choose).
+    var askMic by remember(together) { mutableStateOf(false) }
+    LaunchedEffect(together, micOk) { if (together != null && micOk && session.voice == null) askMic = true }
+    if (askMic) androidx.compose.material3.AlertDialog(
+        onDismissRequest = {},
+        containerColor = Color(0xFF1A1A1C),
+        title = { Text("Join the voice call", style = inter(17f, FontWeight.Bold), color = Color.White) },
+        text = { Text("Do you want your microphone on, or join muted? You can change it any time.", style = inter(14f, FontWeight.Normal), color = Color(0xFFCFCDD3)) },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { askMic = false; session.ensureVoice(); session.voice?.setMuted(false) }) { Text("Mic on", style = inter(14f, FontWeight.SemiBold), color = Ani.Lavender) } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = { askMic = false; session.ensureVoice(); session.voice?.setMuted(true) }) { Text("Join muted", style = inter(14f, FontWeight.SemiBold), color = Color(0xFFCFCDD3)) } },
+    )
     val speaking by (voice?.speaking ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val voiceLinks by (voice?.states ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<String, String>()) }).collectAsStateWithLifecycle()
     val mutedUsers by (together?.mutedUsers ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()

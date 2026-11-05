@@ -54,7 +54,7 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
             Text((p?.shownName ?: "…") + if (me) " (you)" else "", style = inter(12.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (host) Text("  HOST", style = inter(10f, FontWeight.Bold), color = Ani.Lime)
         }
-        if (!me && link != null) {
+        if (!me && link != null && link != "connected") {
             val c = when (link) { "connected" -> Speaking; "failed" -> Danger; else -> Color(0xFFFEA500) }
             Row(Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color(0x99000000)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(c))
