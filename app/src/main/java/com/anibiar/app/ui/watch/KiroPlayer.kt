@@ -116,7 +116,6 @@ private val cueCache = HashMap<String, List<Cue>>()
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val BOOST_MB = listOf(0, 600, 950, 1200)
 private fun boostLabel(i: Int) = "${i * 100}%"
-private val CAPTION_SIZES = listOf("Small" to 1.0f, "Medium" to 1.22f, "Large" to 1.5f)
 private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
@@ -500,7 +499,7 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (w.value * 0.0235f).coerceIn(10f, 30f) * CAPTION_SIZES[captionSize].second * (if (aCtl > 0.5f) 0.92f else 1f)
+            val base = (w.value * 0.026f).coerceIn(10.5f, 32f) * (if (aCtl > 0.5f) 0.92f else 1f)
             val face = TextStyle(
                 fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.2f).sp, fontWeight = FontWeight.Normal,
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.sp,
@@ -693,7 +692,7 @@ fun KiroPlayer(
                         MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost) + if (readOnly) " · host" else "") { if (!readOnly) menuView = "boost" }
                         if (sortedSubs.isNotEmpty()) {
                             MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { if (captionState == "error") captionTry++ else menuView = "captions" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
+                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_STYLES[captionStyle]) { menuView = "style" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                     }
@@ -707,8 +706,6 @@ fun KiroPlayer(
                         sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = true; captionTrack = i; menuView = "main" } }
                     }
                     "style" -> {
-                        CAPTION_SIZES.forEachIndexed { i, s -> OptionRow(s.first, captionSize == i) { capLocal = true; captionSize = i } }
-                        Spacer(Modifier.height(2.dp))
                         CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = true; captionStyle = i } }
                     }
                     else -> SPEEDS.forEach { s -> OptionRow(if (s == 1f) "Normal" else "${s}x", speed == s) { speed = s; menuView = "main" } }

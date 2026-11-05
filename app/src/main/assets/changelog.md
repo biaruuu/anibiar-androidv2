@@ -1,3 +1,7 @@
+## 22 | One caption size, Crunchyroll look | 2026-11-05
+- Removed the Small / Medium / Large caption sizes; captions use one default size that scales with the player
+- Default caption style matches Crunchyroll: Trebuchet, white with a black outline
+
 ## 21 | Host settings shown live to everyone | 2026-11-05
 - When the host opens the settings menu or the volume slider, everyone in the room sees it open on their player too
 
