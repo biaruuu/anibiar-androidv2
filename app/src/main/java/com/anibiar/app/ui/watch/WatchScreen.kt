@@ -205,6 +205,20 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
     val stream = watch?.streams?.let { all -> all.firstOrNull { it.name == streamName } ?: all.firstOrNull() }
     val ready = watch != null && watch?.episode == current?.number && watch?.audio == audio
+    // Host shares its server; a guest switches to it once per episode so everyone sees the same captions.
+    LaunchedEffect(together, stream?.name, isHost) { val t = together; if (t != null && isHost) t.srv = stream?.name.orEmpty() }
+    var followedSrv by remember(together, current?.number) { mutableStateOf(false) }
+    LaunchedEffect(together, locked, ready) {
+        val t = together ?: return@LaunchedEffect
+        if (!locked || !ready) return@LaunchedEffect
+        t.commands.collect { c ->
+            val n = c.srv
+            if (!followedSrv && n != null) {
+                followedSrv = true
+                if (n != stream?.name && watch?.streams?.any { it.name == n } == true) streamName = n
+            }
+        }
+    }
 
     // Quietly load the next episode's streams while this one plays.
     LaunchedEffect(ready, next?.number, audio) {

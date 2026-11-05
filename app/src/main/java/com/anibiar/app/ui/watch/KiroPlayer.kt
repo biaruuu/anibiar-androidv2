@@ -176,6 +176,7 @@ fun KiroPlayer(
     var userQuality by remember { mutableStateOf(false) }
     var heights by remember { mutableStateOf<List<Int>>(emptyList()) }
     var captionTrack by remember { mutableIntStateOf(0) }
+    val captionRetry = remember { IntArray(1) }
     var resumePrompt by remember { mutableStateOf(false) }
     var volOpen by remember { mutableStateOf(false) }
     var volTick by remember { mutableIntStateOf(0) }
@@ -202,6 +203,7 @@ fun KiroPlayer(
     }
     // English only by default: if the stream has no English track, captions start off instead of picking another language.
     LaunchedEffect(sortedSubs) {
+        captionRetry[0] = 0
         val first = sortedSubs.firstOrNull()
         if (first != null && !isEnglishTrack(first.srclang, first.label) && captionTrack == 0) captionTrack = -1
     }
@@ -246,6 +248,8 @@ fun KiroPlayer(
         if (!capLocal) c.cap?.let { label ->
             val idx = if (label.isEmpty()) -1 else sortedSubs.indexOfFirst { it.label == label }
             if (idx != captionTrack && (idx >= 0 || label.isEmpty())) captionTrack = idx
+            // Host has captions on but my server names its tracks differently (or I started with them off): use my English track.
+            else if (idx < 0 && label.isNotEmpty() && captionTrack < 0 && sortedSubs.isNotEmpty()) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
         }
         if (c.ui != null && readOnlyNow) showControls = c.ui
         if (player.playWhenReady != c.playing) player.playWhenReady = c.playing
@@ -380,6 +384,7 @@ fun KiroPlayer(
             delay(600L * (attempt + 1))
         }
         captionState = "error"
+        if (captionRetry[0] < 3) { captionRetry[0]++; delay(3000); captionTry++ }
     }
     LaunchedEffect(captionState) { if (captionState == "error") say("Captions couldn't load. Open Settings, Captions to retry", true) }
 

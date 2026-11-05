@@ -1,3 +1,7 @@
+## 20 | Captions for friends who join late | 2026-11-05
+- A friend joining mid-episode now switches to the host's server and picks the matching English captions
+- Captions that fail to load retry on their own
+
 ## 19 | Call volume, invites, captions | 2026-11-05
 - Volume buttons now control the video and your friends' voices together, so the call no longer makes the video quiet
 - Invite again works: it shows "Invite sent", and the invited friend gets the banner even after leaving a room
