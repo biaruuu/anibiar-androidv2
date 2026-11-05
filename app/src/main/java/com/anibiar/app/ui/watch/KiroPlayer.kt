@@ -197,8 +197,10 @@ fun KiroPlayer(
     var skipToast by remember { mutableStateOf<Pair<String, Double>?>(null) }
     val skipped = remember { HashSet<String>() }
 
-    val sortedSubs = remember(subtitles) {
-        subtitles.sortedBy { t -> if (isEnglishTrack(t.srclang, t.label)) 0 else if (t.default) 1 else 2 }
+    // In a watch party: the host's caption file, used when my own server gave me none.
+    var hostSub by remember { mutableStateOf<StreamSubtitle?>(null) }
+    val sortedSubs = remember(subtitles, hostSub) {
+        (if (subtitles.isEmpty() && hostSub != null) listOf(hostSub!!) else subtitles).sortedBy { t -> if (isEnglishTrack(t.srclang, t.label)) 0 else if (t.default) 1 else 2 }
     }
     // English only by default: if the stream has no English track, captions start off instead of picking another language.
     LaunchedEffect(sortedSubs) {
@@ -251,6 +253,7 @@ fun KiroPlayer(
             else if (idx < 0 && label.isNotEmpty() && captionTrack < 0 && sortedSubs.isNotEmpty()) captionTrack = sortedSubs.indexOfFirst { isEnglishTrack(it.srclang, it.label) }.coerceAtLeast(0)
         }
         if (readOnlyNow) {
+            c.csrc?.let { src -> if (hostSub?.src != src) hostSub = StreamSubtitle(c.clabel ?: "English", "en", src, true) }
             if (c.ui != null) showControls = c.ui
             c.menu?.let { m -> if (m.isEmpty()) menuOpen = false else { menuView = m; menuOpen = true } }
             c.vol?.let { volOpen = it }
@@ -322,7 +325,7 @@ fun KiroPlayer(
 
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
-        resumeDecided[0] = false; resumePrompt = false
+        resumeDecided[0] = false; resumePrompt = false; hostSub = null
         error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
@@ -336,7 +339,7 @@ fun KiroPlayer(
     }
     LaunchedEffect(captionTrack, captionSize, captionStyle, sortedSubs) {
         togetherNow?.let { t ->
-            t.captionLabel = sortedSubs.getOrNull(captionTrack)?.label.orEmpty(); t.captionSize = captionSize; t.captionStyle = captionStyle
+            t.captionLabel = sortedSubs.getOrNull(captionTrack)?.label.orEmpty(); t.captionSrc = sortedSubs.getOrNull(captionTrack)?.src.orEmpty(); t.captionSize = captionSize; t.captionStyle = captionStyle
             if (!readOnlyNow && player.duration > 0 && System.currentTimeMillis() > remoteUntil[0]) t.announce(player.playWhenReady, player.currentPosition, hard = false)
         }
     }

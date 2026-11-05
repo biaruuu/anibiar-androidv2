@@ -1,3 +1,6 @@
+## 27 | Guests always get the host's captions | 2026-11-05
+- If a friend's server has no captions, they now show the host's captions automatically, so everyone sees the same subtitles
+
 ## 26 | Crunchyroll caption size, new invite card | 2026-11-05
 - Captions are sized like Crunchyroll's, by the height of the picture, so they are bigger and stay the same size when the controls show
 - The invite you get from a host is now a card with the anime cover, who invited you, and Join / Not now buttons

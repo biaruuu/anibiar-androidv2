@@ -216,6 +216,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             if (!followedSrv && n != null) {
                 followedSrv = true
                 if (n != stream?.name && watch?.streams?.any { it.name == n } == true) streamName = n
+                // The host is showing captions but my stream is flagged as burned-in: try a stream with separate captions.
+                else if (c.csrc != null && stream?.kind == "hard") watch?.streams?.firstOrNull { it.kind == "soft" }?.let { streamName = it.name }
             }
         }
     }
