@@ -1,7 +1,16 @@
 package com.anibiar.app.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Request
@@ -37,10 +46,87 @@ object Streaming {
         }
     }
 
-    suspend fun episodes(id: Int): EpisodesPayload = json.decodeFromString(get("/api/anime/$id/episodes"))
+    // ---- Kiro-WebApp gateway: /api/src?k=eps|watch and the /api/stream proxy. Used first; the older API is the fallback. ----
+    private val tokens = java.util.concurrent.ConcurrentHashMap<String, String>()
+    @Volatile private var gatewaySkipUntil = 0L
+    private fun label(alias: String) = alias.replaceFirstChar { it.uppercase() }
+
+    private suspend fun gatewayEpisodes(id: Int): EpisodesPayload? {
+        if (System.currentTimeMillis() < gatewaySkipUntil) return null
+        return runCatching {
+            val root = Json.parseToJsonElement(get("/api/src?k=eps&id=$id")).jsonObject
+            val aliases = root.keys.toList()
+            val out = mutableMapOf<String, java.util.TreeMap<Int, WatchEpisode>>("sub" to java.util.TreeMap(), "dub" to java.util.TreeMap())
+            for (alias in aliases) for (audio in listOf("sub", "dub")) {
+                val list = root[alias]?.jsonObject?.get("episodes")?.jsonObject?.get(audio)?.jsonArray ?: continue
+                for (e in list) {
+                    val o = e.jsonObject
+                    val n = o["number"]?.jsonPrimitive?.intOrNull ?: continue
+                    val tok = o["id"]?.jsonPrimitive?.contentOrNull ?: continue
+                    tokens["$id|$audio|$n|$alias"] = tok
+                    fun str(k: String) = o[k]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() && it != "null" }
+                    val map = out.getValue(audio)
+                    val old = map[n]
+                    map[n] = if (old == null) WatchEpisode(n, str("title").orEmpty(), str("description"), str("image"), str("airDate"), o["duration"]?.jsonPrimitive?.doubleOrNull, o["filler"]?.jsonPrimitive?.booleanOrNull ?: false, listOf(alias))
+                    else old.copy(
+                        title = old.title.ifBlank { str("title").orEmpty() }, description = old.description ?: str("description"),
+                        image = old.image ?: str("image"), airDate = old.airDate ?: str("airDate"), providers = old.providers + alias,
+                    )
+                }
+            }
+            if (out.getValue("sub").isEmpty() && out.getValue("dub").isEmpty()) error("empty")
+            EpisodesPayload(null, out.getValue("sub").values.toList(), out.getValue("dub").values.toList(), aliases.map(::label))
+        }.onFailure { gatewaySkipUntil = System.currentTimeMillis() + 60_000 }.getOrNull()
+    }
+
+    private suspend fun gatewayProvider(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> {
+        val tok = tokens["$id|$audio|$ep|$alias"] ?: return emptyList()
+        val o = Json.parseToJsonElement(get("/api/src?k=watch&t=" + java.net.URLEncoder.encode(tok, "UTF-8"))).jsonObject
+        fun subs(a: kotlinx.serialization.json.JsonElement?) = (a as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { t ->
+            val to = t.jsonObject; val u = to["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            StreamSubtitle(to["label"]?.jsonPrimitive?.contentOrNull ?: to["srclang"]?.jsonPrimitive?.contentOrNull ?: "Subtitle", to["srclang"]?.jsonPrimitive?.contentOrNull ?: "und", u, to["default"]?.jsonPrimitive?.booleanOrNull ?: false)
+        }
+        fun range(a: kotlinx.serialization.json.JsonElement?): TimeRange? = (a as? JsonObject)?.let {
+            val st = it["start"]?.jsonPrimitive?.doubleOrNull; val en = it["end"]?.jsonPrimitive?.doubleOrNull
+            if (st != null && en != null && en > st) TimeRange(st, en) else null
+        }
+        val top = subs(o["subtitles"])
+        val list = o["streams"]?.jsonArray.orEmpty().map { it.jsonObject }.filter { it["type"]?.jsonPrimitive?.contentOrNull != "embed" && it["url"]?.jsonPrimitive?.contentOrNull != null }
+        return list.mapIndexed { i, s ->
+            val own = subs(s["subtitles"]).ifEmpty { top }
+            StreamSource(
+                id = "$alias-$i", name = label(alias) + if (list.size > 1) " ${i + 1}" else "",
+                kind = if (audio == "sub" && own.isEmpty()) "hard" else "soft",
+                format = if (s["type"]?.jsonPrimitive?.contentOrNull == "mp4") "file" else "hls",
+                src = s["url"]!!.jsonPrimitive.content, subtitles = own, intro = range(s["intro"]), outro = range(s["outro"]),
+            )
+        }
+    }
+
+    /** Asks several providers at once and returns as soon as the first one answers (plus a short grace for the rest). */
+    private suspend fun gatewayWatch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload? {
+        val order = servers.map { it.lowercase() }.filter { tokens.containsKey("$id|$audio|$ep|$it") }.take(4)
+        if (order.isEmpty()) return null
+        return kotlinx.coroutines.coroutineScope {
+            val ch = kotlinx.coroutines.channels.Channel<List<StreamSource>>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+            val jobs = order.map { a -> launch { ch.send(kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { gatewayProvider(id, audio, ep, a) }.getOrNull() }.orEmpty()) } }
+            val all = mutableListOf<StreamSource>(); var left = jobs.size; var deadline = 0L
+            while (left > 0) {
+                val got = if (deadline == 0L) ch.receive() else kotlinx.coroutines.withTimeoutOrNull((deadline - System.currentTimeMillis()).coerceAtLeast(1)) { ch.receive() } ?: break
+                left--
+                if (got.isNotEmpty()) { all += got; if (deadline == 0L) deadline = System.currentTimeMillis() + 1500 }
+            }
+            jobs.forEach { it.cancel() }
+            val sorted = all.sortedBy { s -> order.indexOfFirst { s.id.startsWith("$it-") } }
+            if (sorted.isEmpty()) null else WatchPayload(audio, ep, sorted, sorted.firstNotNullOfOrNull { it.intro }, sorted.firstNotNullOfOrNull { it.outro })
+        }
+    }
+
+    suspend fun episodes(id: Int): EpisodesPayload = gatewayEpisodes(id) ?: json.decodeFromString(get("/api/anime/$id/episodes"))
 
     suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload =
-        json.decodeFromString(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + if (servers.isNotEmpty()) "&p=" + servers.joinToString(",") else ""))
+        gatewayWatch(id, audio, ep, servers)
+            ?: json.decodeFromString(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + if (servers.isNotEmpty()) "&p=" + servers.joinToString(",") else ""))
 
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =
         runCatching { json.decodeFromString<SkipPayload>(get("/api/skip?mal=$mal&ep=$ep")) }.getOrNull()

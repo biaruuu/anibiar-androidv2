@@ -136,10 +136,16 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var pickerOpen by remember { mutableStateOf(false) }
     // Voice call: starts by itself once I'm in a room (and have allowed the microphone).
     var micOk by remember { mutableStateOf(androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) }
-    val micLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { micOk = it }
+    // The microphone has to be allowed before joining a call; once in, anyone can mute.
+    var pendingJoin by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val micLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+        micOk = ok
+        val go = pendingJoin; pendingJoin = null
+        if (ok) go?.invoke() else if (go != null) android.widget.Toast.makeText(context, "Allow the microphone to join the call. You can mute yourself once you're in.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    fun withMic(action: () -> Unit) { if (micOk) action() else { pendingJoin = action; micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) } }
     val vMuted by (voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     LaunchedEffect(joinRoom?.id) { joinRoom?.let { session.enter(it) } }
-    LaunchedEffect(together != null) { if (together != null && !micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
     LaunchedEffect(together, micOk) { if (together != null && micOk) session.ensureVoice() }
     val speaking by (voice?.speaking ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val voiceLinks by (voice?.states ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptyMap<String, String>()) }).collectAsStateWithLifecycle()
@@ -351,7 +357,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                         listOf("sub" to "Sub", "dub" to "Dub").forEach { (k, label) ->
                             val available = if (k == "sub") !eps?.sub.isNullOrEmpty() else !eps?.dub.isNullOrEmpty()
                             DropdownMenuItem(
-                                text = { Text(label + if (!available) "  ·  Unavailable" else "", style = inter(15f), color = if (available) Color.White else Ani.Muted) },
+                                text = { Text(label + (if (!available) "  ·  Unavailable" else "  ·  ${(if (k == "sub") eps?.sub?.size else eps?.dub?.size) ?: 0} eps"), style = inter(15f), color = if (available) Color.White else Ani.Muted) },
                                 enabled = available, onClick = { audioOpen = false; if (locked) hostOnly() else { audio = k; streamName = null } },
                                 trailingIcon = { if (audio == k && available) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(20.dp)) },
                             )
@@ -390,7 +396,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     .border(1.dp, if (room != null) Ani.Lime.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(12.dp))
                     .clickable {
                         if (social.myId == null) android.widget.Toast.makeText(context, "Log in to watch together", android.widget.Toast.LENGTH_SHORT).show()
-                        else if (!starting) {
+                        else if (!starting) withMic {
                             // Straight into the full-screen room; invite friends from there.
                             starting = true
                             scope.launch {
@@ -494,12 +500,14 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         com.anibiar.app.ui.watch.TogetherSheet(
             room = room, together = together, isHost = isHost, starting = starting,
             onStart = {
-                starting = true
-                scope.launch {
-                    runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
-                        .onSuccess { session.enter(it) }
-                        .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
-                    starting = false
+                withMic {
+                    starting = true
+                    scope.launch {
+                        runCatching { social.createRoom(id, name, anime?.posterUrl, ep, audio) }
+                            .onSuccess { session.enter(it) }
+                            .onFailure { android.widget.Toast.makeText(context, it.message ?: "Couldn't start the room", android.widget.Toast.LENGTH_SHORT).show() }
+                        starting = false
+                    }
                 }
             },
             onLeave = { session.leave(isHost); togetherOpen = false },

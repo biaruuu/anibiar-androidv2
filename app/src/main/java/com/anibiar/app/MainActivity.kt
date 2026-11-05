@@ -161,7 +161,7 @@ private fun AppNavigation() {
     val toastCtx = androidx.compose.ui.platform.LocalContext.current
     val mainScope = androidx.compose.runtime.rememberCoroutineScope()
     var banner by androidx.compose.runtime.remember { mutableStateOf<Pair<com.anibiar.app.social.Room, String>?>(null) }
-    fun joinRoomById(roomId: String) {
+    fun doJoin(roomId: String) {
         mainScope.launch {
             val r = runCatching { social.fetchRoom(roomId) }.getOrNull()
             if (r == null || r.ended) {
@@ -171,6 +171,16 @@ private fun AppNavigation() {
                 joinRoom = r; watchEp = r.episode; watchId = r.animeId
             }
         }
+    }
+    // Joining a call needs the microphone allowed first (you can mute once you're in).
+    var pendingRoom by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    val micAsk = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
+        val rid = pendingRoom; pendingRoom = null
+        if (ok && rid != null) doJoin(rid) else if (rid != null) android.widget.Toast.makeText(toastCtx, "Allow the microphone to join the call. You can mute yourself once you're in.", android.widget.Toast.LENGTH_LONG).show()
+    }
+    fun joinRoomById(roomId: String) {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(toastCtx, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) doJoin(roomId)
+        else { pendingRoom = roomId; micAsk.launch(android.Manifest.permission.RECORD_AUDIO) }
     }
     // Invites arrive live over realtime; each one is checked against the database before it is shown.
     androidx.compose.runtime.LaunchedEffect(authState?.uid) {

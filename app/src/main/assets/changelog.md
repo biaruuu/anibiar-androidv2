@@ -1,3 +1,8 @@
+## 12 | Faster streams, mic before joining | 2026-11-05
+- Joining or starting a watch party now asks for the microphone first; once you're in you can mute yourself any time
+- Episodes and streams now load through the Kiro-WebApp gateway: several servers are asked at once and the first one to answer plays, with the old server as backup
+- Audio picker shows how many episodes each of Sub and Dub has
+
 ## 11 | Captions yours, reactions removed, voice fix | 2026-11-05
 - Caption language, size and style can now be changed by everyone in a watch party and apply right away for you (the host's settings are the starting point)
 - Removed the emoji reactions
