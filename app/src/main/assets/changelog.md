@@ -1,3 +1,10 @@
+## 14 | Smaller player, Crunchyroll captions | 2026-11-05
+- Player controls are smaller and fit better on phones; settings menu is more compact
+- Captions sit right above the seek slider while controls are showing, and drop to the bottom when they hide
+- Cleaner Crunchyroll-style caption text (regular Trebuchet, thin outline)
+- Removed Autoplay / Auto skip / Auto next from settings (they're in the top bar)
+- "Continue watching?" prompt is smaller and hides the controls behind it
+
 ## 13 | New watch page like the web app | 2026-11-05
 - Episode sheet redesigned: thumbnail cards, sort / hide-spoilers / grid buttons, dub and sub marks, episode ranges
 - Watch page: Episode heading, Sub / Provider / options row, Seasons, Related and Recommendations cards in the new web style

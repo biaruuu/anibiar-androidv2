@@ -432,18 +432,18 @@ fun KiroPlayer(
     }
 
     val controlsVisible = showControls || !playing || menuOpen
-    val aCtl by animateFloatAsState(if (controlsVisible) 1f else 0f, label = "ctl")
+    val aCtl by animateFloatAsState(if (controlsVisible && !resumePrompt) 1f else 0f, label = "ctl")
 
     BoxWithConstraints(modifier.background(Color.Black)) {
         val w = maxWidth
         val h = maxHeight
         val pad = (w * 0.022f).coerce(8.dp, 20.dp)
-        val btn = (w * 0.04f).coerce(32.dp, 44.dp)
-        val ico = btn * 0.76f
-        val pill = (w * 0.041f).coerce(30.dp, 42.dp)
-        val playSize = (w * 0.063f).coerce(46.dp, 68.dp)
-        val seekSize = (w * 0.057f).coerce(38.dp, 62.dp)
-        val timeSp = (w.value * 0.018f).coerceIn(12f, 16f)
+        val btn = (w * 0.04f).coerce(26.dp, 44.dp)
+        val ico = (w * 0.034f).coerce(19.dp, 33.dp)
+        val pill = (w * 0.041f).coerce(26.dp, 42.dp)
+        val playSize = (w * 0.063f).coerce(36.dp, 68.dp)
+        val seekSize = (w * 0.057f).coerce(30.dp, 62.dp)
+        val timeSp = (w.value * 0.018f).coerceIn(11f, 16f)
         val wide = w >= 520.dp
 
         // Video + gestures
@@ -473,23 +473,26 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (w.value * 0.027f).coerceIn(12f, 38f) * CAPTION_SIZES[captionSize].second
+            val base = (w.value * 0.027f).coerceIn(11.5f, 38f) * CAPTION_SIZES[captionSize].second * (if (aCtl > 0.5f) 0.92f else 1f)
             val face = TextStyle(
-                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.18f).sp, fontWeight = FontWeight.Normal,
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.1.sp,
+                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.2f).sp, fontWeight = FontWeight.Normal,
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.sp,
             )
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = w * 0.06f).padding(bottom = (w * 0.032f).coerce(16.dp, 44.dp)), contentAlignment = Alignment.Center) {
+            // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
+            val lifted = aCtl > 0.5f
+            val bottomPad by animateDpAsState(if (lifted) (w * 0.032f).coerce(10.dp, 34.dp) + 22.dp else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
+            val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
                 if (captionStyle == 0) {
-                    // Crunchyroll look: white Trebuchet with a thick black outline and a soft drop shadow, no box.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.16f).sp.toPx() }
+                    // Crunchyroll look: regular-weight Trebuchet, white with a thin dark outline and a soft shadow, no box.
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.14f).sp.toPx() }
                     Text(
                         line, style = face.copy(
-                            color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
-                            shadow = Shadow(Color(0xAA000000), Offset(0f, 2f), 4f),
+                            color = Color(0xEB141414), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
+                            shadow = Shadow(Color(0x99000000), Offset(0f, 1.5f), 3f),
                         ),
                     )
                     Text(line, style = face.copy(color = Color.White))
-                    Text(line, style = face.copy(color = Color.White, drawStyle = Stroke(width = strokePx * 0.28f, join = StrokeJoin.Round)))
                 } else {
                     Text(
                         line, style = face.copy(color = Color.White),
@@ -511,13 +514,13 @@ fun KiroPlayer(
             CircularProgressIndicator(Modifier.align(Alignment.Center).size(playSize * 0.6f), color = Color.White, strokeWidth = 2.5.dp)
         }
         if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0xCC000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text("Continue watching?", style = inter(19f, FontWeight.Bold), color = Color.White)
-                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(15f, FontWeight.SemiBold), color = Color.Black,
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Continue watching?", style = inter(15f, FontWeight.Bold), color = Color.White)
+                Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(12.5f, FontWeight.SemiBold), color = Color.Black,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable {
                         resumePrompt = false; player.seekTo((resumeFraction * player.duration).toLong()); player.playWhenReady = true
-                    }.padding(horizontal = 30.dp, vertical = 13.dp))
-                Text("Start from the beginning", style = inter(15f, FontWeight.SemiBold), color = Color(0xCCFFFFFF),
+                    }.padding(horizontal = 20.dp, vertical = 8.dp))
+                Text("Start from the beginning", style = inter(12.5f, FontWeight.SemiBold), color = Color(0xCCFFFFFF),
                     modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.playWhenReady = true }.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }
@@ -576,7 +579,7 @@ fun KiroPlayer(
                     BarButton(btn, VidIcons.Chromecast, ico, live) { openCastSettings(context) }
                 }
                 GlassPill {
-                    val sw = (w * 0.1f).coerce(27.dp, 38.dp); val sh = (w * 0.0525f).coerce(14.dp, 20.dp)
+                    val sw = (w * 0.075f).coerce(25.dp, 38.dp); val sh = (w * 0.04f).coerce(13.dp, 20.dp)
                     GlassSwitch(autoplay, FeatherIcons.Play, sw, sh, live) { onAutoplay(!autoplay); say("Autoplay ${if (!autoplay) "on" else "off"}") }
                     GlassSwitch(autoSkip, FeatherIcons.FastForward, sw, sh, live) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}") }
                     GlassSwitch(autoNext, FeatherIcons.SkipForward, sw, sh, live) { onAutoNext(!autoNext); say("Auto next ${if (!autoNext) "on" else "off"}") }
@@ -642,14 +645,14 @@ fun KiroPlayer(
 
         // ---------------- settings menu ----------------
         AnimatedVisibility(menuOpen, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopEnd)) {
-            val panelW = (w * 0.62f).coerce(228.dp, 340.dp)
+            val panelW = (w * 0.6f).coerce(190.dp, 300.dp)
             val top = pad + btn + 10.dp
             Column(
                 Modifier.padding(top = top, end = pad).width(panelW).heightIn(max = h - top - pad)
-                    .clip(RoundedCornerShape(22.dp)).background(Color(0xCC0C0C0F)).border(1.dp, GlassEdge, RoundedCornerShape(22.dp))
+                    .clip(RoundedCornerShape(18.dp)).background(Color(0xD90C0C0F)).border(1.dp, GlassEdge, RoundedCornerShape(18.dp))
                     .pointerInput(Unit) { detectTapGestures { } }
-                    .verticalScroll(rememberScrollState()).padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                    .verticalScroll(rememberScrollState()).padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Caption style"; else -> "Speed" }) { menuView = "main" }
                 when (menuView) {
@@ -661,9 +664,6 @@ fun KiroPlayer(
                             MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_SIZES[captionSize].first) { menuView = "style" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
-                        MenuRow(VidIcons.Play, "Autoplay", if (autoplay) "On" else "Off", chevron = false) { onAutoplay(!autoplay) }
-                        MenuRow(VidIcons.SeekForward10, "Auto skip intro/outro", if (intro == null && outro == null) "No data" else if (autoSkip) "On" else "Off", chevron = false) { onAutoSkip(!autoSkip) }
-                        MenuRow(VidIcons.SeekForward10, "Auto next episode", if (autoNext) "On" else "Off", chevron = false) { onAutoNext(!autoNext) }
                     }
                     "quality" -> {
                         OptionRow("Auto", quality == -1) { userQuality = true; quality = -1; menuView = "main" }
@@ -754,36 +754,36 @@ private fun TrackBar(
 @Composable
 private fun MenuRow(icon: ImageVector, label: String, value: String, chevron: Boolean = true, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0x14FFFFFF)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0x14FFFFFF)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(label, style = inter(14f, FontWeight.Medium, lineHeight = 17f), color = Color.White, modifier = Modifier.weight(1f))
-        Text(value, style = inter(13f), color = Color(0x99FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 100.dp))
-        if (chevron) { Spacer(Modifier.width(4.dp)); Icon(VidIcons.ChevronRight, null, tint = Color.White, modifier = Modifier.size(20.dp)) }
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, style = inter(12.5f, FontWeight.Medium, lineHeight = 15f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(value, style = inter(11.5f), color = Color(0x99FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
+        if (chevron) { Spacer(Modifier.width(2.dp)); Icon(VidIcons.ChevronRight, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
     }
 }
 
 @Composable
 private fun MenuBack(title: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onBack).padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(VidIcons.ChevronLeft, "Back", tint = Color.White, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(title, style = inter(14.5f, FontWeight.SemiBold), color = Color.White)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack).padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(VidIcons.ChevronLeft, "Back", tint = Color.White, modifier = Modifier.size(19.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(title, style = inter(13f, FontWeight.SemiBold), color = Color.White)
     }
 }
 
 @Composable
 private fun OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(if (selected) Color(0x26FFFFFF) else Color(0x14FFFFFF)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 11.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (selected) Color(0x26FFFFFF) else Color(0x14FFFFFF)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = inter(14f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        if (selected) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Text(label, style = inter(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        if (selected) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(17.dp))
     }
 }
 
