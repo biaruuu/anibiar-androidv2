@@ -26,22 +26,20 @@ import java.util.concurrent.TimeUnit
  */
 object Streaming {
     const val BASE = "https://anibiartv.vercel.app"
-    /** Kiro-WebApp gateway (/api/src + /api/stream). The app caches, races and prefetches on-device; this only supplies the sources. */
-    const val GATEWAY = "https://anibiar-beta.vercel.app"
 
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     private val client by lazy {
         Http.plain.newBuilder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(75, TimeUnit.SECONDS).build()
     }
 
-    fun abs(path: String) = if (path.startsWith("http")) path else (if (path.startsWith("/api/stream")) GATEWAY else BASE) + path
+    fun abs(path: String) = if (path.startsWith("http")) path else BASE + path
 
     private class Cached<T>(val at: Long, val v: T)
     private val epsCache = java.util.concurrent.ConcurrentHashMap<Int, Cached<EpisodesPayload>>()
     private val watchCache = java.util.concurrent.ConcurrentHashMap<String, Cached<WatchPayload>>()
 
-    private suspend fun get(path: String, base: String = BASE): String = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(base + path).header("Accept", "application/json").build()
+    private suspend fun get(path: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(BASE + path).header("Accept", "application/json").build()
         client.newCall(request).execute().use { r ->
             val text = r.body?.string().orEmpty()
             if (!r.isSuccessful) {
@@ -60,7 +58,7 @@ object Streaming {
     private suspend fun gatewayEpisodes(id: Int): EpisodesPayload? {
         if (System.currentTimeMillis() < gatewaySkipUntil) return null
         return runCatching {
-            val root = Json.parseToJsonElement(get("/api/src?k=eps&id=$id", GATEWAY)).jsonObject
+            val root = Json.parseToJsonElement(get("/api/src?k=eps&id=$id")).jsonObject
             val aliases = root.keys.toList()
             val out = mutableMapOf<String, java.util.TreeMap<Int, WatchEpisode>>("sub" to java.util.TreeMap(), "dub" to java.util.TreeMap())
             for (alias in aliases) for (audio in listOf("sub", "dub")) {
@@ -87,7 +85,7 @@ object Streaming {
 
     private suspend fun gatewayProvider(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> {
         val tok = tokens["$id|$audio|$ep|$alias"] ?: return emptyList()
-        val o = Json.parseToJsonElement(get("/api/src?k=watch&t=" + java.net.URLEncoder.encode(tok, "UTF-8"), GATEWAY)).jsonObject
+        val o = Json.parseToJsonElement(get("/api/src?k=watch&t=" + java.net.URLEncoder.encode(tok, "UTF-8"))).jsonObject
         fun subs(a: kotlinx.serialization.json.JsonElement?) = (a as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { t ->
             val to = t.jsonObject; val u = to["url"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
             StreamSubtitle(to["label"]?.jsonPrimitive?.contentOrNull ?: to["srclang"]?.jsonPrimitive?.contentOrNull ?: "Subtitle", to["srclang"]?.jsonPrimitive?.contentOrNull ?: "und", u, to["default"]?.jsonPrimitive?.booleanOrNull ?: false)
