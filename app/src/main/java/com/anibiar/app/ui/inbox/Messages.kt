@@ -28,6 +28,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -239,22 +244,25 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Bg).imePadding()) {
-        Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(60.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            GlassButton(onClick = onBack, size = 36.dp) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp).align(Alignment.Center)) }
-            Spacer(Modifier.width(10.dp))
-            Row(Modifier.weight(1f).clickable { onOpenUser(uid) }, verticalAlignment = Alignment.CenterVertically) {
-                Avatar(person?.avatarUrl, person?.username, 36.dp)
-                Spacer(Modifier.width(10.dp))
-                Column {
-                    Text(person?.shownName ?: "…", style = inter(15.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    person?.let { Text("@${it.username}", style = inter(12f), color = Muted, maxLines = 1) }
-                }
+    val glass = Brush.verticalGradient(listOf(Color(0xCC2E2E34), Color(0xE61A1A1E)))
+    val rim = Brush.verticalGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF)))
+    Column(Modifier.fillMaxSize().background(Color.Black).imePadding()) {
+        Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(84.dp).padding(horizontal = 14.dp)) {
+            Box(Modifier.align(Alignment.CenterStart)) {
+                GlassButton(onClick = onBack, size = 40.dp) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp).align(Alignment.Center)) }
             }
-            StreakBadge(streak, big = true)
+            Column(Modifier.align(Alignment.Center).clickable { onOpenUser(uid) }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Avatar(person?.avatarUrl, person?.username, 44.dp)
+                Text(
+                    person?.shownName ?: "…", style = inter(12.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.offset(y = (-6).dp).clip(RoundedCornerShape(50)).background(Color(0xE61E1E22)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp).widthIn(max = 160.dp),
+                )
+            }
+            if (streak >= 2) Box(
+                Modifier.align(Alignment.CenterEnd).clip(RoundedCornerShape(50)).background(glass).border(1.dp, rim, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 8.dp),
+            ) { StreakBadge(streak, big = true) }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF)))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
             if (msgs.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Avatar(person?.avatarUrl, person?.username, 84.dp)
@@ -263,35 +271,63 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     Text("Say hi. Message each other every day to build a 🔥 streak.", style = inter(13.5f, FontWeight.Normal, 19f), color = Muted, modifier = Modifier.padding(horizontal = 36.dp, vertical = 6.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
-            items(msgs, key = { it.id }) { m ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start) {
+            itemsIndexed(msgs, key = { _, m -> m.id }) { i, m ->
+                val prev = msgs.getOrNull(i - 1); val next = msgs.getOrNull(i + 1)
+                val gapBefore = prev == null || m.at - prev.at > 30 * 60 * 1000
+                val gapAfter = next == null || next.at - m.at > 30 * 60 * 1000
+                val firstInGroup = gapBefore || prev?.mine != m.mine
+                val lastInGroup = gapAfter || next?.mine != m.mine
+                if (gapBefore) Text(
+                    stamp(m.at), style = inter(11.5f, FontWeight.Medium), color = Muted,
+                    modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 14.dp, bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                val tail = if (lastInGroup) 5.dp else 20.dp
+                val shape = if (m.mine) RoundedCornerShape(20.dp, 20.dp, tail, 20.dp) else RoundedCornerShape(20.dp, 20.dp, 20.dp, tail)
+                Row(Modifier.fillMaxWidth().padding(top = if (firstInGroup) 0.dp else 2.dp), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
+                    if (!m.mine) {
+                        Box(Modifier.size(30.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 30.dp) }
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
                         Text(
-                            m.body, style = inter(14.5f, FontWeight.Normal, 20f), color = if (m.mine) Color(0xFF0B0B0D) else Color.White,
-                            modifier = Modifier.widthIn(max = 280.dp).clip(RoundedCornerShape(18.dp)).background(if (m.mine) Accent else Item).padding(horizontal = 13.dp, vertical = 8.dp),
+                            m.body, style = inter(15.5f, FontWeight.Normal, 21f), color = Color.White,
+                            modifier = Modifier.widthIn(max = 280.dp).clip(shape)
+                                .background(if (m.mine) Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0))) else Brush.verticalGradient(listOf(Color(0xFF2C2C31), Color(0xFF232327))))
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
                         )
-                        if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 2.dp, end = 4.dp))
+                        if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
                     }
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().background(Bg).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(Panel).padding(horizontal = 16.dp, vertical = 11.dp)) {
-                if (text.isEmpty()) Text("Message…", style = inter(14.5f), color = Muted)
-                BasicTextField(
-                    value = text, onValueChange = { if (it.length <= 2000) text = it },
-                    textStyle = inter(14.5f).copy(color = Color.White), cursorBrush = SolidColor(Accent), maxLines = 5,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
+                Text("+", style = inter(24f, FontWeight.Light), color = Color.White)
             }
-            Spacer(Modifier.width(8.dp))
-            val ready = text.isNotBlank() && !sending
-            Box(
-                Modifier.size(42.dp).clip(CircleShape).background(if (ready) Accent else Panel).clickable(enabled = ready) { send() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(AniIcons.ArrowBack, "Send", tint = if (ready) Color(0xFF0B0B0D) else Muted, modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = 90f })
+            Spacer(Modifier.width(10.dp))
+            Row(Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(26.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(26.dp)).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).padding(vertical = 4.dp)) {
+                    if (text.isEmpty()) Text("Message…", style = inter(15.5f), color = Muted)
+                    BasicTextField(
+                        value = text, onValueChange = { if (it.length <= 2000) text = it },
+                        textStyle = inter(15.5f).copy(color = Color.White), cursorBrush = SolidColor(Accent), maxLines = 5,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                val ready = text.isNotBlank() && !sending
+                if (ready) Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0)))).clickable { send() },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = 90f }) }
             }
         }
     }
+}
+
+private fun stamp(at: Long): String {
+    val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.getDefault())
+    val time = java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(at))
+    val d = day.format(java.util.Date(at)); val now = day.format(java.util.Date())
+    val yest = day.format(java.util.Date(System.currentTimeMillis() - 86400000))
+    return when (d) { now -> "Today $time"; yest -> "Yesterday $time"; else -> java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()).format(java.util.Date(at)) }
 }

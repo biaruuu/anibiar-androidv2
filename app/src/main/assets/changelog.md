@@ -219,3 +219,7 @@
 ## 49 | Name cards and message fix | 2026-11-07
 - Search name cards redesigned: compact dark card with the banner fading behind, avatar, name, bio, follower count and a Follow button
 - Fixed "permission denied" when sending a message
+
+## 50 | Liquid glass tab bar and chat | 2026-11-07
+- Bottom bar is now a floating liquid-glass pill with a glass capsule on the selected tab
+- Chat redesigned with rounded gradient bubbles, grouped messages with tails, avatars, time stamps, glass input bar and glass streak pill

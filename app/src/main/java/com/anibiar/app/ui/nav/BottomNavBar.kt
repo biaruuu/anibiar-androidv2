@@ -44,12 +44,19 @@ enum class NavTab(val label: String, val icon: ImageVector) {
     Settings("Settings", AniIcons.Settings),
 }
 
-/** Flat gray tab bar, icon over label: white when selected, light gray otherwise, so it reads on a dark page. */
+/** Floating liquid-glass pill: translucent, bright rim, the selected tab sits in a lighter glass capsule. */
 @Composable
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier, inboxBadge: Int = 0) {
-    Column(modifier.fillMaxWidth().background(Color(0xFF1C1C1E)).navigationBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1AFFFFFF)))
-        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+    val shape = RoundedCornerShape(36.dp)
+    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(start = 16.dp, end = 16.dp, bottom = 10.dp, top = 4.dp)) {
+        Row(
+            Modifier.fillMaxWidth().shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black).clip(shape)
+                .background(Brush.verticalGradient(listOf(Color(0xCC2E2E34), Color(0xE61A1A1E))))
+                .background(Brush.verticalGradient(listOf(Color(0x22FFFFFF), Color.Transparent)))
+                .border(1.dp, Brush.verticalGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF), Color(0x33FFFFFF))), shape)
+                .padding(6.dp).height(60.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             NavTab.entries.forEach { tab -> NavItem(tab, tab == selected, { onSelect(tab) }, Modifier.weight(1f), if (tab == NavTab.Inbox) inboxBadge else 0) }
         }
     }
@@ -57,13 +64,15 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 @Composable
 private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit, modifier: Modifier, badge: Int = 0) {
-    val tint by animateColorAsState(if (selected) Color.White else Color(0xFFA0A0A8), tween(160), label = "navTint")
+    val tint by animateColorAsState(if (selected) Color.White else Color(0xFFC4C4CC), tween(160), label = "navTint")
     Column(
-        modifier.fillMaxHeight().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
+        modifier.fillMaxHeight().clip(RoundedCornerShape(28.dp))
+            .then(if (selected) Modifier.background(Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x1FFFFFFF)))).border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(28.dp)) else Modifier)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
         Box {
-            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(25.dp))
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(24.dp))
             if (badge > 0) Box(
                 Modifier.align(Alignment.TopEnd).padding(start = 16.dp).clip(RoundedCornerShape(50)).background(Color(0xFFFF4D6A)).padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
