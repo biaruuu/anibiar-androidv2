@@ -79,7 +79,7 @@ fun EpisodeSheet(
     var desc by remember { mutableStateOf(prefs.getBoolean("episode-newest-first", false)) }
     var hidden by remember { mutableStateOf(prefs.getBoolean("episode-hide-spoilers", false)) }
     var range by remember { mutableIntStateOf(0) }
-    val ordered = remember(episodes, desc) { if (desc) episodes.reversed() else episodes }
+    val ordered = remember(episodes, desc) { episodes.distinctBy { it.number }.let { if (desc) it.reversed() else it } }
     val size = 100
     val ranges = remember(ordered) { ordered.chunked(size).mapIndexed { i, c -> Triple("${c.first().number}-${c.last().number}", i * size, i * size + c.size) } }
     LaunchedEffect(current, ordered) { ordered.indexOfFirst { it.number == current }.takeIf { it >= 0 }?.let { range = it / size } }

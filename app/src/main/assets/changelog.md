@@ -149,3 +149,8 @@
 ## 34 | Always fresh episodes | 2026-11-06
 - Episode lists are re-fetched live every time; the saved copy only shows while the fresh list loads
 - Newly aired episodes now appear within about a minute instead of waiting for an app restart
+
+## 35 | Crash protection | 2026-11-06
+- Errors on background threads (network, player loading) no longer close the app
+- If Kiro does close, the next launch shows what went wrong with a Copy report button
+- Episode list ignores duplicate episode numbers from different servers

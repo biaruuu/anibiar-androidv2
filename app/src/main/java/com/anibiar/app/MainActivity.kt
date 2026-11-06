@@ -60,6 +60,19 @@ class MainActivity : ComponentActivity() {
                 var splash by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
                 Box(Modifier.fillMaxSize()) {
                     AppNavigation()
+                    var crash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(CrashLog.take(this@MainActivity)) }
+                    crash?.let { report ->
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { crash = null },
+                            title = { androidx.compose.material3.Text("Kiro closed unexpectedly") },
+                            text = { androidx.compose.material3.Text(report.take(900), fontSize = androidx.compose.ui.unit.TextUnit(10f, androidx.compose.ui.unit.TextUnitType.Sp)) },
+                            confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", report)); crash = null
+                            }) { androidx.compose.material3.Text("Copy report") } },
+                            dismissButton = { androidx.compose.material3.TextButton(onClick = { crash = null }) { androidx.compose.material3.Text("Close") } },
+                        )
+                    }
                     if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
                 }
             }

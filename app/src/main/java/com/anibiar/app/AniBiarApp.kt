@@ -26,6 +26,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         Http.init(this)
         social.start()
         // Build the network stack and warm image caches off the main thread while the UI starts.

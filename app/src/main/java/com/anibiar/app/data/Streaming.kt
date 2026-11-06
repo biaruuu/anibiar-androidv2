@@ -180,7 +180,8 @@ object Streaming {
      * Same result as [episodes], but reports early: a saved copy shows instantly, then the list is refreshed
      * every time the server or any in-app provider answers, so the player can start on the first partial result.
      */
-    suspend fun episodesLive(id: Int, onUpdate: (EpisodesPayload) -> Unit) {
+    suspend fun episodesLive(id: Int, onUpdateRaw: (EpisodesPayload) -> Unit) {
+        val onUpdate: (EpisodesPayload) -> Unit = { p -> runCatching { onUpdateRaw(p) } }
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { onUpdate(it.v); return }
         readDisk(id)?.let { onUpdate(it) }
         val lock = kotlinx.coroutines.sync.Mutex()
