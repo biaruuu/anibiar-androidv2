@@ -233,6 +233,26 @@ object Streaming {
 
     suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload = withContext(Dispatchers.Default) { watchInner(id, audio, ep, servers) }
 
+    /** Reads an HLS master playlist and returns the stream with its best resolution filled in (never throws, 2.5 s limit). */
+    private suspend fun probe(s: StreamSource): StreamSource {
+        if (s.format != "hls" || !s.src.startsWith("http")) return s
+        val h = kotlinx.coroutines.withTimeoutOrNull(2_500) {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val b = Request.Builder().url(s.src).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+                    LocalSources.referers[s.src]?.let { b.header("Referer", it).header("Origin", it.trimEnd('/')) }
+                    Http.plain.newCall(b.build()).execute().use { r ->
+                        val text = r.body?.string().orEmpty()
+                        Regex("RESOLUTION=\\d+x(\\d+)").findAll(text).maxOfOrNull { it.groupValues[1].toInt() } ?: 0
+                    }
+                }
+            }.getOrNull()
+        } ?: 0
+        return if (h > 0) s.copy(height = h) else s
+    }
+
+    private suspend fun probeAll(l: List<StreamSource>): List<StreamSource> = kotlinx.coroutines.coroutineScope { l.map { async { probe(it) } }.awaitAll() }
+
     private class Res(val base: WatchPayload?, val streams: List<StreamSource>, val err: Throwable?, val local: String?)
 
     /**
@@ -251,11 +271,11 @@ object Streaming {
                 val res = kotlinx.coroutines.withTimeoutOrNull(16_000) {
                     runCatching { gatewayWatch(id, audio, ep, remote) ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + "&p=" + remote.joinToString(","))) }
                 }
-                ch.send(Res(res?.getOrNull(), res?.getOrNull()?.streams.orEmpty(), res?.exceptionOrNull(), null))
+                ch.send(Res(res?.getOrNull(), probeAll(res?.getOrNull()?.streams.orEmpty()), res?.exceptionOrNull(), null))
             }
             for (a in local) jobs += launch {
                 val res = kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) } }
-                ch.send(Res(null, res?.getOrNull().orEmpty(), res?.exceptionOrNull(), a.lowercase()))
+                ch.send(Res(null, probeAll(res?.getOrNull().orEmpty()), res?.exceptionOrNull(), a.lowercase()))
             }
             var left = jobs.size; var deadline = 0L
             var base: WatchPayload? = null; var err: Throwable? = null
@@ -268,7 +288,7 @@ object Streaming {
                 if (got.streams.isNotEmpty() && deadline == 0L) deadline = System.currentTimeMillis() + 1200
             }
             jobs.forEach { it.cancel() }
-            val all = remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second }
+            val all = (remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second }).sortedByDescending { it.height }
             if (all.isEmpty()) throw err ?: IOException("No stream found for this episode")
             WatchPayload(audio, ep, all, base?.intro ?: all.firstNotNullOfOrNull { it.intro }, base?.outro ?: all.firstNotNullOfOrNull { it.outro })
         }
@@ -283,7 +303,6 @@ object Streaming {
 
     /** Referer for the stream the player is playing now (only set for in-app providers). */
     @Volatile var activeReferer: String? = null
-    @Volatile var activeCookie: String? = null
     /** Last player error, included in the Copy report button. */
     @Volatile var lastPlayError: String? = null
     fun isOwnHost(host: String?) = host != null && (BASE.endsWith(host) || BACKUP.endsWith(host))
@@ -334,6 +353,8 @@ data class StreamSource(
     val subtitles: List<StreamSubtitle> = emptyList(),
     val intro: TimeRange? = null,
     val outro: TimeRange? = null,
+    /** Highest picture height found in the stream's playlist, 0 when unknown. Used to pick the best server. */
+    val height: Int = 0,
 )
 
 @Serializable

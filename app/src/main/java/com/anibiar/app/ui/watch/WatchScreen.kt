@@ -418,7 +418,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 2.dp),
             )
         }
-        if (!fullscreen && !episodesOpen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (!fullscreen && !episodesOpen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().imePadding().padding(horizontal = 14.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Episode heading
             val generic = current?.title.isNullOrBlank() || Regex("^episode\\s*\\d+$", RegexOption.IGNORE_CASE).matches(current?.title.orEmpty().trim())
             Column {
@@ -580,6 +580,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     }
                 }
             }
+
+            com.anibiar.app.ui.watch.CommentsSection(animeId = id, episode = ep, modifier = Modifier.fillMaxWidth())
 
             if (seasons.size > 1) com.anibiar.app.ui.watch.SeasonsCard(seasons, id) { sid -> onWatch(sid) }
             com.anibiar.app.ui.watch.RelatedSections(anime) { aid -> onOpenDetails(aid) }

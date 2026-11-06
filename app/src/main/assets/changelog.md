@@ -184,3 +184,8 @@
 
 ## 42 | Mizu playback headers | 2026-11-06
 - Mizu streams now send the player site's cookie and headers when loading the video
+
+## 43 | Community comments, best-quality server | 2026-11-06
+- New Community chat on every anime page and episode: Episode, Anime and All episodes tabs, replies, emoji reactions, live updates
+- The player now reads each server's available resolutions and starts on the one with the highest quality
+- Removed the Mizu (Ani.pm) server
