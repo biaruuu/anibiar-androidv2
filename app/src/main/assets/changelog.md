@@ -145,3 +145,7 @@
 - Episode list now loads in stages: it appears as soon as the first server answers, and a saved copy shows instantly on repeat visits
 - Two new in-app servers: Hoshi (sub) and Yuki (sub and dub)
 - Shorter provider timeouts and one shared anime lookup, so slow servers no longer hold up the list
+
+## 34 | Always fresh episodes | 2026-11-06
+- Episode lists are re-fetched live every time; the saved copy only shows while the fresh list loads
+- Newly aired episodes now appear within about a minute instead of waiting for an app restart

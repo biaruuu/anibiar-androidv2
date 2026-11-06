@@ -181,7 +181,7 @@ object Streaming {
      * every time the server or any in-app provider answers, so the player can start on the first partial result.
      */
     suspend fun episodesLive(id: Int, onUpdate: (EpisodesPayload) -> Unit) {
-        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 120_000 }?.let { onUpdate(it.v); return }
+        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { onUpdate(it.v); return }
         readDisk(id)?.let { onUpdate(it) }
         val lock = kotlinx.coroutines.sync.Mutex()
         var base: EpisodesPayload? = null
@@ -211,7 +211,7 @@ object Streaming {
     }
 
     suspend fun episodes(id: Int): EpisodesPayload {
-        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 120_000 }?.let { return it.v }
+        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { return it.v }
         val r = kotlinx.coroutines.coroutineScope {
             val srv = async { runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) } }
             val loc = async { runCatching { LocalSources.episodes(id) }.getOrNull().orEmpty() }

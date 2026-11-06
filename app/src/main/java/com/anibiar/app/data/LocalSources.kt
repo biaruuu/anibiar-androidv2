@@ -541,7 +541,15 @@ object LocalSources {
 
     // ---------------------------------------------------------------- public
     /** Runs every in-app provider at once and reports each one the moment it answers (failures are skipped). */
+    @Volatile private var lastFresh = 0L
+    /** Series caches hold episode lists, so drop them every couple of minutes to pick up newly aired episodes. */
+    private fun freshen() {
+        val now = System.currentTimeMillis()
+        if (now - lastFresh > 90_000) { lastFresh = now; ggCache.clear(); zoneCache.clear(); kaaCache.clear(); nsCache.clear() }
+    }
+
     suspend fun episodesEach(id: Int, onEach: suspend (String, Local) -> Unit) = coroutineScope {
+        freshen()
         val jobs: List<Pair<String, suspend () -> Local>> = listOf(
             KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
             YUKI to { nsEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
