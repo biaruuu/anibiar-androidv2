@@ -32,8 +32,8 @@ object CrashLog {
      * a native crash, out-of-memory kill or freeze never reaches it, so Android's own exit history is checked too.
      */
     fun take(c: Context): String? {
-        val java = runCatching { file(c).let { f -> if (f.exists()) f.readText().also { f.delete() } else null } }.getOrNull()
-        if (java != null) return java
+        val saved = runCatching { file(c).let { f -> if (f.exists()) f.readText().also { f.delete() } else null } }.getOrNull()
+        if (saved != null) return saved
         if (android.os.Build.VERSION.SDK_INT < 30) return null
         return runCatching {
             val prefs = c.getSharedPreferences("crash_log", Context.MODE_PRIVATE)
