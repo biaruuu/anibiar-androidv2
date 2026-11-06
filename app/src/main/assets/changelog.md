@@ -189,3 +189,7 @@
 - New Community chat on every anime page and episode: Episode, Anime and All episodes tabs, replies, emoji reactions, live updates
 - The player now reads each server's available resolutions and starts on the one with the highest quality
 - Removed the Mizu (Ani.pm) server
+
+## 44 | Dark profile restyle | 2026-11-06
+- Profile redesigned: big bold name, @handle, Following / Followers / Friends counts, avatar on the right with your status as a speech bubble, pill buttons, deep dark background
+- Removed the Community comments feature

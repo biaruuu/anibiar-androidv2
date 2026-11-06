@@ -242,10 +242,6 @@ fun DetailsScreen(
                     }
                 }
 
-                item(key = "comments") {
-                    com.anibiar.app.ui.watch.CommentsSection(animeId = media.id, episode = null, modifier = Modifier.padding(horizontal = side, vertical = 8.dp))
-                }
-
                 val relations = media.relations?.edges.orEmpty().filter { it.node?.type == "ANIME" }
                 val showEdges = state.franchise?.map { it to "" }
                     ?: relations.filter { it.relationType == "PREQUEL" || it.relationType == "SEQUEL" }

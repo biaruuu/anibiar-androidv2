@@ -49,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -135,47 +137,55 @@ fun ProfileScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D))) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 90.dp),
         ) {
             item(key = "header") {
-                Box(Modifier.fillMaxWidth().height(150.dp + WindowInsets.statusBars.asPaddingValues().calculateTopPadding())) {
-                    Banner(profile?.bannerUrl, Modifier.fillMaxSize())
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0xFF121214)))))
-                }
-                Column(Modifier.padding(horizontal = 16.dp)) {
-                    // Instagram-style: avatar overlaps the banner, the counts sit to its right.
-                    Row(Modifier.fillMaxWidth().height(60.dp)) {
-                        Box(Modifier.offset(y = (-36).dp).requiredSize(88.dp)) {
-                            Avatar(profile?.avatarUrl, profile?.shownName, 88.dp, Modifier.requiredSize(88.dp).border(4.dp, Ani.Onyx, CircleShape))
-                            StatusDot(
-                                profile?.status, 30.dp, Ani.Onyx,
-                                Modifier.align(Alignment.BottomEnd).then(if (isMe) Modifier.clip(CircleShape).clickable { showStatus = true } else Modifier),
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Row(Modifier.weight(1f).padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
-                            Stat("Followers", followerIds.size) { open("followers") }
-                            Stat("Following", followingIds.size) { open("following") }
-                            Stat("Friends", friendIds.size) { open("friends") }
-                        }
+                Box(Modifier.fillMaxWidth()) {
+                    // Banner stays as a faint backdrop that fades into the dark page.
+                    Box(Modifier.fillMaxWidth().height(300.dp)) {
+                        Banner(profile?.bannerUrl, Modifier.fillMaxSize().graphicsLayer { alpha = 0.32f })
+                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xFF0B0B0D)))))
                     }
-                    Spacer(Modifier.height(2.dp))
-                    Text(profile?.shownName ?: "Loading…", style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    profile?.let { Text("@${it.username}", style = inter(13.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    profile?.let { p ->
-                        if (!p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            StatusChip(p, isMe) { showStatus = true }
+                    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                                Text(profile?.shownName ?: "Loading…", style = inter(30f, FontWeight.ExtraBold, lineHeight = 34f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                profile?.let { Text("@${it.username}", style = inter(15f, FontWeight.Medium), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)) }
+                                Spacer(Modifier.height(22.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                                    val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
+                                    BigStat("Following", followingIds.size) { open("following") }
+                                    BigStat("Followers", followerIds.size) { open("followers") }
+                                    BigStat("Friends", friendIds.size) { open("friends") }
+                                }
+                            }
+                            Box(Modifier.padding(top = 26.dp)) {
+                                Box(Modifier.requiredSize(104.dp)) {
+                                    Avatar(profile?.avatarUrl, profile?.shownName, 104.dp, Modifier.requiredSize(104.dp).border(2.dp, Color(0x33FFFFFF), CircleShape))
+                                    StatusDot(
+                                        profile?.status, 32.dp, Color(0xFF0B0B0D),
+                                        Modifier.align(Alignment.BottomEnd).then(if (isMe) Modifier.clip(CircleShape).clickable { showStatus = true } else Modifier),
+                                    )
+                                }
+                                // Custom status floats above the avatar like a speech bubble.
+                                profile?.let { p ->
+                                    val has = !p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()
+                                    if (has || isMe) Text(
+                                        listOfNotNull(p.statusEmoji?.takeIf { it.isNotBlank() }, p.statusText?.takeIf { it.isNotBlank() }).joinToString(" ").ifBlank { "Set a status" },
+                                        style = inter(13f, FontWeight.Medium), color = if (has) Ani.Soft else Ani.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.align(Alignment.TopCenter).offset(y = (-34).dp).widthIn(max = 130.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF26262B))
+                                            .then(if (isMe) Modifier.clickable { showStatus = true } else Modifier).padding(horizontal = 12.dp, vertical = 7.dp),
+                                    )
+                                }
+                            }
                         }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    val bio = profile?.bio.orEmpty()
-                    if (bio.isNotBlank()) Text(bio, style = inter(14f, lineHeight = 20f), color = Ani.Soft)
-                    Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(16.dp))
+                        val bio = profile?.bio.orEmpty()
+                        if (bio.isNotBlank()) Text(bio, style = inter(15f, lineHeight = 21f), color = Color.White)
+                        Spacer(Modifier.height(14.dp))
                     if (isMe) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ActionButton("Edit profile", Modifier.weight(1f)) { editing = true }
@@ -213,7 +223,8 @@ fun ProfileScreen(
                             ProfileButton("Decline request", false, Modifier.fillMaxWidth()) { scope.launch { runCatching { social.removeFriend(targetUid) } } }
                         }
                     }
-                    Spacer(Modifier.height(18.dp))
+                        Spacer(Modifier.height(18.dp))
+                    }
                 }
             }
             item(key = "fav-tabs") {
@@ -388,6 +399,14 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
 }
 
 @Composable
+private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
+    Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
+        Text("$count", style = inter(22f, FontWeight.Bold), color = Color.White)
+        Text(label, style = inter(14f), color = Ani.Muted)
+    }
+}
+
+@Composable
 private fun Stat(label: String, count: Int, onClick: () -> Unit) {
     Column(
         Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
@@ -401,7 +420,7 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(36.dp).clip(RoundedCornerShape(10.dp)).background(if (primary) Color.White else Ani.ButtonDark).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Color.White else Color(0xFF151517)).border(1.dp, if (primary) Color.White else Color(0x33FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
 }
@@ -409,7 +428,7 @@ private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, o
 @Composable
 private fun ActionButton(label: String, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(36.dp).clip(RoundedCornerShape(10.dp)).background(Ani.ButtonDark).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(Color(0xFF151517)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = Color.White) }
 }

@@ -72,13 +72,6 @@ data class UserProfile(
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
 }
 
-/** One comment. [episode] 0 means the anime's general discussion. */
-data class Comment(
-    val id: Long, val animeId: Int, val episode: Int, val userId: String, val body: String, val replyTo: Long?,
-    val createdAt: Long, val edited: Boolean, val author: UserProfile?, val reactions: Map<String, List<String>>,
-    val replyAuthor: String?, val replyBody: String?,
-)
-
 /** One inbox entry. [type] is follow, friend_request or friend_accepted. */
 data class Notice(val id: Long, val type: String, val actor: UserProfile?, val actorId: String, val read: Boolean, val createdAt: Long, val ref: String? = null)
 
@@ -710,64 +703,6 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Milliseconds to add to this phone's clock to get server time (best of a few round trips). */
-    // ---------------------------------------------------------------- comments (anime, episode, or every episode)
-
-    private val commentSelect = "id,anime_id,episode,user_id,body,reply_to,created_at,edited_at,author:profiles($cols),reactions:comment_reactions(emoji,user_id),parent:comments!comments_reply_to_fkey(id,body,author:profiles(username,display_name))"
-
-    private fun parseComment(o: JsonObject): Comment {
-        val reacts = LinkedHashMap<String, MutableList<String>>()
-        (o["reactions"] as? JsonArray)?.forEach { r ->
-            val ro = r.jsonObject
-            val e = ro["emoji"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-            val u = ro["user_id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
-            reacts.getOrPut(e) { mutableListOf() }.add(u)
-        }
-        val parent = o["parent"] as? JsonObject
-        val pAuthor = parent?.get("author") as? JsonObject
-        return Comment(
-            id = o["id"]!!.jsonPrimitive.content.toLong(),
-            animeId = o["anime_id"]!!.jsonPrimitive.content.toInt(),
-            episode = o["episode"]!!.jsonPrimitive.content.toInt(),
-            userId = o["user_id"]!!.jsonPrimitive.content,
-            body = o["body"]!!.jsonPrimitive.content,
-            replyTo = o["reply_to"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
-            createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
-            edited = o["edited_at"]?.jsonPrimitive?.contentOrNull != null,
-            author = (o["author"] as? JsonObject)?.let { runCatching { parseProfile(it) }.getOrNull() },
-            reactions = reacts,
-            replyAuthor = pAuthor?.let { it["display_name"]?.jsonPrimitive?.contentOrNull?.takeIf { n -> n.isNotBlank() } ?: it["username"]?.jsonPrimitive?.contentOrNull },
-            replyBody = parent?.get("body")?.jsonPrimitive?.contentOrNull,
-        )
-    }
-
-    /** Newest first. [episode] null = every episode of the anime; 0 = the anime's own discussion; n = that episode. */
-    suspend fun fetchComments(animeId: Int, episode: Int?, limit: Int): List<Comment> = net {
-        val ep = if (episode != null) "&episode=eq.$episode" else ""
-        getRows("/rest/v1/comments?anime_id=eq.$animeId$ep&select=${encode(commentSelect)}&order=id.desc&limit=$limit").map { parseComment(it.jsonObject) }
-    }
-
-    suspend fun postComment(animeId: Int, episode: Int, body: String, replyTo: Long?) = net {
-        val b = buildJsonObject { put("anime_id", animeId); put("episode", episode); put("body", body.trim()); if (replyTo != null) put("reply_to", replyTo) }
-        val (code, text) = raw("POST", "/rest/v1/comments", b.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
-        if (code !in 200..299) fail(code, text)
-    }
-
-    suspend fun deleteComment(id: Long) = net {
-        val (code, text) = raw("DELETE", "/rest/v1/comments?id=eq.$id")
-        if (code !in 200..299) fail(code, text)
-    }
-
-    suspend fun toggleReaction(commentId: Long, emoji: String, on: Boolean) = net {
-        val me = myId ?: return@net
-        if (on) {
-            val (code, text) = raw("POST", "/rest/v1/comment_reactions", buildJsonObject { put("comment_id", commentId); put("emoji", emoji) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
-            if (code !in 200..299 && code != 409) fail(code, text)
-        } else {
-            val (code, text) = raw("DELETE", "/rest/v1/comment_reactions?comment_id=eq.$commentId&user_id=eq.$me&emoji=eq.${encode(emoji)}")
-            if (code !in 200..299) fail(code, text)
-        }
-    }
-
     suspend fun clockOffset(): Long? {
         var best = Long.MAX_VALUE; var offset = 0L
         repeat(5) {
