@@ -83,6 +83,7 @@ import java.util.Locale
 fun ProfileScreen(
     uid: String?, onBack: (() -> Unit)?, onOpenUser: (String) -> Unit,
     onOpenInbox: (() -> Unit)? = null, onOpenSettings: (() -> Unit)? = null, onOpenAnime: (Int) -> Unit = {},
+    onMessage: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
@@ -111,6 +112,11 @@ fun ProfileScreen(
     var listTab by rememberSaveable(targetUid) { mutableStateOf<String?>(null) }
     var editing by rememberSaveable(targetUid) { mutableStateOf(false) }
     var showStatus by remember { mutableStateOf(false) }
+    var showSuggest by remember(targetUid) { mutableStateOf(false) }
+    var suggested by remember(targetUid) { mutableStateOf<List<UserProfile>>(emptyList()) }
+    androidx.compose.runtime.LaunchedEffect(showSuggest, targetUid) {
+        if (showSuggest) suggested = social.suggestions(setOf(targetUid), 14)
+    }
     val favs by remember(targetUid) { social.favorites(targetUid) }.collectAsStateWithLifecycle(emptyList())
     val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
     val favCols = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.let { if (it >= 900) 6 else if (it >= 600) 4 else 3 }
@@ -198,7 +204,35 @@ fun ProfileScreen(
                             ProfileButton(
                                 if (iFollow) "Following" else if (theyFollow) "Follow back" else "Follow", !iFollow, Modifier.weight(1f),
                             ) { scope.launch { toggle(social, targetUid, myFollowing) } }
-                            friendAction?.let { (label, act) -> ProfileButton(label, label == "Accept request" || label == "Add friend", Modifier.weight(1f), act) }
+                            ProfileButton("Message", false, Modifier.weight(1f)) {
+                                if (iFollow || theyFollow) onMessage(targetUid) else toast("Follow ${profile?.shownName ?: "them"} to send a message")
+                            }
+                            Box(
+                                Modifier.size(40.dp).clip(RoundedCornerShape(50)).background(if (showSuggest) Color.White else Color(0xFF151517))
+                                    .border(1.dp, if (showSuggest) Color.White else Color(0x33FFFFFF), RoundedCornerShape(50)).clickable { showSuggest = !showSuggest },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(AniIcons.ArrowBack, "Suggested accounts", tint = if (showSuggest) Color.Black else Color.White, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (showSuggest) 90f else -90f })
+                            }
+                        }
+                        friendAction?.let { (label, act) ->
+                            Spacer(Modifier.height(8.dp))
+                            ProfileButton(label, label == "Accept request" || label == "Add friend", Modifier.fillMaxWidth(), act)
+                        }
+                        if (showSuggest) {
+                            Spacer(Modifier.height(14.dp))
+                            Text("Suggested accounts", style = inter(14.5f, FontWeight.Bold), color = Color.White)
+                            Spacer(Modifier.height(10.dp))
+                            if (suggested.isEmpty()) Text("No suggestions right now", style = inter(13f), color = Ani.Muted)
+                            else androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                items(suggested, key = { it.uid }) { u ->
+                                    SuggestCard(u, onOpen = { onOpenUser(u.uid) }, onFollow = {
+                                        scope.launch { runCatching { social.follow(u.uid) }.onFailure { toast(it.message ?: "Couldn't follow") }; suggested = suggested.filter { x -> x.uid != u.uid } }
+                                    }, onDismiss = { suggested = suggested.filter { x -> x.uid != u.uid } })
+                                }
+                            }
                         }
                         if (targetUid in incoming) {
                             Spacer(Modifier.height(8.dp))
@@ -257,6 +291,7 @@ fun ProfileScreen(
                 myUid = me?.uid, myFollowing = myFollowing, myFollowers = myFollowers, myFriends = myFriends,
                 onBack = { listTab = null }, onOpenUser = { onOpenUser(it) },
                 onToggle = { scope.launch { toggle(social, it, myFollowing) } },
+                onMessage = { onMessage(it) },
             )
         }
         if (editing) EditProfileScreen(profile) { editing = false }
@@ -279,6 +314,9 @@ fun ProfileScreen(
                             ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
                         }
                     }
+                    if (!isMe && me != null) GlassButton({
+                        if (targetUid in myFollowing || targetUid in myFollowers) onMessage(targetUid) else toast("Follow ${profile?.shownName ?: "them"} to send a message")
+                    }) { Icon(AniIcons.Mail, "Message", tint = Color.White, modifier = Modifier.size(18.dp)) }
                     GlassButton({
                         val slug = profile?.linkSlug
                         if (slug.isNullOrBlank()) toast(if (isMe) "Set your profile link in Edit profile first" else "This profile has no share link")
@@ -414,6 +452,25 @@ private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, o
         modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Color.White else Color(0xFF151517)).border(1.dp, if (primary) Color.White else Color(0x33FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
+}
+
+@Composable
+private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit, onDismiss: () -> Unit) {
+    Box(Modifier.width(150.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onOpen)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Avatar(u.avatarUrl, u.shownName, 64.dp)
+            Spacer(Modifier.height(8.dp))
+            Text(u.shownName, style = inter(13.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("@${u.username}", style = inter(12f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Follow", style = inter(13f, FontWeight.Bold), color = Color(0xFF0B0B0D),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFB7A9FF)).clickable(onClick = onFollow).padding(vertical = 8.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+        Text("✕", style = inter(12f, FontWeight.Bold), color = Ani.Muted, modifier = Modifier.align(Alignment.TopEnd).clickable(onClick = onDismiss).padding(8.dp))
+    }
 }
 
 @Composable

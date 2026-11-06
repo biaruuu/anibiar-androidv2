@@ -61,6 +61,7 @@ internal fun FollowListScreen(
     onBack: () -> Unit,
     onOpenUser: (String) -> Unit,
     onToggle: (String) -> Unit,
+    onMessage: (String) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -71,36 +72,29 @@ internal fun FollowListScreen(
         if (q.isEmpty()) l else l.filter { it.username.contains(q, ignoreCase = true) }
     }
 
-    Column(Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                AniIcons.ArrowBack, "Back", tint = Color.White,
-                modifier = Modifier.padding(start = 8.dp).size(44.dp).clip(CircleShape).clickable(onClick = onBack).padding(10.dp),
-            )
-            Spacer(Modifier.size(8.dp))
-            Text(username, style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp)) {
+            Box(Modifier.align(Alignment.CenterStart)) {
+                com.anibiar.app.ui.theme.GlassButton(onClick = onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(19.dp).align(Alignment.Center)) }
+            }
+            Text("@$username", style = inter(17f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp))
         }
-        // Tabs: white underline under the selected one, hairline under the row.
         Row(Modifier.fillMaxWidth()) {
             tabs.forEach { (key, l) ->
                 val sel = key == tab
-                Column(
-                    Modifier.weight(1f).clickable { tab = key },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
+                Column(Modifier.weight(1f).clickable { tab = key }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "${l.size} $key", style = inter(14f, FontWeight.SemiBold),
-                        color = if (sel) Color.White else Ani.Muted, maxLines = 1, textAlign = TextAlign.Center,
+                        "${l.size} ${key.replaceFirstChar { it.uppercase() }}", style = inter(13.5f, FontWeight.SemiBold),
+                        color = if (sel) Color.White else Color(0xFF9B98A0), maxLines = 1, textAlign = TextAlign.Center,
                         modifier = Modifier.padding(vertical = 13.dp),
                     )
-                    Box(Modifier.fillMaxWidth().height(if (sel) 2.dp else 1.dp).background(if (sel) Color.White else Ani.Border))
+                    Box(Modifier.fillMaxWidth().height(if (sel) 2.dp else 1.dp).background(if (sel) Color.White else Color(0x1AFFFFFF)))
                 }
             }
         }
-        // Search
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth().height(40.dp)
-                .clip(RoundedCornerShape(10.dp)).background(Ani.Item).padding(horizontal = 12.dp),
+                .clip(RoundedCornerShape(50)).background(Color(0xFF151517)).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(AniIcons.Search, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
@@ -109,14 +103,15 @@ internal fun FollowListScreen(
                 if (query.isEmpty()) Text("Search", style = inter(15f), color = Ani.Muted)
                 BasicTextField(
                     query, { query = it }, singleLine = true,
-                    textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lavender),
+                    textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Color(0xFFB7A9FF)),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
         LazyColumn(
             Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp),
+            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (list.isEmpty()) item {
                 Text(
@@ -132,27 +127,39 @@ internal fun FollowListScreen(
             items(list, key = { "$tab-${it.uid}" }) { u ->
                 val iFollow = u.uid in myFollowing
                 val theyFollow = u.uid in myFollowers
+                val isMe = u.uid == myUid
                 Row(
-                    Modifier.fillMaxWidth().clickable { onOpenUser(u.uid) }.padding(horizontal = 16.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517)).clickable { onOpenUser(u.uid) }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(u.avatarUrl, u.username, 52.dp)
+                    Avatar(u.avatarUrl, u.shownName, 54.dp)
                     Spacer(Modifier.size(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(u.username, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val sub = when { u.uid in myFriends -> "Friends"; theyFollow -> "Follows you"; else -> null }
-                        if (sub != null) Text(sub, style = inter(13f), color = Ani.Muted, maxLines = 1)
+                        Text(u.shownName, style = inter(15f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("@${u.username}", style = inter(12.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val sub = when { u.uid in myFriends -> "Friends"; theyFollow && !isMe -> "Follows you"; else -> null }
+                        if (sub != null) Text(
+                            sub, style = inter(11f, FontWeight.SemiBold), color = Color(0xFFB7A9FF),
+                            modifier = Modifier.padding(top = 5.dp).clip(RoundedCornerShape(50)).background(Color(0x26B7A9FF)).padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
                     }
-                    if (myUid != null && u.uid != myUid) {
+                    if (myUid != null && !isMe) {
                         Spacer(Modifier.size(8.dp))
                         val label = when { iFollow -> "Following"; theyFollow -> "Follow back"; else -> "Follow" }
                         Box(
-                            Modifier.widthIn(min = 104.dp).height(34.dp).clip(RoundedCornerShape(10.dp))
-                                .background(if (iFollow) Ani.ButtonDark else Color.White)
+                            Modifier.widthIn(min = 92.dp).height(34.dp).clip(RoundedCornerShape(50))
+                                .background(if (iFollow) Color(0xFF232326) else Color(0xFFB7A9FF))
                                 .clickable { onToggle(u.uid) }.padding(horizontal = 14.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(label, style = inter(13.5f, FontWeight.SemiBold), color = if (iFollow) Color.White else Color.Black, maxLines = 1)
+                            Text(label, style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Color(0xFF0B0B0D), maxLines = 1)
+                        }
+                        if (iFollow || theyFollow) {
+                            Spacer(Modifier.size(6.dp))
+                            Box(
+                                Modifier.size(34.dp).clip(CircleShape).background(Color(0xFF232326)).clickable { onMessage(u.uid) },
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(AniIcons.Mail, "Message", tint = Color.White, modifier = Modifier.size(17.dp)) }
                         }
                     }
                 }

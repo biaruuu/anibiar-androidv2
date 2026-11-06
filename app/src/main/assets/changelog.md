@@ -207,3 +207,11 @@
 ## 47 | Flat gray tab bar, clean avatar | 2026-11-07
 - Bottom bar is now a flat gray bar with plain icons and labels (no round buttons), easy to see on dark
 - Profile avatar has no white ring and loads at full resolution so it is sharper; banner is brighter and only fades to black near the bottom
+
+## 48 | Inbox, messages and streaks | 2026-11-07
+- New Inbox tab in the bottom bar with an unread badge: Activity entry on top, then your chats
+- Message people you follow (or who follow you) from their profile, a follower list or the Inbox; seen/sent marks and live updates
+- Streak: message each other every day and a pulsing flame with the day count appears on the chat
+- Suggested accounts strip on other profiles (arrow button) and in the Inbox
+- Followers / Following / Friends lists restyled as dark name cards with glass back button
+- Other profiles now use the same page colour and icon buttons as your own

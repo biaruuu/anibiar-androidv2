@@ -120,6 +120,8 @@ private fun AppNavigation() {
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var inboxOpen by rememberSaveable { mutableStateOf(false) }
+    var inboxTab by rememberSaveable { mutableStateOf(false) }
+    var chatUid by rememberSaveable { mutableStateOf<String?>(null) }
     var searchMode by rememberSaveable { mutableStateOf("anime") }
     val userStack = rememberSaveable(
         saver = androidx.compose.runtime.saveable.listSaver<SnapshotStateList<String>, String>(
@@ -140,6 +142,7 @@ private fun AppNavigation() {
     androidx.compose.runtime.LaunchedEffect(pendingUser) {
         pendingUser?.let { searchOpen = false; settingsOpen = false; userStack.add(it); social.consumePendingUser() }
     }
+    BackHandler(enabled = inboxTab && chatUid == null && userStack.isEmpty() && !inboxOpen) { inboxTab = false }
     BackHandler(enabled = settingsOpen) { settingsOpen = false }
     BackHandler(enabled = profileOpen) { profileOpen = false }
     BackHandler(enabled = inboxOpen) { inboxOpen = false }
@@ -211,7 +214,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -225,6 +228,15 @@ private fun AppNavigation() {
             }
         }
 
+        if (inboxTab && authState != null) {
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                com.anibiar.app.ui.inbox.InboxTab(
+                    onOpenActivity = { inboxOpen = true },
+                    onOpenChat = { chatUid = it },
+                    onOpenUser = { userStack.add(it) },
+                )
+            }
+        }
         if (settingsOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                 com.anibiar.app.ui.settings.SettingsScreen(
@@ -258,11 +270,23 @@ private fun AppNavigation() {
 
         userStack.lastOrNull()?.let { uid ->
             androidx.compose.runtime.key(userStack.size, uid) {
-                Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0B0B0D))) {
                     com.anibiar.app.ui.profile.ProfileScreen(
                         uid = uid,
                         onBack = { if (userStack.isNotEmpty()) userStack.removeAt(userStack.lastIndex) },
                         onOpenUser = { userStack.add(it) }, onOpenAnime = { stack.add(it) },
+                        onMessage = { chatUid = it },
+                    )
+                }
+            }
+        }
+
+        chatUid?.let { cu ->
+            androidx.compose.runtime.key(cu) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0B0B0D))) {
+                    com.anibiar.app.ui.inbox.ChatScreen(
+                        uid = cu, onBack = { chatUid = null },
+                        onOpenUser = { chatUid = null; userStack.add(it) },
                     )
                 }
             }
@@ -348,6 +372,8 @@ private fun AppNavigation() {
             }
         }
 
+        val dmUnread by social.dmUnread.collectAsStateWithLifecycle()
+        val noticeUnread by social.unread.collectAsStateWithLifecycle()
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
             visible = stack.isEmpty() && !inboxOpen && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
@@ -360,15 +386,22 @@ private fun AppNavigation() {
                 selected = when {
                     profileOpen -> com.anibiar.app.ui.nav.NavTab.Profile
                     settingsOpen -> com.anibiar.app.ui.nav.NavTab.Settings
+                    inboxTab -> com.anibiar.app.ui.nav.NavTab.Inbox
                     searchOpen -> com.anibiar.app.ui.nav.NavTab.Search
                     else -> com.anibiar.app.ui.nav.NavTab.Home
                 },
                 onSelect = { tab ->
-                    if (tab == com.anibiar.app.ui.nav.NavTab.Home) { searchOpen = false; profileOpen = false; settingsOpen = false; inboxOpen = false; userStack.clear() }
-                    else if (tab == com.anibiar.app.ui.nav.NavTab.Search) { profileOpen = false; settingsOpen = false; inboxOpen = false; userStack.clear(); searchOpen = true }
-                    else if (tab == com.anibiar.app.ui.nav.NavTab.Profile) { searchOpen = false; settingsOpen = false; userStack.clear(); profileOpen = true }
-                    else { searchOpen = false; profileOpen = false; inboxOpen = false; userStack.clear(); settingsOpen = true }
+                    inboxOpen = false; chatUid = null; userStack.clear()
+                    searchOpen = false; profileOpen = false; settingsOpen = false; inboxTab = false
+                    when (tab) {
+                        com.anibiar.app.ui.nav.NavTab.Home -> {}
+                        com.anibiar.app.ui.nav.NavTab.Search -> searchOpen = true
+                        com.anibiar.app.ui.nav.NavTab.Inbox -> if (authState != null) inboxTab = true else profileOpen = true
+                        com.anibiar.app.ui.nav.NavTab.Profile -> profileOpen = true
+                        com.anibiar.app.ui.nav.NavTab.Settings -> settingsOpen = true
+                    }
                 },
+                inboxBadge = dmUnread + noticeUnread,
                 modifier = Modifier,
             )
         }

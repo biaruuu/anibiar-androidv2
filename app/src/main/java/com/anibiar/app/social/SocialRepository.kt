@@ -46,6 +46,9 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
+data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean)
+
 data class UserProfile(
     val uid: String,
     val username: String,
@@ -120,6 +123,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     private val _pendingUser = MutableStateFlow<String?>(null)
     val pendingUser: StateFlow<String?> = _pendingUser.asStateFlow()
     fun consumePendingUser() { _pendingUser.value = null }
+    private val _dmUnread = MutableStateFlow(0)
+    /** Unread direct messages across all chats, for the Inbox tab badge. */
+    val dmUnread: StateFlow<Int> = _dmUnread.asStateFlow()
     private val tick = MutableStateFlow(0)
 
     /** Bumped when a confirmation link signs the user in, so the UI can jump to the profile. */
@@ -166,7 +172,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 val me = session?.uid
                 if (me == null) {
                     _myFollowing.value = emptySet(); _myFollowers.value = emptySet()
-                    _myFriends.value = emptySet(); _incoming.value = emptySet(); _outgoing.value = emptySet(); _unread.value = 0; _myFavs.value = emptySet()
+                    _myFriends.value = emptySet(); _incoming.value = emptySet(); _outgoing.value = emptySet(); _unread.value = 0; _myFavs.value = emptySet(); _dmUnread.value = 0
                 } else {
                     runCatching {
                         _myFollowing.value = fetchIds(me, "following")
@@ -185,6 +191,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                     }
                     runCatching { _myFavs.value = getRows("/rest/v1/favorites?user_id=eq.$me&select=anime_id").map { it.jsonObject["anime_id"]!!.jsonPrimitive.content.toInt() }.toSet() }
                     runCatching { _unread.value = getRows("/rest/v1/notifications?user_id=eq.$me&read=eq.false&select=id").size }
+                    runCatching { _dmUnread.value = getRows("/rest/v1/dm_messages?recipient_id=eq.$me&read_at=is.null&select=id").size }
                 }
             }
         }
@@ -430,6 +437,97 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val q = prefix.trim().filter { it.isLetterOrDigit() || it == '_' || it == '.' }.replace("_", "\\_")
         if (q.isEmpty()) return@net emptyList()
         getRows("/rest/v1/profiles?username=ilike.${encode("$q*")}&select=${encode(cardCols)}&order=username.asc&limit=25").map { parseProfile(it.jsonObject) }
+    }
+
+    // ---------------------------------------------------------------- direct messages
+
+    private fun isoMs(s: String?): Long = runCatching { java.time.OffsetDateTime.parse(s).toInstant().toEpochMilli() }.getOrDefault(0L)
+
+    private suspend fun fetchConversations(): List<DmConversation> {
+        val (code, text) = raw("POST", "/rest/v1/rpc/dm_conversations", "{}".toByteArray())
+        if (code !in 200..299) fail(code, text)
+        val me = session?.uid
+        return json.parseToJsonElement(text).jsonArray.map {
+            val o = it.jsonObject
+            DmConversation(
+                otherId = o["other_id"]!!.jsonPrimitive.content,
+                lastBody = o["last_body"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                lastAt = isoMs(o["last_at"]?.jsonPrimitive?.contentOrNull),
+                lastMine = o["last_sender"]?.jsonPrimitive?.contentOrNull == me,
+                unread = o["unread"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0,
+                streak = o["streak"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0,
+            )
+        }
+    }
+
+    /** My chats, newest first, refreshed every few seconds. */
+    fun conversations(): Flow<List<DmConversation>> = live { fetchConversations() }
+
+    private suspend fun fetchMessages(other: String): List<DmMessage> {
+        val me = session?.uid ?: return emptyList()
+        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at&order=id.desc&limit=200"
+        return getRows(q).map {
+            val o = it.jsonObject
+            DmMessage(
+                id = o["id"]!!.jsonPrimitive.content.toLong(),
+                mine = o["sender_id"]!!.jsonPrimitive.content == me,
+                body = o["body"]!!.jsonPrimitive.content,
+                at = isoMs(o["created_at"]?.jsonPrimitive?.contentOrNull),
+                read = o["read_at"]?.jsonPrimitive?.contentOrNull != null,
+            )
+        }.reversed()
+    }
+
+    private val chatTick = MutableStateFlow(0)
+
+    /** Messages with one person, oldest first; polls every ~2.5 s while collected. */
+    fun messages(other: String): Flow<List<DmMessage>> =
+        chatTick.flatMapLatest {
+            flow {
+                while (true) {
+                    try { emit(fetchMessages(other)) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                    delay(2500)
+                }
+            }
+        }.distinctUntilChanged()
+
+    suspend fun sendMessage(to: String, body: String) = net {
+        val text = body.trim()
+        if (text.isEmpty()) return@net
+        val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
+        val (code, resp) = raw(
+            "POST", "/rest/v1/dm_messages",
+            buildJsonObject { put("sender_id", me); put("recipient_id", to); put("body", text) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal"),
+        )
+        if (code !in 200..299) {
+            val msg = runCatching { json.parseToJsonElement(resp).jsonObject["message"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+            throw IllegalStateException(msg?.takeIf { it.isNotBlank() } ?: "Couldn't send ($code)")
+        }
+        chatTick.value++; refreshSoon()
+    }
+
+    suspend fun markChatRead(other: String) {
+        val me = session?.uid ?: return
+        runCatching {
+            raw(
+                "PATCH", "/rest/v1/dm_messages?recipient_id=eq.$me&sender_id=eq.$other&read_at=is.null",
+                buildJsonObject { put("read_at", java.time.Instant.now().toString()) }.toString().toByteArray(),
+                extra = mapOf("Prefer" to "return=minimal"),
+            )
+            _dmUnread.value = 0; refreshSoon()
+        }
+    }
+
+    /** People I don't follow yet, for the "Suggested accounts" strips. Friends-of-friends first, then newest. */
+    suspend fun suggestions(exclude: Set<String> = emptySet(), limit: Int = 12): List<UserProfile> {
+        val me = session?.uid ?: return emptyList()
+        return try {
+            val skip = (exclude + _myFollowing.value + me)
+            val rows = getRows("/rest/v1/profiles?select=${encode(cardCols)}&order=created_at.desc&limit=60").map { parseProfile(it.jsonObject) }
+            val mine = _myFollowers.value
+            rows.filter { it.uid !in skip }.sortedByDescending { if (it.uid in mine) 1 else 0 }.take(limit)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { emptyList() }
     }
 
     // ---------------------------------------------------------------- writes
