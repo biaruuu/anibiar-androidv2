@@ -203,3 +203,7 @@
 - Profile: sharper banner, smaller top buttons, no back arrow on your own profile
 - Bottom tab bar now uses the same glass buttons as the profile top bar
 - Edit profile and Settings restyled to match (dark page, glass buttons, rounded dark cards); the tab bar hides on Edit profile and follower lists
+
+## 47 | Flat gray tab bar, clean avatar | 2026-11-07
+- Bottom bar is now a flat gray bar with plain icons and labels (no round buttons), easy to see on dark
+- Profile avatar has no white ring and loads at full resolution so it is sharper; banner is brighter and only fades to black near the bottom

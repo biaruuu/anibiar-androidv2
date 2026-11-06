@@ -153,10 +153,10 @@ fun ProfileScreen(
                 // Banner fills the top; name, handle and counts sit on it, avatar on the right.
                 Box(Modifier.fillMaxWidth().height(topInset + 232.dp)) {
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x40000000), Color.Transparent, Color(0x73000000), Color(0xFF0B0B0D)))))
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                            Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 6f)), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             profile?.let { Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp)) }
                             Spacer(Modifier.height(14.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -166,9 +166,9 @@ fun ProfileScreen(
                                 BigStat("Friends", friendIds.size) { open("friends") }
                             }
                         }
-                        Box(Modifier.requiredSize(92.dp)) {
-                            Avatar(profile?.avatarUrl, profile?.shownName, 92.dp, Modifier.requiredSize(92.dp).border(2.5.dp, Color.White, CircleShape))
-                            StatusDot(profile?.status, 28.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
+                        Box(Modifier.requiredSize(96.dp)) {
+                            Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp))
+                            StatusDot(profile?.status, 24.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
                         }
                     }
                 }
@@ -365,7 +365,11 @@ private fun Banner(url: String?, modifier: Modifier) {
 fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(CircleShape).background(Ani.Item), contentAlignment = Alignment.Center) {
         if (url != null) {
-            AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            AsyncImage(
+                model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).size(coil.size.Size.ORIGINAL).crossfade(true).build(),
+                contentDescription = null, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             Text((name?.firstOrNull() ?: '?').uppercase(), style = inter((size.value * 0.42f), FontWeight.Bold), color = Ani.Lavender)
         }
