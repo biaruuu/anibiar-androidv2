@@ -32,21 +32,43 @@ object Streaming {
         Http.plain.newBuilder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(75, TimeUnit.SECONDS).build()
     }
 
-    fun abs(path: String) = if (path.startsWith("http")) path else BASE + path
+    /** The same web app, deployed a second time. Used automatically when the main server is out of quota (HTTP 402), rate limited or down. */
+    private const val BACKUP = "https://anibiar-beta.vercel.app"
+    @Volatile private var failoverHost: String? = null
+    @Volatile private var failoverUntil = 0L
+    private fun host(): String = failoverHost?.takeIf { System.currentTimeMillis() < failoverUntil } ?: BASE
+
+    fun abs(path: String) = if (path.startsWith("http")) path else host() + path
 
     private class Cached<T>(val at: Long, val v: T)
     private val epsCache = java.util.concurrent.ConcurrentHashMap<Int, Cached<EpisodesPayload>>()
     private val watchCache = java.util.concurrent.ConcurrentHashMap<String, Cached<WatchPayload>>()
 
-    private suspend fun get(path: String): String = withContext(Dispatchers.IO) {
-        val request = Request.Builder().url(BASE + path).header("Accept", "application/json").build()
+    private class ServerError(val code: Int, msg: String) : IOException(msg)
+
+    private suspend fun getFrom(base: String, path: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(base + path).header("Accept", "application/json").build()
         client.newCall(request).execute().use { r ->
             val text = r.body?.string().orEmpty()
             if (!r.isSuccessful) {
                 val msg = runCatching { json.decodeFromString<ErrorBody>(text).error }.getOrNull()
-                throw IOException(msg ?: "Streaming server error (HTTP ${r.code}).")
+                throw ServerError(r.code, msg ?: "Streaming server error (HTTP ${r.code}).")
             }
             text
+        }
+    }
+
+    /** Asks the current server; if it is out of quota (402), rate limited (429), erroring (5xx) or unreachable, switches to the backup for 10 minutes. */
+    private suspend fun get(path: String): String {
+        val first = host()
+        return try { getFrom(first, path) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: IOException) {
+            val code = (e as? ServerError)?.code
+            if (code != null && code in 400..499 && code != 402 && code != 429) throw e
+            val other = if (first == BASE) BACKUP else BASE
+            val r = try { getFrom(other, path) } catch (e2: kotlinx.coroutines.CancellationException) { throw e2 } catch (_: IOException) { throw e }
+            failoverHost = other; failoverUntil = System.currentTimeMillis() + 600_000
+            tokens.clear(); epsCache.clear(); watchCache.clear()
+            r
         }
     }
 

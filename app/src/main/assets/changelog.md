@@ -1,3 +1,6 @@
+## 30 | Backup server for "HTTP 402" | 2026-11-06
+- When the main streaming server says it is out of quota (HTTP 402), rate limited or down, the app switches to the backup server by itself for 10 minutes
+
 ## 29 | Fix guest captions not turning back on | 2026-11-06
 - When the host turned captions off and on again, guests stayed off; they now follow the host both ways
 
