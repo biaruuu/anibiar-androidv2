@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -35,7 +36,9 @@ object LocalSources {
     const val TSUKI = "tsuki"    // HLS with soft subtitles
     const val DUNYA = "sakura"   // MAL-id based, HLS with soft subtitles
     const val GG = "momiji"      // sub + dub, MP4/HLS
-    val aliases = listOf(KAZE, TSUKI, DUNYA, GG)
+    const val HOSHI = "hoshi"    // JSON API, HLS
+    const val YUKI = "yuki"      // sub + dub, vidmoly / nova players
+    val aliases = listOf(KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI)
 
     private const val KAZE_API = "https://animetsu.live/v2/api/anime"
     private const val KAZE_PROXY = "https://swiftstream.top/proxy"
@@ -47,7 +50,7 @@ object LocalSources {
     private const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val http by lazy { Http.plain.newBuilder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(25, TimeUnit.SECONDS).build() }
+    private val http by lazy { Http.plain.newBuilder().connectTimeout(6, TimeUnit.SECONDS).readTimeout(12, TimeUnit.SECONDS).build() }
 
     /** Streams from these providers need a Referer; the player looks it up here by URL. */
     val referers = ConcurrentHashMap<String, String>()
@@ -84,8 +87,13 @@ object LocalSources {
     class Meta(val idMal: Int?, val titles: List<String>, val episodes: Int?, val format: String?)
     private val metaCache = ConcurrentHashMap<Int, Meta>()
 
+    private val metaLock = kotlinx.coroutines.sync.Mutex()
     private suspend fun meta(id: Int): Meta {
         metaCache[id]?.let { return it }
+        return metaLock.withLock { metaCache[id] ?: fetchMeta(id) }
+    }
+
+    private suspend fun fetchMeta(id: Int): Meta {
         val body = buildJsonObject {
             put("query", "query(\$id:Int){Media(id:\$id,type:ANIME){idMal title{english romaji} synonyms episodes format}}")
             put("variables", buildJsonObject { put("id", id) })
@@ -357,21 +365,202 @@ object LocalSources {
         return listOf(StreamSource("$TSUKI-0", "Tsuki", if (tracks.isEmpty()) "hard" else "soft", "hls", src, tracks))
     }
 
+    // ---------------------------------------------------------------- Hoshi (kickassanime: JSON API, HLS, sub)
+    private const val KAA_BASE = "https://kaa.lt"
+    private const val KAA_HLS = "https://hls.krussdomi.com/manifest"
+    private class KaaEp(val number: Int, val full: String, val title: String)
+    private class KaaSeries(val slug: String, val eps: List<KaaEp>)
+    private val kaaCache = ConcurrentHashMap<Int, KaaSeries>()
+
+    private suspend fun kaaGet(path: String, body: String? = null): String = withContext(Dispatchers.IO) {
+        val b = Request.Builder().url(KAA_BASE + path).header("User-Agent", UA).header("Accept", "application/json")
+        if (body != null) b.post(body.toRequestBody("application/json".toMediaType()))
+        http.newCall(b.build()).execute().use { r -> if (!r.isSuccessful) throw IOException("HTTP ${r.code}"); r.body?.string().orEmpty() }
+    }
+
+    private suspend fun kaaSeries(id: Int): KaaSeries {
+        kaaCache[id]?.let { return it }
+        val m = meta(id)
+        val queries = LinkedHashSet<String>()
+        for (t in m.titles.take(3)) {
+            if (t.any { it.code >= 0x2E80 }) continue
+            val words = t.replace(Regex("[^\\w\\s]"), " ").split(Regex("\\s+")).filter { it.isNotEmpty() }
+            if (words.isEmpty()) continue
+            if (words.size <= 3) queries += words.joinToString(" ") else { queries += words.take(2).joinToString(" "); queries += words.take(3).joinToString(" ") }
+        }
+        val found = LinkedHashMap<String, JsonObject>()
+        coroutineScope {
+            queries.take(6).map { q -> async { runCatching { json.parseToJsonElement(kaaGet("/api/fsearch", buildJsonObject { put("page", 1); put("query", q) }.toString())).jsonObject["result"]?.jsonArray }.getOrNull() } }.awaitAll()
+        }.filterNotNull().forEach { arr -> arr.forEach { r -> (r as? JsonObject)?.let { o -> o["slug"]?.jsonPrimitive?.contentOrNull?.let { found.putIfAbsent(it, o) } } } }
+        val af = m.format.orEmpty().uppercase()
+        val scored = found.values.map { c ->
+            val te = c["title_en"]?.jsonPrimitive?.contentOrNull.orEmpty(); val tj = c["title"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            var score = m.titles.maxOfOrNull { t -> maxOf(dice(t, te), dice(t, tj)) } ?: 0.0
+            val type = c["type"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
+            if (af == "MOVIE" && type != "movie") score *= 0.25 else if (af != "MOVIE" && type == "movie") score *= 0.25
+            c["slug"]!!.jsonPrimitive.content to score
+        }.filter { it.second >= 0.65 }.sortedByDescending { it.second }
+        val slug = scored.firstOrNull()?.first ?: error("no match")
+        val info = json.parseToJsonElement(kaaGet("/api/show/$slug")).jsonObject
+        val eps: List<KaaEp> = if (info["type"]?.jsonPrimitive?.contentOrNull == "movie") {
+            Regex("/(ep-(\\d+)-([a-f0-9]+))$", RegexOption.IGNORE_CASE).find(info["watch_uri"]?.jsonPrimitive?.contentOrNull.orEmpty())?.let { listOf(KaaEp(1, it.groupValues[1], "")) }.orEmpty()
+        } else {
+            fun page(root: JsonObject) = (root["result"] as? JsonArray).orEmpty().mapNotNull { e ->
+                val o = e as? JsonObject ?: return@mapNotNull null
+                val n = o["episode_number"]?.jsonPrimitive?.intOrNull ?: o["episode_number"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt() ?: return@mapNotNull null
+                val s = o["slug"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                KaaEp(n, "ep-$n-$s", o["title"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            }
+            val first = json.parseToJsonElement(kaaGet("/api/show/$slug/episodes?ep=1&lang=ja-JP")).jsonObject
+            val rest = coroutineScope {
+                (first["pages"] as? JsonArray).orEmpty().drop(1).map { pg ->
+                    async {
+                        val start = ((pg as? JsonObject)?.get("eps") as? JsonArray)?.firstOrNull()?.jsonPrimitive?.contentOrNull ?: return@async emptyList<KaaEp>()
+                        runCatching { page(json.parseToJsonElement(kaaGet("/api/show/$slug/episodes?ep=$start&lang=ja-JP")).jsonObject) }.getOrDefault(emptyList())
+                    }
+                }.awaitAll().flatten()
+            }
+            page(first) + rest
+        }
+        if (eps.isEmpty()) error("no episodes")
+        return KaaSeries(slug, eps.distinctBy { it.number }.sortedBy { it.number }).also { kaaCache[id] = it }
+    }
+
+    private suspend fun kaaEpisodes(id: Int): Local =
+        Local(kaaSeries(id).eps.map { WatchEpisode(it.number, it.title, providers = listOf(HOSHI)) }, emptyList())
+
+    private suspend fun kaaWatch(id: Int, ep: Int): List<StreamSource> {
+        val s = kaaSeries(id)
+        val e = s.eps.firstOrNull { it.number == ep } ?: error("episode not found")
+        val servers = (json.parseToJsonElement(kaaGet("/api/show/${s.slug}/episode/${e.full}")).jsonObject["servers"] as? JsonArray).orEmpty()
+        val out = mutableListOf<StreamSource>()
+        for (sv in servers) {
+            val o = sv as? JsonObject ?: continue
+            val vid = Regex("[?&]id=([^&]+)").find(o["src"]?.jsonPrimitive?.contentOrNull.orEmpty())?.groupValues?.get(1) ?: continue
+            val url = "$KAA_HLS/$vid/master.m3u8"
+            referers[url] = "https://krussdomi.com/"
+            out += StreamSource("$HOSHI-${out.size}", "Hoshi" + if (servers.size > 1) " ${out.size + 1}" else "", "hard", "hls", url)
+        }
+        return out
+    }
+
+    // ---------------------------------------------------------------- Yuki (animenosub: sub + dub, vidmoly / nova players)
+    private const val NS_BASE = "https://animenosub.to"
+    private class NsEp(val number: Int, val url: String)
+    private class NsSeries(val sub: List<NsEp>, val dub: List<NsEp>)
+    private val nsCache = ConcurrentHashMap<Int, NsSeries>()
+
+    private suspend fun nsSearch(q: String): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        val body = FormBody.Builder().add("action", "ts_ac_do_search").add("ts_ac_query", q).build()
+        val txt = http.newCall(Request.Builder().url("$NS_BASE/wp-admin/admin-ajax.php").post(body).header("User-Agent", UA).header("X-Requested-With", "XMLHttpRequest").header("Origin", NS_BASE).header("Referer", "$NS_BASE/").build())
+            .execute().use { r -> if (!r.isSuccessful) throw IOException("HTTP ${r.code}"); r.body?.string().orEmpty() }
+        val all = json.parseToJsonElement(txt).jsonObject["anime"]?.jsonArray?.firstOrNull()?.jsonObject?.get("all")?.jsonArray.orEmpty()
+        all.mapNotNull { it as? JsonObject }.mapNotNull { o ->
+            val slug = Regex("/anime/([^/]+)/?$").find(o["post_link"]?.jsonPrimitive?.contentOrNull.orEmpty())?.groupValues?.get(1) ?: return@mapNotNull null
+            slug to (o["post_title"]?.jsonPrimitive?.contentOrNull ?: slug.replace("-", " "))
+        }
+    }
+
+    private suspend fun nsEpisodesOf(slug: String): List<NsEp> {
+        val h = html("$NS_BASE/anime/$slug/", NS_BASE)
+        val seen = HashSet<Int>()
+        return Regex("<li\\b[^>]*data-index=\"\\d+\"[^>]*>[\\s\\S]*?<a\\s+href=\"(https?://animenosub\\.to/[^\"]+)\"[\\s\\S]*?<div\\s+class=\"epl-num\">([^<]+)</div>", RegexOption.IGNORE_CASE).findAll(h).mapNotNull { m ->
+            val label = m.groupValues[2].trim()
+            val n = if (label.equals("movie", true)) 1 else label.toDoubleOrNull()?.takeIf { it >= 1 }?.let { Math.round(it).toInt() }
+            if (n == null || !seen.add(n)) null else NsEp(n, decodeEntities(m.groupValues[1]))
+        }.sortedBy { it.number }.toList()
+    }
+
+    private suspend fun nsSeries(id: Int): NsSeries {
+        nsCache[id]?.let { return it }
+        val m = meta(id)
+        val found = LinkedHashMap<String, String>()
+        for (t in m.titles.take(2)) runCatching { nsSearch(t) }.getOrNull()?.forEach { (s, txt) -> found.putIfAbsent(s, txt) }
+        fun isDub(slug: String) = Regex("(^|[-\\s])dub($|[-\\s])", RegexOption.IGNORE_CASE).containsMatchIn(slug)
+        fun score(e: Map.Entry<String, String>) = m.titles.maxOfOrNull { dice(it, e.value.replace(Regex("\\(?dub\\)?", RegexOption.IGNORE_CASE), "")) } ?: 0.0
+        val cands = found.entries.map { it to score(it) }.filter { it.second >= 0.7 }.sortedByDescending { it.second }
+        val subSlug = cands.firstOrNull { !isDub(it.first.key) }?.first?.key
+        val dubSlug = cands.firstOrNull { isDub(it.first.key) }?.first?.key
+        val (sub, dub) = coroutineScope {
+            val a = async { subSlug?.let { runCatching { nsEpisodesOf(it) }.getOrNull() }.orEmpty() }
+            val b = async { dubSlug?.let { runCatching { nsEpisodesOf(it) }.getOrNull() }.orEmpty() }
+            a.await() to b.await()
+        }
+        if (sub.isEmpty() && dub.isEmpty()) error("no match")
+        return NsSeries(sub, dub).also { nsCache[id] = it }
+    }
+
+    private suspend fun nsEpisodes(id: Int): Local {
+        val s = nsSeries(id)
+        fun map(l: List<NsEp>) = l.map { WatchEpisode(it.number, "", providers = listOf(YUKI)) }
+        return Local(map(s.sub), map(s.dub))
+    }
+
+    private suspend fun nsWatch(id: Int, audio: String, ep: Int): List<StreamSource> {
+        val s = nsSeries(id)
+        val e = (if (audio == "dub") s.dub else s.sub).firstOrNull { it.number == ep } ?: error("episode not found")
+        val h = html(e.url, "$NS_BASE/")
+        val embeds = Regex("<option\\s+value=\"([A-Za-z0-9+/=]+)\"\\s+data-index=\"\\d+\"[^>]*>([^<]+)</option>", RegexOption.IGNORE_CASE).findAll(h).mapNotNull { m ->
+            val name = m.groupValues[2].trim()
+            if (name.isEmpty() || name.contains("select video server", true)) return@mapNotNull null
+            val src = runCatching { String(android.util.Base64.decode(m.groupValues[1], android.util.Base64.DEFAULT)) }.getOrNull()
+                ?.let { Regex("src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) } ?: return@mapNotNull null
+            name to (if (src.startsWith("//")) "https:$src" else src)
+        }.toList()
+        val resolved = coroutineScope { embeds.map { (name, url) -> async { kotlinx.coroutines.withTimeoutOrNull(10_000) { runCatching { resolveEmbed(url) }.getOrNull() }?.let { name to it } } }.awaitAll() }.filterNotNull()
+        val out = mutableListOf<StreamSource>()
+        for ((_, r) in resolved) {
+            referers[r.first] = r.second
+            out += StreamSource("$YUKI-${out.size}", "Yuki" + if (resolved.size > 1) " ${out.size + 1}" else "", "hard", "hls", r.first)
+        }
+        return out
+    }
+
+    /** Turns a player page into a direct playlist URL plus the Referer it needs. Only players that work over plain HTTP are supported. */
+    private suspend fun resolveEmbed(url: String): Pair<String, String> {
+        if (Regex("vidmoly\\.(net|biz|to)", RegexOption.IGNORE_CASE).containsMatchIn(url)) {
+            val h = html(url, "$NS_BASE/")
+            val m3u8 = Regex("sources:\\s*\\[\\s*\\{\\s*file:\\s*['\"]([^'\"]+\\.m3u8[^'\"]*)['\"]").find(h)?.groupValues?.get(1) ?: error("no playlist")
+            return m3u8 to "https://vidmoly.biz/"
+        }
+        if (url.contains("upn.one", true)) {
+            val vid = Regex("upn\\.one/#([A-Za-z0-9]+)", RegexOption.IGNORE_CASE).find(url)?.groupValues?.get(1) ?: error("no id")
+            val hex = withContext(Dispatchers.IO) {
+                http.newCall(Request.Builder().url("https://nova.upn.one/api/v1/video?id=$vid&w=1920&h=1080&r=").header("User-Agent", UA).header("Referer", "https://nova.upn.one/").build())
+                    .execute().use { r -> if (!r.isSuccessful) throw IOException("HTTP ${r.code}"); r.body?.string().orEmpty().trim() }
+            }
+            fun unhex(s: String) = ByteArray(s.length / 2) { i -> s.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+            val cipher = javax.crypto.Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, javax.crypto.spec.SecretKeySpec(unhex("6b69656d7469656e6d75613931316361"), "AES"), javax.crypto.spec.IvParameterSpec(unhex("313233343536373839306f6975797472")))
+            val data = json.parseToJsonElement(String(cipher.doFinal(unhex(hex)))).jsonObject
+            val u = data["cf"]?.jsonPrimitive?.contentOrNull ?: data["source"]?.jsonPrimitive?.contentOrNull ?: error("no playlist")
+            return u to "https://nova.upn.one/"
+        }
+        error("unsupported player")
+    }
+
     // ---------------------------------------------------------------- public
-    /** Episode lists from every local provider that answers (each failure is simply skipped). */
-    suspend fun episodes(id: Int): Map<String, Local> = coroutineScope {
-        listOf(
-            KAZE to async { runCatching { kazeEpisodes(id) }.getOrNull() },
-            TSUKI to async { runCatching { zoneEpisodes(id) }.getOrNull() },
-            DUNYA to async { runCatching { dunyaEpisodes(id) }.getOrNull() },
-            GG to async { runCatching { ggEpisodes(id) }.getOrNull() },
+    /** Runs every in-app provider at once and reports each one the moment it answers (failures are skipped). */
+    suspend fun episodesEach(id: Int, onEach: suspend (String, Local) -> Unit) = coroutineScope {
+        val jobs: List<Pair<String, suspend () -> Local>> = listOf(
+            KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
+            YUKI to { nsEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
         )
-            .mapNotNull { (a, d) -> d.await()?.takeIf { it.sub.isNotEmpty() || it.dub.isNotEmpty() }?.let { a to it } }.toMap()
+        jobs.map { (alias, f) -> async { runCatching { f() }.getOrNull()?.takeIf { it.sub.isNotEmpty() || it.dub.isNotEmpty() }?.let { onEach(alias, it) } } }.awaitAll()
+        Unit
+    }
+
+    suspend fun episodes(id: Int): Map<String, Local> {
+        val out = java.util.concurrent.ConcurrentHashMap<String, Local>()
+        episodesEach(id) { a, l -> out[a] = l }
+        return out
     }
 
     suspend fun watch(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
         KAZE -> kazeWatch(id, audio, ep)
         TSUKI -> if (audio == "sub") zoneWatch(id, ep) else emptyList()
+        HOSHI -> if (audio == "sub") kaaWatch(id, ep) else emptyList()
+        YUKI -> nsWatch(id, audio, ep)
         DUNYA -> if (audio == "sub") dunyaWatch(id, ep) else emptyList()
         GG -> ggWatch(id, audio, ep)
         else -> emptyList()

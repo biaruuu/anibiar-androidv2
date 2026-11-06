@@ -61,6 +61,8 @@ object Http {
         appContext = context.applicationContext
     }
 
+    val context: Context? get() = appContext
+
     val client: OkHttpClient by lazy { create() }
 
     /** Plain OkHttp (no Cronet) for third-party sites where HTTP/3 gives no benefit. */

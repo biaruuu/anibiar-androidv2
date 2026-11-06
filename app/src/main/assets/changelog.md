@@ -140,3 +140,8 @@
 
 ## 1 | Profiles & friends | 2026-11-02
 - Edit profile, online status, favorites with privacy, friend system fixes
+
+## 33 | Faster episodes, more servers | 2026-11-06
+- Episode list now loads in stages: it appears as soon as the first server answers, and a saved copy shows instantly on repeat visits
+- Two new in-app servers: Hoshi (sub) and Yuki (sub and dub)
+- Shorter provider timeouts and one shared anime lookup, so slow servers no longer hold up the list

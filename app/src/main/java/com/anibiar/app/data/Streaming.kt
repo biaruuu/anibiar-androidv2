@@ -1,5 +1,6 @@
 package com.anibiar.app.data
 
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -161,6 +162,52 @@ object Streaming {
             )
         }
         return EpisodesPayload(base?.title, sub.values.toList(), dub.values.toList(), ((base?.sources.orEmpty()) + local.keys.map(::label)).distinct())
+    }
+
+    private fun diskFile(id: Int): java.io.File? = Http.context?.let { java.io.File(it.cacheDir, "eps-$id.json") }
+
+    private fun readDisk(id: Int): EpisodesPayload? = runCatching {
+        val f = diskFile(id) ?: return null
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 7L * 24 * 3600_000) return null
+        json.decodeFromString<EpisodesPayload>(f.readText())
+    }.getOrNull()
+
+    private fun writeDisk(id: Int, p: EpisodesPayload) {
+        runCatching { diskFile(id)?.writeText(json.encodeToString(EpisodesPayload.serializer(), p)) }
+    }
+
+    /**
+     * Same result as [episodes], but reports early: a saved copy shows instantly, then the list is refreshed
+     * every time the server or any in-app provider answers, so the player can start on the first partial result.
+     */
+    suspend fun episodesLive(id: Int, onUpdate: (EpisodesPayload) -> Unit) {
+        epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 120_000 }?.let { onUpdate(it.v); return }
+        readDisk(id)?.let { onUpdate(it) }
+        val lock = kotlinx.coroutines.sync.Mutex()
+        var base: EpisodesPayload? = null
+        val locals = LinkedHashMap<String, LocalSources.Local>()
+        var last: EpisodesPayload? = null
+        var serverErr: Throwable? = null
+        kotlinx.coroutines.coroutineScope {
+            launch {
+                val r = runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) }
+                lock.withLock {
+                    base = r.getOrNull(); serverErr = r.exceptionOrNull()
+                    if (base != null) { last = merge(base, locals); onUpdate(last!!) }
+                }
+            }
+            launch {
+                LocalSources.episodesEach(id) { alias, l ->
+                    lock.withLock {
+                        locals[alias] = l
+                        last = merge(base, locals); onUpdate(last!!)
+                    }
+                }
+            }
+        }
+        val done = last ?: throw serverErr ?: IOException("No episodes found")
+        epsCache[id] = Cached(System.currentTimeMillis(), done)
+        writeDisk(id, done)
     }
 
     suspend fun episodes(id: Int): EpisodesPayload {
