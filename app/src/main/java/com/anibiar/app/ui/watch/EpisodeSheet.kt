@@ -84,7 +84,9 @@ fun EpisodeSheet(
     val ranges = remember(ordered) { ordered.chunked(size).mapIndexed { i, c -> Triple("${c.first().number}-${c.last().number}", i * size, i * size + c.size) } }
     LaunchedEffect(current, ordered) { ordered.indexOfFirst { it.number == current }.takeIf { it >= 0 }?.let { range = it / size } }
     val cur = ranges.getOrNull(range.coerceIn(0, (ranges.size - 1).coerceAtLeast(0)))
-    val visible = if (cur != null) ordered.subList(cur.second, cur.third) else emptyList()
+    // Only a first screenful of the range is built; more are added as the list is scrolled near its end.
+    var shown by remember(range, desc) { mutableIntStateOf(24) }
+    val visible = if (cur != null) ordered.subList(cur.second, minOf(cur.third, cur.second + shown)) else emptyList()
     val position = episodes.indexOfFirst { it.number == current } + 1
     val shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
 
@@ -116,7 +118,12 @@ fun EpisodeSheet(
         if (visible.isEmpty()) {
             Text("No episodes available for this selection.", style = inter(14f), color = Muted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp))
         } else if (grid) {
-            LazyVerticalGrid(GridCells.Fixed(4), Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 16.dp + 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+            LaunchedEffect(gridState, visible.size) {
+                androidx.compose.runtime.snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+                    .collect { if (it >= visible.size - 6) shown += 24 }
+            }
+            LazyVerticalGrid(GridCells.Fixed(4), state = gridState, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 16.dp + 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(visible, key = { it.number }) { e ->
                     val on = e.number == current; val s = RoundedCornerShape(50)
                     Box(
@@ -132,7 +139,16 @@ fun EpisodeSheet(
             }
         } else {
             val state = rememberLazyListState()
-            LaunchedEffect(current, range, desc) { visible.indexOfFirst { it.number == current }.takeIf { it > 1 }?.let { state.scrollToItem(it - 1) } }
+            LaunchedEffect(state, visible.size) {
+                androidx.compose.runtime.snapshotFlow { state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+                    .collect { if (it >= visible.size - 5) shown += 24 }
+            }
+            LaunchedEffect(current, range, desc) {
+                val idx = ordered.indexOfFirst { it.number == current } - (cur?.second ?: 0)
+                if (idx + 12 > shown) shown = idx + 12
+            }
+            val hasCurrent = visible.any { it.number == current }
+            LaunchedEffect(current, range, desc, hasCurrent) { visible.indexOfFirst { it.number == current }.takeIf { it > 1 }?.let { state.scrollToItem(it - 1) } }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state, contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(visible, key = { it.number }) { e ->
                     val on = e.number == current; val s = RoundedCornerShape(16.dp)

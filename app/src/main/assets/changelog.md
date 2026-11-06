@@ -158,3 +158,8 @@
 ## 36 | Episode details and error reports | 2026-11-06
 - Episode titles, thumbnails and air dates are filled in live (ani.zip and MyAnimeList) when a streaming server leaves them blank
 - When an episode or server fails, a Copy report button gives you the exact error to send
+
+## 37 | Lighter episode list, crash detection | 2026-11-06
+- The episode list builds only the first few rows and loads more as you scroll
+- Kiro now detects out-of-memory kills, freezes and native crashes (not just errors) and shows a report on next launch
+- More memory allowed for long series like One Piece

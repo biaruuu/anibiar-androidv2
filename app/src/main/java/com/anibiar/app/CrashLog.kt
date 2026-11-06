@@ -27,9 +27,32 @@ object CrashLog {
         }
     }
 
-    /** Returns and clears the report saved by the previous crash, if any. */
-    fun take(c: Context): String? = runCatching {
-        val f = file(c)
-        if (f.exists()) f.readText().also { f.delete() } else null
-    }.getOrNull()
+    /**
+     * Returns and clears the report from the previous crash, if any. A Java error is saved by the handler above;
+     * a native crash, out-of-memory kill or freeze never reaches it, so Android's own exit history is checked too.
+     */
+    fun take(c: Context): String? {
+        val java = runCatching { file(c).let { f -> if (f.exists()) f.readText().also { f.delete() } else null } }.getOrNull()
+        if (java != null) return java
+        if (android.os.Build.VERSION.SDK_INT < 30) return null
+        return runCatching {
+            val prefs = c.getSharedPreferences("crash_log", Context.MODE_PRIVATE)
+            val am = c.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val last = prefs.getLong("seen", 0L)
+            val info = am.getHistoricalProcessExitReasons(c.packageName, 0, 5).filter { it.timestamp > last }.maxByOrNull { it.timestamp }
+                ?: return@runCatching null
+            prefs.edit().putLong("seen", info.timestamp).apply()
+            val reason = when (info.reason) {
+                android.app.ApplicationExitInfo.REASON_CRASH -> "CRASH"
+                android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
+                android.app.ApplicationExitInfo.REASON_ANR -> "NOT_RESPONDING"
+                android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+                android.app.ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+                android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
+                android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INIT_FAILURE"
+                else -> return@runCatching null
+            }
+            "Exit reason: $reason\nStatus: ${info.status}\nDescription: ${info.description}\nMemory (PSS/RSS KB): ${info.pss}/${info.rss}\nTime: ${java.util.Date(info.timestamp)}"
+        }.getOrNull()
+    }
 }
