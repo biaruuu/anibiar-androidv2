@@ -464,11 +464,18 @@ object LocalSources {
     private suspend fun nsEpisodesOf(slug: String): List<NsEp> {
         val h = html("$NS_BASE/anime/$slug/", NS_BASE)
         val seen = HashSet<Int>()
-        return Regex("<li\\b[^>]*data-index=\"\\d+\"[^>]*>[\\s\\S]*?<a\\s+href=\"(https?://animenosub\\.to/[^\"]+)\"[\\s\\S]*?<div\\s+class=\"epl-num\">([^<]+)</div>", RegexOption.IGNORE_CASE).findAll(h).mapNotNull { m ->
-            val label = m.groupValues[2].trim()
+        val href = Regex("<a\\s+href=\"(https?://animenosub\\.to/[^\"]+)\"", RegexOption.IGNORE_CASE)
+        val num = Regex("<div\\s+class=\"epl-num\">([^<]+)</div>", RegexOption.IGNORE_CASE)
+        val out = ArrayList<NsEp>()
+        // One small piece per <li> keeps matching linear even for 1000+ episode lists.
+        for (chunk in h.split("data-index=\"").drop(1)) {
+            val part = chunk.take(1500)
+            val u = href.find(part)?.groupValues?.get(1) ?: continue
+            val label = num.find(part)?.groupValues?.get(1)?.trim() ?: continue
             val n = if (label.equals("movie", true)) 1 else label.toDoubleOrNull()?.takeIf { it >= 1 }?.let { Math.round(it).toInt() }
-            if (n == null || !seen.add(n)) null else NsEp(n, decodeEntities(m.groupValues[1]))
-        }.sortedBy { it.number }.toList()
+            if (n != null && seen.add(n)) out += NsEp(n, decodeEntities(u))
+        }
+        return out.sortedBy { it.number }
     }
 
     private suspend fun nsSeries(id: Int): NsSeries {
@@ -548,7 +555,9 @@ object LocalSources {
         if (now - lastFresh > 90_000) { lastFresh = now; ggCache.clear(); zoneCache.clear(); kaaCache.clear(); nsCache.clear() }
     }
 
-    suspend fun episodesEach(id: Int, onEach: suspend (String, Local) -> Unit) = coroutineScope {
+    suspend fun episodesEach(id: Int, onEach: suspend (String, Local) -> Unit) = withContext(Dispatchers.Default) { episodesEachInner(id, onEach) }
+
+    private suspend fun episodesEachInner(id: Int, onEach: suspend (String, Local) -> Unit) = coroutineScope {
         freshen()
         val jobs: List<Pair<String, suspend () -> Local>> = listOf(
             KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
@@ -564,7 +573,9 @@ object LocalSources {
         return out
     }
 
-    suspend fun watch(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
+    suspend fun watch(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = withContext(Dispatchers.Default) { watchInner(id, audio, ep, alias) }
+
+    private suspend fun watchInner(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
         KAZE -> kazeWatch(id, audio, ep)
         TSUKI -> if (audio == "sub") zoneWatch(id, ep) else emptyList()
         HOSHI -> if (audio == "sub") kaaWatch(id, ep) else emptyList()

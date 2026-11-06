@@ -163,3 +163,7 @@
 - The episode list builds only the first few rows and loads more as you scroll
 - Kiro now detects out-of-memory kills, freezes and native crashes (not just errors) and shows a report on next launch
 - More memory allowed for long series like One Piece
+
+## 38 | Fix freezing on long series | 2026-11-06
+- Episode and stream lookups now run off the main thread, so opening One Piece no longer freezes the app
+- Faster parsing of very long episode lists

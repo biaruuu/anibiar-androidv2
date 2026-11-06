@@ -180,7 +180,9 @@ object Streaming {
      * Same result as [episodes], but reports early: a saved copy shows instantly, then the list is refreshed
      * every time the server or any in-app provider answers, so the player can start on the first partial result.
      */
-    suspend fun episodesLive(id: Int, onUpdateRaw: (EpisodesPayload) -> Unit) {
+    suspend fun episodesLive(id: Int, onUpdateRaw: (EpisodesPayload) -> Unit) = withContext(Dispatchers.Default) { episodesLiveInner(id, onUpdateRaw) }
+
+    private suspend fun episodesLiveInner(id: Int, onUpdateRaw: (EpisodesPayload) -> Unit) {
         val onUpdate: (EpisodesPayload) -> Unit = { p -> runCatching { onUpdateRaw(p) } }
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { onUpdate(it.v); return }
         readDisk(id)?.let { onUpdate(it) }
@@ -211,7 +213,9 @@ object Streaming {
         writeDisk(id, done)
     }
 
-    suspend fun episodes(id: Int): EpisodesPayload {
+    suspend fun episodes(id: Int): EpisodesPayload = withContext(Dispatchers.Default) { episodesInner(id) }
+
+    private suspend fun episodesInner(id: Int): EpisodesPayload {
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { return it.v }
         val r = kotlinx.coroutines.coroutineScope {
             val srv = async { runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) } }
@@ -227,7 +231,9 @@ object Streaming {
         return r
     }
 
-    suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
+    suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload = withContext(Dispatchers.Default) { watchInner(id, audio, ep, servers) }
+
+    private suspend fun watchInner(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
         val key = "$id|$audio|$ep|${servers.firstOrNull()}"
         watchCache[key]?.takeIf { System.currentTimeMillis() - it.at < 240_000 }?.let { return it.v }
         val local = servers.filter { it.lowercase() in LocalSources.aliases }
