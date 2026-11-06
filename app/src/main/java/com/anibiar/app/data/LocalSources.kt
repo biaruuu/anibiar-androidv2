@@ -30,9 +30,17 @@ import java.util.concurrent.TimeUnit
  * still load when the AniBiar server is slow, out of quota or down. Only providers that work over plain HTTP are ported.
  */
 object LocalSources {
-    const val DUNYA = "dunya"
-    const val GG = "animegg"
-    val aliases = listOf(DUNYA, GG)
+    // The in-app servers get their own names (shown in the Server menu).
+    const val KAZE = "kaze"      // AniList-id based JSON API: sub + dub, several servers
+    const val TSUKI = "tsuki"    // HLS with soft subtitles
+    const val DUNYA = "sakura"   // MAL-id based, HLS with soft subtitles
+    const val GG = "momiji"      // sub + dub, MP4/HLS
+    val aliases = listOf(KAZE, TSUKI, DUNYA, GG)
+
+    private const val KAZE_API = "https://animetsu.live/v2/api/anime"
+    private const val KAZE_PROXY = "https://swiftstream.top/proxy"
+    private const val KAZE_SITE = "https://animetsu.live/"
+    private const val TSUKI_BASE = "https://anizone.to"
 
     private const val DUNYA_BASE = "https://anime-dunya.com"
     private const val GG_BASE = "https://www.animegg.org"
@@ -144,7 +152,7 @@ object LocalSources {
             StreamSubtitle(so["label"]?.jsonPrimitive?.contentOrNull ?: "Subtitle", so["srclang"]?.jsonPrimitive?.contentOrNull ?: "und", u, so["default"]?.jsonPrimitive?.booleanOrNull ?: false)
         }
         referers[source] = "$DUNYA_BASE/"
-        return listOf(StreamSource("$DUNYA-0", "Dunya", if (subs.isEmpty()) "hard" else "soft", if (source.contains(".m3u8")) "hls" else "file", source, subs))
+        return listOf(StreamSource("$DUNYA-0", "Sakura", if (subs.isEmpty()) "hard" else "soft", if (source.contains(".m3u8")) "hls" else "file", source, subs))
     }
 
     // ---------------------------------------------------------------- AnimeGG (title search; sub + dub, MP4/HLS)
@@ -219,7 +227,7 @@ object LocalSources {
         lists.forEachIndexed { i, srcs ->
             srcs.forEachIndexed { j, (label, url) ->
                 referers[url] = "$GG_BASE/"
-                out += StreamSource("$GG-${out.size}", "AnimeGG" + if (tabs.size > 1 || srcs.size > 1) " ${out.size + 1}" else "", if (audio == "sub") "hard" else "soft", if (url.contains(".m3u8")) "hls" else "file", url)
+                out += StreamSource("$GG-${out.size}", "Momiji" + if (tabs.size > 1 || srcs.size > 1) " ${out.size + 1}" else "", if (audio == "sub") "hard" else "soft", if (url.contains(".m3u8")) "hls" else "file", url)
             }
         }
         return out
@@ -237,14 +245,133 @@ object LocalSources {
         }
     }
 
+    // ---------------------------------------------------------------- Kaze (animetsu: keyed by the AniList id, sub + dub)
+    private val kazeHeaders = mapOf("Origin" to "https://animetsu.live", "Referer" to KAZE_SITE)
+    private suspend fun kazeGet(url: String): String = withContext(Dispatchers.IO) {
+        val b = Request.Builder().url(url).header("User-Agent", UA).header("Accept", "application/json")
+        kazeHeaders.forEach { (k, v) -> b.header(k, v) }
+        http.newCall(b.build()).execute().use { r -> if (!r.isSuccessful) throw IOException("HTTP ${r.code}"); r.body?.string().orEmpty() }
+    }
+    private fun kazeUrl(u: String) = if (u.startsWith("/")) KAZE_PROXY + u else u
+
+    private suspend fun kazeEpisodes(id: Int): Local {
+        val arr = json.parseToJsonElement(kazeGet("$KAZE_API/eps/$id")).jsonArray
+        val eps = arr.mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            val n = o["ep_num"]?.jsonPrimitive?.intOrNull ?: o["ep_num"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt() ?: return@mapNotNull null
+            WatchEpisode(n, o["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it != "null" }.orEmpty(), image = o["img"]?.jsonPrimitive?.contentOrNull?.takeIf { it != "null" }?.let(::kazeUrl),
+                filler = o["is_filler"]?.jsonPrimitive?.booleanOrNull ?: false, providers = listOf(KAZE))
+        }.distinctBy { it.number }.sortedBy { it.number }
+        return Local(eps, eps)
+    }
+
+    private suspend fun kazeWatch(id: Int, audio: String, ep: Int): List<StreamSource> {
+        val servers = json.parseToJsonElement(kazeGet("$KAZE_API/servers/$id/$ep")).jsonArray.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull }
+        val got = coroutineScope {
+            servers.map { sv -> async { runCatching { json.parseToJsonElement(kazeGet("$KAZE_API/oppai/$id/$ep?server=${URLEncoder.encode(sv, "UTF-8")}&source_type=$audio")).jsonObject }.getOrNull() } }.awaitAll()
+        }
+        val out = mutableListOf<StreamSource>()
+        for (o in got.filterNotNull()) {
+            val sources = (o["sources"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+            // Prefer the multi-quality master playlist so the player can switch quality by itself.
+            val pick = sources.firstOrNull { it["quality"]?.jsonPrimitive?.contentOrNull?.trim() == "master" } ?: sources.firstOrNull() ?: continue
+            val url = pick["url"]?.jsonPrimitive?.contentOrNull?.let(::kazeUrl) ?: continue
+            val subs = (o["subs"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+            val sub = subs.firstOrNull { it["lang"]?.jsonPrimitive?.contentOrNull == "English" } ?: subs.firstOrNull()
+            val subUrl = sub?.get("url")?.jsonPrimitive?.contentOrNull?.let(::kazeUrl)
+            referers[url] = KAZE_SITE
+            val tracks = if (subUrl != null) { referers[subUrl] = KAZE_SITE; listOf(StreamSubtitle(sub["lang"]?.jsonPrimitive?.contentOrNull ?: "English", "en", subUrl, true)) } else emptyList()
+            out += StreamSource("$KAZE-${out.size}", "Kaze" + if (servers.size > 1) " ${out.size + 1}" else "", if (audio == "sub" && tracks.isEmpty()) "hard" else "soft", if (url.contains(".mp4")) "file" else "hls", url, tracks)
+        }
+        return out
+    }
+
+    // ---------------------------------------------------------------- Tsuki (anizone: HLS, soft English subtitles)
+    private class ZoneEp(val url: String, val title: String, val image: String?, val filler: Boolean)
+    private class ZoneSeries(val eps: List<ZoneEp>)
+    private val zoneCache = ConcurrentHashMap<Int, ZoneSeries>()
+
+    private fun zoneJson(page: String, after: String?, prefix: String): String? {
+        val from = after?.let { page.indexOf(it).takeIf { i -> i >= 0 } } ?: 0
+        val m = Regex("$prefix\s*JSON\.parse\('(.+?)'\)", RegexOption.DOT_MATCHES_ALL).find(page, from) ?: return null
+        return decodeEntities(m.groupValues[1]).replace("\u0022", """)
+    }
+
+    private suspend fun zoneSeries(id: Int): ZoneSeries {
+        zoneCache[id]?.let { return it }
+        val m = meta(id)
+        val found = LinkedHashMap<String, String>()
+        for (t in m.titles.take(2)) {
+            val page = runCatching { html("$TSUKI_BASE/anime?search=${URLEncoder.encode(t, "UTF-8")}") }.getOrNull() ?: continue
+            val raw = zoneJson(page, "<main", "") ?: continue
+            val arr = runCatching { json.parseToJsonElement(raw).jsonArray }.getOrNull() ?: continue
+            for (e in arr) {
+                val o = e as? JsonObject ?: continue
+                val title = o["main_title"]?.jsonPrimitive?.contentOrNull ?: continue
+                val url = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\\", "")?.replace("\", "") ?: continue
+                found.putIfAbsent(url, title)
+            }
+        }
+        val movie = m.format.equals("MOVIE", true) || m.episodes == 1
+        val best = found.entries.map { e -> e to (m.titles.maxOfOrNull { dice(it, e.value) } ?: 0.0) }.filter { it.second >= if (movie) 0.9 else 0.7 }
+            .sortedByDescending { it.second }.take(3)
+        val picks = coroutineScope { best.map { (e, score) -> async { runCatching { Triple(e.key, score, zoneEpisodesOf(e.key)) }.getOrNull() } }.awaitAll() }.filterNotNull().filter { it.third.isNotEmpty() }
+        val chosen = picks.minByOrNull { (_, score, eps) -> (m.episodes?.let { kotlin.math.abs(eps.size - it) } ?: 0) - score * 2 } ?: error("no match")
+        return ZoneSeries(chosen.third).also { zoneCache[id] = it }
+    }
+
+    private suspend fun zoneEpisodesOf(url: String): List<ZoneEp> {
+        val page = html(url)
+        val raw = zoneJson(page, "<main", "items:") ?: error("no episodes")
+        val arr = json.parseToJsonElement(raw).jsonArray
+        return arr.mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            val u = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: return@mapNotNull null
+            val tl = o["title_list"]
+            val title = when (tl) { is JsonObject -> tl["1"]?.jsonPrimitive?.contentOrNull; is JsonArray -> tl.firstOrNull()?.jsonPrimitive?.contentOrNull; else -> null }
+            ZoneEp(u, title.orEmpty(), o["snapshot"]?.jsonPrimitive?.contentOrNull?.replace("\", ""), o["type"]?.jsonPrimitive?.contentOrNull.equals("filler", true))
+        }
+    }
+
+    private suspend fun zoneEpisodes(id: Int): Local {
+        val s = zoneSeries(id)
+        return Local(s.eps.mapIndexed { i, e -> WatchEpisode(i + 1, e.title, image = e.image, filler = e.filler, providers = listOf(TSUKI)) }, emptyList())
+    }
+
+    private suspend fun zoneWatch(id: Int, ep: Int): List<StreamSource> {
+        val e = zoneSeries(id).eps.getOrNull(ep - 1) ?: error("episode not found")
+        val page = html(e.url)
+        val raw = zoneJson(page, "mb-8", "") ?: error("no stream data")
+        val o = json.parseToJsonElement(raw).jsonObject
+        val src = o["src"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: error("no stream")
+        val tracks = (o["subtitles"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+            .filter { it["language"]?.jsonPrimitive?.contentOrNull == "en" }
+            .sortedByDescending { it["default"]?.jsonPrimitive?.booleanOrNull ?: false }
+            .mapNotNull { t ->
+                val f = t["file"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: return@mapNotNull null
+                val fmt = t["format"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
+                if (fmt.isNotEmpty() && fmt != "vtt" && fmt != "srt" && fmt != "webvtt") null else StreamSubtitle("English", "en", f, true)
+            }.take(1)
+        referers[src] = "$TSUKI_BASE/"
+        tracks.forEach { referers[it.src] = "$TSUKI_BASE/" }
+        return listOf(StreamSource("$TSUKI-0", "Tsuki", if (tracks.isEmpty()) "hard" else "soft", "hls", src, tracks))
+    }
+
     // ---------------------------------------------------------------- public
     /** Episode lists from every local provider that answers (each failure is simply skipped). */
     suspend fun episodes(id: Int): Map<String, Local> = coroutineScope {
-        listOf(DUNYA to async { runCatching { dunyaEpisodes(id) }.getOrNull() }, GG to async { runCatching { ggEpisodes(id) }.getOrNull() })
+        listOf(
+            KAZE to async { runCatching { kazeEpisodes(id) }.getOrNull() },
+            TSUKI to async { runCatching { zoneEpisodes(id) }.getOrNull() },
+            DUNYA to async { runCatching { dunyaEpisodes(id) }.getOrNull() },
+            GG to async { runCatching { ggEpisodes(id) }.getOrNull() },
+        )
             .mapNotNull { (a, d) -> d.await()?.takeIf { it.sub.isNotEmpty() || it.dub.isNotEmpty() }?.let { a to it } }.toMap()
     }
 
     suspend fun watch(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
+        KAZE -> kazeWatch(id, audio, ep)
+        TSUKI -> if (audio == "sub") zoneWatch(id, ep) else emptyList()
         DUNYA -> if (audio == "sub") dunyaWatch(id, ep) else emptyList()
         GG -> ggWatch(id, audio, ep)
         else -> emptyList()

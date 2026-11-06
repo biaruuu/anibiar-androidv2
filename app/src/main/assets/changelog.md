@@ -1,3 +1,7 @@
+## 32 | More in-app servers: Kaze, Tsuki | 2026-11-06
+- Two more servers that run inside the app, Kaze (sub and dub, several servers) and Tsuki (HLS with English subtitles)
+- The in-app servers now have their own names: Kaze, Tsuki, Sakura and Momiji
+
 ## 31 | Streams that work without the server | 2026-11-06
 - Episodes and streams from AnimeDunya and AnimeGG now load inside the app itself, so you can still watch when the AniBiar server is slow, out of quota or down
 - These appear as extra servers in the Server menu
