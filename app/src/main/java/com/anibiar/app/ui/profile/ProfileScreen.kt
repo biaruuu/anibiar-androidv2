@@ -143,65 +143,41 @@ fun ProfileScreen(
             contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 90.dp),
         ) {
             item(key = "header") {
-                Box(Modifier.fillMaxWidth()) {
-                    // Banner stays as a faint backdrop that fades into the dark page.
-                    Box(Modifier.fillMaxWidth().height(300.dp)) {
-                        Banner(profile?.bannerUrl, Modifier.fillMaxSize().graphicsLayer { alpha = 0.32f })
-                        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x99000000), Color(0xFF0B0B0D)))))
+                val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                // Banner fills the top; name, handle and counts sit on it, avatar on the right.
+                Box(Modifier.fillMaxWidth().height(topInset + 250.dp)) {
+                    Banner(profile?.bannerUrl, Modifier.fillMaxSize())
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
+                    Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
+                        Column(Modifier.weight(1f).padding(end = 10.dp)) {
+                            Text(profile?.shownName ?: "Loading…", style = inter(24f, FontWeight.ExtraBold, lineHeight = 28f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            profile?.let { Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp)) }
+                            Spacer(Modifier.height(14.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                                val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
+                                BigStat("Following", followingIds.size) { open("following") }
+                                BigStat("Followers", followerIds.size) { open("followers") }
+                                BigStat("Friends", friendIds.size) { open("friends") }
+                            }
+                        }
+                        Box(Modifier.requiredSize(96.dp)) {
+                            Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp).border(3.dp, Color.White, CircleShape))
+                            StatusDot(profile?.status, 28.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
+                        }
                     }
-                    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 64.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                                Text(profile?.shownName ?: "Loading…", style = inter(30f, FontWeight.ExtraBold, lineHeight = 34f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                profile?.let { Text("@${it.username}", style = inter(15f, FontWeight.Medium), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)) }
-                                Spacer(Modifier.height(22.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                                    val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
-                                    BigStat("Following", followingIds.size) { open("following") }
-                                    BigStat("Followers", followerIds.size) { open("followers") }
-                                    BigStat("Friends", friendIds.size) { open("friends") }
-                                }
-                            }
-                            Box(Modifier.padding(top = 26.dp)) {
-                                Box(Modifier.requiredSize(104.dp)) {
-                                    Avatar(profile?.avatarUrl, profile?.shownName, 104.dp, Modifier.requiredSize(104.dp).border(2.dp, Color(0x33FFFFFF), CircleShape))
-                                    StatusDot(
-                                        profile?.status, 32.dp, Color(0xFF0B0B0D),
-                                        Modifier.align(Alignment.BottomEnd).then(if (isMe) Modifier.clip(CircleShape).clickable { showStatus = true } else Modifier),
-                                    )
-                                }
-                                // Custom status floats above the avatar like a speech bubble.
-                                profile?.let { p ->
-                                    val has = !p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()
-                                    if (has || isMe) Text(
-                                        listOfNotNull(p.statusEmoji?.takeIf { it.isNotBlank() }, p.statusText?.takeIf { it.isNotBlank() }).joinToString(" ").ifBlank { "Set a status" },
-                                        style = inter(13f, FontWeight.Medium), color = if (has) Ani.Soft else Ani.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.align(Alignment.TopCenter).offset(y = (-34).dp).widthIn(max = 130.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF26262B))
-                                            .then(if (isMe) Modifier.clickable { showStatus = true } else Modifier).padding(horizontal = 12.dp, vertical = 7.dp),
-                                    )
-                                }
-                            }
+                }
+                Column(Modifier.padding(horizontal = 20.dp)) {
+                    Spacer(Modifier.height(14.dp))
+                    profile?.let { p ->
+                        if (!p.statusText.isNullOrBlank() || !p.statusEmoji.isNullOrBlank()) {
+                            StatusChip(p, isMe) { showStatus = true }
+                            Spacer(Modifier.height(10.dp))
                         }
-                        Spacer(Modifier.height(16.dp))
-                        val bio = profile?.bio.orEmpty()
-                        if (bio.isNotBlank()) Text(bio, style = inter(15f, lineHeight = 21f), color = Color.White)
-                        Spacer(Modifier.height(14.dp))
-                    if (isMe) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ActionButton("Edit profile", Modifier.weight(1f)) { editing = true }
-                            ActionButton("Share profile", Modifier.weight(1f)) {
-                                val slug = profile?.linkSlug
-                                if (slug.isNullOrBlank()) toast("Set your profile link in Settings first")
-                                else context.startActivity(
-                                    android.content.Intent.createChooser(
-                                        android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                                            .putExtra(android.content.Intent.EXTRA_TEXT, "Add me on Kiro: kiro://u/$slug"),
-                                        "Share profile",
-                                    ),
-                                )
-                            }
-                        }
-                    } else if (me != null) {
+                    }
+                    val bio = profile?.bio.orEmpty()
+                    if (bio.isNotBlank()) { Text(bio, style = inter(14f, lineHeight = 20f), color = Color.White); Spacer(Modifier.height(14.dp)) }
+                    if (!isMe && me != null) {
+
                         val iFollow = targetUid in myFollowing
                         val theyFollow = targetUid in myFollowers
                         val friendAction: Pair<String, () -> Unit>? = when {
@@ -223,8 +199,7 @@ fun ProfileScreen(
                             ProfileButton("Decline request", false, Modifier.fillMaxWidth()) { scope.launch { runCatching { social.removeFriend(targetUid) } } }
                         }
                     }
-                        Spacer(Modifier.height(18.dp))
-                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
             item(key = "fav-tabs") {
@@ -279,33 +254,39 @@ fun ProfileScreen(
             )
         }
         if (editing) EditProfileScreen(profile) { editing = false }
-        if (isMe && listTab == null && !editing && (onOpenInbox != null || onOpenSettings != null)) {
+        if (listTab == null && !editing) {
             Row(
-                Modifier.align(Alignment.TopEnd).padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, end = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.fillMaxWidth().padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, start = 12.dp, end = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             ) {
-                onOpenInbox?.let { open ->
-                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = open), contentAlignment = Alignment.Center) {
-                        Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(21.dp))
-                        if (unread > 0) Box(
-                            Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(if (unread > 9) 18.dp else 16.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
-                            contentAlignment = Alignment.Center,
-                        ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onBack != null) GlassButton(onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(21.dp)) }
+                    if (isMe) GlassButton({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(19.dp)) }
                 }
-                onOpenSettings?.let { open ->
-                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = open), contentAlignment = Alignment.Center) {
-                        Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(21.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isMe) onOpenInbox?.let { open ->
+                        GlassButton(open) {
+                            Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(20.dp))
+                            if (unread > 0) Box(
+                                Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(if (unread > 9) 18.dp else 16.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
+                        }
                     }
+                    GlassButton({
+                        val slug = profile?.linkSlug
+                        if (slug.isNullOrBlank()) toast(if (isMe) "Set your profile link in Edit profile first" else "This profile has no share link")
+                        else context.startActivity(
+                            android.content.Intent.createChooser(
+                                android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                    .putExtra(android.content.Intent.EXTRA_TEXT, "Add me on Kiro: kiro://u/$slug"),
+                                "Share profile",
+                            ),
+                        )
+                    }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Share, "Share profile", tint = Color.White, modifier = Modifier.size(19.dp)) }
+                    if (isMe) onOpenSettings?.let { open -> GlassButton(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(20.dp)) } }
                 }
             }
-        }
-        if (onBack != null && listTab == null && !editing) {
-            Box(
-                Modifier.padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, start = 12.dp)
-                    .size(38.dp).clip(CircleShape).background(Color(0x99000000)).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(22.dp)) }
         }
         if (busy) {
             Text("Uploading…", style = inter(13f, FontWeight.Medium), color = Color.White,
@@ -398,11 +379,23 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
         modifier = Modifier.clip(shape).border(1.dp, Ani.Border, shape).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp))
 }
 
+/** Glass circle button, the same look as the video player's controls. */
+@Composable
+private fun GlassButton(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+    Box(
+        Modifier.size(40.dp).clip(CircleShape).background(Color(0x73000000))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.06f))))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.22f))), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center, content = content,
+    )
+}
+
 @Composable
 private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
     Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
-        Text("$count", style = inter(22f, FontWeight.Bold), color = Color.White)
-        Text(label, style = inter(14f), color = Ani.Muted)
+        Text("$count", style = inter(17f, FontWeight.Bold), color = Color.White)
+        Text(label, style = inter(12f), color = Color(0xFFB4B1BA), maxLines = 1)
     }
 }
 

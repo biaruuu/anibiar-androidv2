@@ -350,7 +350,7 @@ private fun AppNavigation() {
 
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !profileOpen && !inboxOpen && userStack.isEmpty() && watchId == 0,
+            visible = stack.isEmpty() && !inboxOpen && watchId == 0,
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),
@@ -369,8 +369,7 @@ private fun AppNavigation() {
                     else if (tab == com.anibiar.app.ui.nav.NavTab.Profile) { searchOpen = false; settingsOpen = false; userStack.clear(); profileOpen = true }
                     else { searchOpen = false; profileOpen = false; inboxOpen = false; userStack.clear(); settingsOpen = true }
                 },
-                modifier = Modifier
-                    .androidx_navPadding(),
+                modifier = Modifier,
             )
         }
     }

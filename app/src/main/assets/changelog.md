@@ -193,3 +193,8 @@
 ## 44 | Dark profile restyle | 2026-11-06
 - Profile redesigned: big bold name, @handle, Following / Followers / Friends counts, avatar on the right with your status as a speech bubble, pill buttons, deep dark background
 - Removed the Community comments feature
+
+## 45 | Banner profile and new tab bar | 2026-11-06
+- Profile: full banner at the top with your name, handle and counts on it, avatar on the right, smaller text
+- Glass buttons on the profile like the video player; pencil edits your profile, share and settings at the top; no more Edit/Share buttons or "Set a status" bubble (status is in Edit profile)
+- New flat dark bottom tab bar (icon over label), also shown when you open someone's profile

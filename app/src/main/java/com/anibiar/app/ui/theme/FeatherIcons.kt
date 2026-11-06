@@ -31,5 +31,7 @@ object FeatherIcons {
     val Play by lazy { icon("Play", "M5,3L19,12L5,21Z") }
     val FastForward by lazy { icon("FastForward", "M13,19L22,12L13,5Z M2,19L11,12L2,5Z") }
     val SkipForward by lazy { icon("SkipForward", "M5,4L15,12L5,20Z M19,5L19,19") }
+    val Edit by lazy { icon("Edit", "M17,3a2.828,2.828 0 0 1 4,4L7.5,20.5 2,22l1.5,-5.5L17,3z") }
+    val Share by lazy { icon("Share", "M4,12v8a2,2 0 0 0 2,2h12a2,2 0 0 0 2,-2v-8 M16,6l-4,-4 -4,4 M12,2v13") }
     val Plus by lazy { icon("Plus", "M12,5L12,19 M5,12L19,12") }
 }
