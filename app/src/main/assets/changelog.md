@@ -181,3 +181,6 @@
 ## 41 | Mizu server and faster stream start | 2026-11-06
 - New in-app server Mizu (Ani.pm): sub and dub, matched by exact AniList / MyAnimeList id
 - "Finding the best stream" now starts playing as soon as the first server has a stream instead of waiting for the slowest one
+
+## 42 | Mizu playback headers | 2026-11-06
+- Mizu streams now send the player site's cookie and headers when loading the video

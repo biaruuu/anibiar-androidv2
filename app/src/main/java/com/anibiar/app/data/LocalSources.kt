@@ -58,6 +58,8 @@ object LocalSources {
 
     /** Streams from these providers need a Referer; the player looks it up here by URL. */
     val referers = ConcurrentHashMap<String, String>()
+    /** Cookie header some players hand out with the stream address (stream URL -> cookie). */
+    val cookies = ConcurrentHashMap<String, String>()
 
     class Local(val sub: List<WatchEpisode>, val dub: List<WatchEpisode>)
 
@@ -837,12 +839,16 @@ object LocalSources {
         val token = Regex("[?&]t=([^&#]+)").find(embedUrl)?.groupValues?.get(1) ?: return null
         // The player site wants the cookie it hands out on its front page before it answers the session call.
         val cookie = runCatching { pmGet("$PM_EMBED/", embedUrl).second.joinToString("; ") { it.substringBefore(";") } }.getOrNull()?.takeIf { it.isNotBlank() }
-        val data = json.parseToJsonElement(pmGet("$PM_EMBED/api/embed/session?t=$token", embedUrl, cookie).first).jsonObject
+        val sess = pmGet("$PM_EMBED/api/embed/session?t=$token", embedUrl, cookie)
+        val data = json.parseToJsonElement(sess.first).jsonObject
+        val jar = LinkedHashMap<String, String>()
+        (cookie.orEmpty().split("; ") + sess.second.map { it.substringBefore(";") }).forEach { kv -> val n = kv.substringBefore("=").trim(); if (n.isNotEmpty() && kv.contains("=")) jar[n] = kv.trim() }
         val src = data["source"]?.jsonPrimitive?.contentOrNull
             ?: (data["sources"] as? JsonArray)?.firstOrNull()?.jsonObject?.let { it["file"]?.jsonPrimitive?.contentOrNull ?: it["url"]?.jsonPrimitive?.contentOrNull }
         if (src.isNullOrBlank() || !src.startsWith("http")) return null
         val embedOrigin = embedUrl.substringBefore("://") + "://" + embedUrl.substringAfter("://").substringBefore("/") + "/"
         referers[src] = embedOrigin
+        if (jar.isNotEmpty()) cookies[src] = jar.values.joinToString("; ")
         val subs = ((data["subtitles"] ?: data["tracks"]) as? JsonArray).orEmpty().mapNotNull { t ->
             val o = t as? JsonObject
             val u = o?.let { it["url"] ?: it["src"] ?: it["file"] }?.jsonPrimitive?.contentOrNull ?: t.jsonPrimitive.contentOrNull ?: return@mapNotNull null

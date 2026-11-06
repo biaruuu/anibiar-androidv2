@@ -156,7 +156,7 @@ fun KiroPlayer(
             androidx.media3.datasource.ResolvingDataSource.Resolver { spec ->
                 val ref = Streaming.activeReferer
                 if (ref == null || Streaming.isOwnHost(spec.uri.host)) spec
-                else spec.withAdditionalHeaders(mapOf("Referer" to ref, "Origin" to ref.trimEnd('/'), "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"))
+                else spec.withAdditionalHeaders(mapOf<String, String>().let { m -> Streaming.activeCookie?.takeIf { spec.uri.host?.endsWith("settlar.io") == true }?.let { m + ("Cookie" to it) } ?: m } + mapOf("Referer" to ref, "Origin" to ref.trimEnd('/'), "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"))
             },
         )
         ExoPlayer.Builder(context)
@@ -347,6 +347,7 @@ fun KiroPlayer(
         error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         Streaming.activeReferer = com.anibiar.app.data.LocalSources.referers[src]
+        Streaming.activeCookie = com.anibiar.app.data.LocalSources.cookies[src]
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
             .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4).build()
         player.setMediaItem(item, ((startAt ?: 0.0) * 1000).toLong())
