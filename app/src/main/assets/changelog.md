@@ -1,3 +1,7 @@
+## 31 | Streams that work without the server | 2026-11-06
+- Episodes and streams from AnimeDunya and AnimeGG now load inside the app itself, so you can still watch when the AniBiar server is slow, out of quota or down
+- These appear as extra servers in the Server menu
+
 ## 30 | Backup server for "HTTP 402" | 2026-11-06
 - When the main streaming server says it is out of quota (HTTP 402), rate limited or down, the app switches to the backup server by itself for 10 minutes
 

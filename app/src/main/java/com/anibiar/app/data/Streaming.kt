@@ -1,6 +1,8 @@
 package com.anibiar.app.data
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.booleanOrNull
@@ -148,9 +150,31 @@ object Streaming {
         }
     }
 
+    /** Adds the in-app providers' episodes to the server's list (or stands in for it when the server is down). */
+    private fun merge(base: EpisodesPayload?, local: Map<String, LocalSources.Local>): EpisodesPayload {
+        val sub = java.util.TreeMap<Int, WatchEpisode>(); val dub = java.util.TreeMap<Int, WatchEpisode>()
+        base?.sub?.forEach { sub[it.number] = it }; base?.dub?.forEach { dub[it.number] = it }
+        for ((alias, l) in local) for ((map, eps) in listOf(sub to l.sub, dub to l.dub)) for (e in eps) {
+            val old = map[e.number]
+            map[e.number] = if (old == null) e.copy(providers = listOf(alias)) else if (alias in old.providers) old else old.copy(
+                title = old.title.ifBlank { e.title }, image = old.image ?: e.image, providers = old.providers + alias,
+            )
+        }
+        return EpisodesPayload(base?.title, sub.values.toList(), dub.values.toList(), ((base?.sources.orEmpty()) + local.keys.map(::label)).distinct())
+    }
+
     suspend fun episodes(id: Int): EpisodesPayload {
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 120_000 }?.let { return it.v }
-        val r = gatewayEpisodes(id) ?: json.decodeFromString(get("/api/anime/$id/episodes"))
+        val r = kotlinx.coroutines.coroutineScope {
+            val srv = async { runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) } }
+            val loc = async { runCatching { LocalSources.episodes(id) }.getOrNull().orEmpty() }
+            val s = srv.await()
+            val base = s.getOrNull()
+            // With a healthy server don't wait long for the in-app sources; if the server failed, they are all we have.
+            val l = if (base != null) kotlinx.coroutines.withTimeoutOrNull(2500) { loc.await() }.orEmpty() else loc.await()
+            if (base == null && l.isEmpty()) throw s.exceptionOrNull() ?: IOException("No episodes found")
+            merge(base, l)
+        }
         epsCache[id] = Cached(System.currentTimeMillis(), r)
         return r
     }
@@ -158,8 +182,24 @@ object Streaming {
     suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
         val key = "$id|$audio|$ep|${servers.firstOrNull()}"
         watchCache[key]?.takeIf { System.currentTimeMillis() - it.at < 240_000 }?.let { return it.v }
-        val r = gatewayWatch(id, audio, ep, servers)
-            ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + if (servers.isNotEmpty()) "&p=" + servers.joinToString(",") else ""))
+        val local = servers.filter { it.lowercase() in LocalSources.aliases }
+        val remote = servers.filter { it.lowercase() !in LocalSources.aliases }
+        val r = kotlinx.coroutines.coroutineScope {
+            val srv = async {
+                if (remote.isEmpty()) null else runCatching {
+                    gatewayWatch(id, audio, ep, remote)
+                        ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + "&p=" + remote.joinToString(",")))
+                }
+            }
+            val loc = async {
+                local.map { a -> async { kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) }.getOrNull() }.orEmpty() } }.awaitAll().flatten()
+            }
+            val s = srv.await(); val l = loc.await()
+            val base = s?.getOrNull()
+            if (base == null && l.isEmpty()) throw s?.exceptionOrNull() ?: IOException("No stream found for this episode")
+            val all = (base?.streams.orEmpty() + l)
+            WatchPayload(audio, ep, all, base?.intro ?: all.firstNotNullOfOrNull { it.intro }, base?.outro ?: all.firstNotNullOfOrNull { it.outro })
+        }
         watchCache[key] = Cached(System.currentTimeMillis(), r)
         return r
     }
@@ -170,9 +210,13 @@ object Streaming {
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =
         runCatching { json.decodeFromString<SkipPayload>(get("/api/skip?mal=$mal&ep=$ep")) }.getOrNull()
 
+    /** Referer for the stream the player is playing now (only set for in-app providers). */
+    @Volatile var activeReferer: String? = null
+    fun isOwnHost(host: String?) = host != null && (BASE.endsWith(host) || BACKUP.endsWith(host))
+
     /** Raw text of a (proxied) subtitle file. */
     suspend fun text(url: String): String = withContext(Dispatchers.IO) {
-        client.newCall(Request.Builder().url(abs(url)).build()).execute().use { r ->
+        client.newCall(Request.Builder().url(abs(url)).apply { LocalSources.referers[url]?.let { header("Referer", it).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36") } }.build()).execute().use { r ->
             if (!r.isSuccessful) throw IOException("Subtitle HTTP ${r.code}")
             r.body?.string().orEmpty()
         }
