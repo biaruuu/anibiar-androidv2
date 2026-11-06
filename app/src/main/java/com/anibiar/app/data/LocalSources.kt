@@ -41,7 +41,8 @@ object LocalSources {
     const val HOSHI = "hoshi"    // JSON API, HLS
     const val YUKI = "yuki"      // sub + dub, vidmoly / nova players
     const val NAMI = "nami"      // anikoto: sub + dub, MegaPlay
-    val aliases = listOf(KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI)
+    const val MIZU = "mizu"      // ani.pm: sub + dub, Settlar player
+    val aliases = listOf(KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI, MIZU)
 
     private const val KAZE_API = "https://animetsu.live/v2/api/anime"
     private const val KAZE_PROXY = "https://swiftstream.top/proxy"
@@ -752,13 +753,126 @@ object LocalSources {
         }
     }
 
+    // ---------------------------------------------------------------- Mizu (ani.pm: AniList/MAL id match, Settlar player)
+    private const val PM = "https://ani.pm"
+    private const val PM_EMBED = "https://embed.settlar.io"
+    private class PmSeries(val id: String, val source: String, val episodes: List<Int>, val packages: JsonObject?)
+    private val pmCache = ConcurrentHashMap<Int, PmSeries>()
+
+    /** Goes through the app's Chrome-based network stack (Cronet) when present, which looks like a browser to the site. */
+    private suspend fun pmGet(url: String, referer: String = "$PM/", cookie: String? = null): Pair<String, List<String>> = withContext(Dispatchers.IO) {
+        val origin = referer.substringBefore("://") + "://" + referer.substringAfter("://").substringBefore("/")
+        val b = Request.Builder().url(url).header("User-Agent", UA).header("Accept", "application/json, text/plain, */*").header("Referer", referer).header("Origin", origin)
+        if (cookie != null) b.header("Cookie", cookie)
+        Http.client.newBuilder().connectTimeout(8, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).build().newCall(b.build()).execute().use { r ->
+            val body = r.body?.string().orEmpty()
+            if (!r.isSuccessful) throw IOException("Ani.pm HTTP ${r.code}")
+            body to r.headers("Set-Cookie")
+        }
+    }
+
+    private suspend fun pmJson(url: String, referer: String = "$PM/"): JsonObject = json.parseToJsonElement(pmGet(url, referer).first).jsonObject
+
+    private suspend fun pmBootstrap(source: String, id: String, ep: Int, lang: String): JsonObject =
+        pmJson("$PM/api/anime/playback-bootstrap/${URLEncoder.encode(source, "UTF-8")}/${URLEncoder.encode(id, "UTF-8")}?ep=$ep&lang=$lang&routes=e4")
+
+    private fun pmCore(data: JsonObject, anilist: Int, mal: Int?): JsonObject {
+        val core = (data["core"] ?: data["anime"] ?: (data["data"] as? JsonObject)?.get("core")) as? JsonObject ?: error("no metadata")
+        val aid = core["anilistId"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt()
+        val m = core["malId"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt()
+        val ok = (aid != null && aid == anilist) || (m != null && mal != null && m == mal)
+        if (!ok || (aid != null && aid != anilist) || (m != null && mal != null && m != mal)) error("identity mismatch")
+        return core
+    }
+
+    private fun pmEpNum(o: JsonObject): Int? = listOf("number", "episode", "ep", "id").firstNotNullOfOrNull { k -> o[k]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt() }
+
+    private suspend fun pmSeries(id: Int): PmSeries {
+        pmCache[id]?.let { return it }
+        val m = meta(id)
+        val queries = LinkedHashSet<String>()
+        for (t in m.titles.take(4)) {
+            val clean = t.replace(Regex("[^\\p{L}\\p{N}\\s]"), " ").replace(Regex("\\s+"), " ").trim()
+            if (clean.length >= 3) { queries += t.trim(); queries += clean }
+            val words = clean.split(" ")
+            if (words.size > 3) queries += words.take(3).joinToString(" ")
+        }
+        val found = LinkedHashMap<String, Pair<String, String>>()
+        coroutineScope {
+            queries.take(8).map { q -> async { runCatching { json.parseToJsonElement(pmGet("$PM/api/anime/search?q=${URLEncoder.encode(q, "UTF-8")}").first) }.getOrNull() } }.awaitAll()
+        }.filterNotNull().forEach { root ->
+            val arr = (root as? JsonArray) ?: (root as? JsonObject)?.let { (it["items"] ?: it["results"] ?: it["data"]) as? JsonArray }
+            arr.orEmpty().forEach { it0 ->
+                val o = it0 as? JsonObject ?: return@forEach
+                val cid = o["id"]?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val src = (o["source"] ?: o["provider"])?.jsonPrimitive?.contentOrNull ?: return@forEach
+                val a = o["anilistId"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt()
+                val mm = o["malId"]?.jsonPrimitive?.contentOrNull?.toDoubleOrNull()?.toInt()
+                // Same strict identity rule as the original: the AniList or MAL id must match exactly.
+                if ((a != null && a == id) || (mm != null && m.idMal != null && mm == m.idMal)) found.putIfAbsent("$src:$cid", src to cid)
+            }
+        }
+        for ((src, cid) in found.values) {
+            val data = runCatching { pmBootstrap(src, cid, 1, "sub") }.getOrNull() ?: continue
+            val core = runCatching { pmCore(data, id, m.idMal) }.getOrNull() ?: continue
+            val eps = (core["episodes"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::pmEpNum) }
+            if (eps.isEmpty()) continue
+            val pk = ((data["anipmPackages"] ?: data["packages"]) as? JsonObject)?.get("episodes") as? JsonObject
+            return PmSeries(cid, src, eps.distinct().sorted(), pk).also { pmCache[id] = it }
+        }
+        error("no confident match")
+    }
+
+    private fun pmHas(s: PmSeries, ep: Int, flag: String) = ((s.packages?.get(ep.toString()) as? JsonObject)?.get(flag)?.jsonPrimitive?.booleanOrNull) == true
+
+    private suspend fun pmEpisodes(id: Int): Local {
+        val s = pmSeries(id)
+        fun list(audio: String) = s.episodes.filter { pmHas(s, it, audio) }.map { WatchEpisode(it, "", providers = listOf(MIZU)) }
+        return Local(list("sub"), list("dub"))
+    }
+
+    private suspend fun pmChannel(sel: String, ep: Int, channel: String, hard: Boolean): StreamSource? {
+        val session = pmJson("$PM/api/anime/settlar/session?selection=${URLEncoder.encode(sel, "UTF-8")}&provider=anipm&ep=$ep&channel=$channel&telemetry=0")
+        val embedUrl = (session["embedUrl"] ?: session["url"])?.jsonPrimitive?.contentOrNull ?: return null
+        val token = Regex("[?&]t=([^&#]+)").find(embedUrl)?.groupValues?.get(1) ?: return null
+        // The player site wants the cookie it hands out on its front page before it answers the session call.
+        val cookie = runCatching { pmGet("$PM_EMBED/", embedUrl).second.joinToString("; ") { it.substringBefore(";") } }.getOrNull()?.takeIf { it.isNotBlank() }
+        val data = json.parseToJsonElement(pmGet("$PM_EMBED/api/embed/session?t=$token", embedUrl, cookie).first).jsonObject
+        val src = data["source"]?.jsonPrimitive?.contentOrNull
+            ?: (data["sources"] as? JsonArray)?.firstOrNull()?.jsonObject?.let { it["file"]?.jsonPrimitive?.contentOrNull ?: it["url"]?.jsonPrimitive?.contentOrNull }
+        if (src.isNullOrBlank() || !src.startsWith("http")) return null
+        val embedOrigin = embedUrl.substringBefore("://") + "://" + embedUrl.substringAfter("://").substringBefore("/") + "/"
+        referers[src] = embedOrigin
+        val subs = ((data["subtitles"] ?: data["tracks"]) as? JsonArray).orEmpty().mapNotNull { t ->
+            val o = t as? JsonObject
+            val u = o?.let { it["url"] ?: it["src"] ?: it["file"] }?.jsonPrimitive?.contentOrNull ?: t.jsonPrimitive.contentOrNull ?: return@mapNotNull null
+            referers[u] = "$PM/"
+            StreamSubtitle(o?.get("label")?.jsonPrimitive?.contentOrNull ?: o?.get("lang")?.jsonPrimitive?.contentOrNull ?: "Subtitle", o?.get("srclang")?.jsonPrimitive?.contentOrNull ?: o?.get("lang")?.jsonPrimitive?.contentOrNull ?: "und", u, o?.get("default")?.jsonPrimitive?.booleanOrNull ?: false)
+        }
+        return StreamSource("", "", if (hard) "hard" else if (subs.isEmpty()) "hard" else "soft", "hls", src, subs)
+    }
+
+    private suspend fun pmWatch(id: Int, audio: String, ep: Int): List<StreamSource> {
+        val s = pmSeries(id)
+        val m = meta(id)
+        val init = pmBootstrap(s.source, s.id, ep, audio)
+        pmCore(init, id, m.idMal)
+        val pk = (((init["anipmPackages"] ?: init["packages"]) as? JsonObject)?.get("episodes") as? JsonObject)?.get(ep.toString()) as? JsonObject
+        val has = pk?.get(audio)?.jsonPrimitive?.booleanOrNull ?: pmHas(s, ep, audio)
+        if (!has) error("episode unavailable")
+        val sel = init["settlarSelection"]?.jsonPrimitive?.contentOrNull ?: error("no selection")
+        val channels = listOf(audio) + (if (pk?.get("${audio}hard")?.jsonPrimitive?.booleanOrNull == true) listOf("${audio}hard") else emptyList())
+        val out = coroutineScope { channels.map { c -> async { runCatching { pmChannel(sel, ep, c, c.endsWith("hard")) }.getOrNull() } }.awaitAll().filterNotNull() }
+        return out.mapIndexed { i, x -> x.copy(id = "$MIZU-$i", name = "Mizu" + if (out.size > 1) " ${i + 1}" else "") }
+    }
+
     // ---------------------------------------------------------------- public
     /** Runs every in-app provider at once and reports each one the moment it answers (failures are skipped). */
     @Volatile private var lastFresh = 0L
     /** Series caches hold episode lists, so drop them every couple of minutes to pick up newly aired episodes. */
     private fun freshen() {
         val now = System.currentTimeMillis()
-        if (now - lastFresh > 90_000) { lastFresh = now; ggCache.clear(); zoneCache.clear(); kaaCache.clear(); nsCache.clear(); akCache.clear() }
+        if (now - lastFresh > 90_000) { lastFresh = now; ggCache.clear(); zoneCache.clear(); kaaCache.clear(); nsCache.clear(); akCache.clear(); pmCache.clear() }
     }
 
     suspend fun episodesEach(id: Int, onEach: suspend (String, Local) -> Unit) = withContext(Dispatchers.Default) { episodesEachInner(id, onEach) }
@@ -767,7 +881,7 @@ object LocalSources {
         freshen()
         val jobs: List<Pair<String, suspend () -> Local>> = listOf(
             KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
-            YUKI to { nsEpisodes(id) }, NAMI to { akEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
+            YUKI to { nsEpisodes(id) }, NAMI to { akEpisodes(id) }, MIZU to { pmEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
         )
         jobs.map { (alias, f) -> async { runCatching { f() }.getOrNull()?.takeIf { it.sub.isNotEmpty() || it.dub.isNotEmpty() }?.let { onEach(alias, it) } } }.awaitAll()
         Unit
@@ -787,6 +901,7 @@ object LocalSources {
         HOSHI -> if (audio == "sub") kaaWatch(id, ep) else emptyList()
         YUKI -> nsWatch(id, audio, ep)
         NAMI -> akWatch(id, audio, ep)
+        MIZU -> pmWatch(id, audio, ep)
         DUNYA -> if (audio == "sub") dunyaWatch(id, ep) else emptyList()
         GG -> ggWatch(id, audio, ep)
         else -> emptyList()

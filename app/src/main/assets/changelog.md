@@ -177,3 +177,7 @@
 ## 40 | Nami server and outlined captions | 2026-11-06
 - New in-app server Nami (AniKoto): sub and dub, picks the right show by MyAnimeList id
 - Captions now default to a bold outlined style with no shadow; Dark box is the other option
+
+## 41 | Mizu server and faster stream start | 2026-11-06
+- New in-app server Mizu (Ani.pm): sub and dub, matched by exact AniList / MyAnimeList id
+- "Finding the best stream" now starts playing as soon as the first server has a stream instead of waiting for the slowest one

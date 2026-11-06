@@ -233,32 +233,49 @@ object Streaming {
 
     suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload = withContext(Dispatchers.Default) { watchInner(id, audio, ep, servers) }
 
+    private class Res(val base: WatchPayload?, val streams: List<StreamSource>, val err: Throwable?, val local: String?)
+
+    /**
+     * Starts every server at once and returns as soon as the first one has a stream (plus a short grace period for the
+     * others), instead of waiting for the slowest server. A server that never answers can no longer hold up playback.
+     */
     private suspend fun watchInner(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
         val key = "$id|$audio|$ep|${servers.firstOrNull()}"
         watchCache[key]?.takeIf { System.currentTimeMillis() - it.at < 240_000 }?.let { return it.v }
         val local = servers.filter { it.lowercase() in LocalSources.aliases }
         val remote = servers.filter { it.lowercase() !in LocalSources.aliases }
+        val ch = kotlinx.coroutines.channels.Channel<Res>(kotlinx.coroutines.channels.Channel.UNLIMITED)
         val r = kotlinx.coroutines.coroutineScope {
-            val srv = async {
-                if (remote.isEmpty()) null else runCatching {
-                    gatewayWatch(id, audio, ep, remote)
-                        ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + "&p=" + remote.joinToString(",")))
+            val jobs = mutableListOf<kotlinx.coroutines.Job>()
+            if (remote.isNotEmpty()) jobs += launch {
+                val res = kotlinx.coroutines.withTimeoutOrNull(16_000) {
+                    runCatching { gatewayWatch(id, audio, ep, remote) ?: json.decodeFromString<WatchPayload>(get("/api/anime/$id/watch?audio=$audio&ep=$ep" + "&p=" + remote.joinToString(","))) }
                 }
+                ch.send(Res(res?.getOrNull(), res?.getOrNull()?.streams.orEmpty(), res?.exceptionOrNull(), null))
             }
-            val loc = async {
-                local.map { a -> async { kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) }.getOrNull() }.orEmpty() } }.awaitAll().flatten()
+            for (a in local) jobs += launch {
+                val res = kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) } }
+                ch.send(Res(null, res?.getOrNull().orEmpty(), res?.exceptionOrNull(), a.lowercase()))
             }
-            val s = srv.await(); val l = loc.await()
-            val base = s?.getOrNull()
-            if (base == null && l.isEmpty()) throw s?.exceptionOrNull() ?: IOException("No stream found for this episode")
-            val all = (base?.streams.orEmpty() + l)
+            var left = jobs.size; var deadline = 0L
+            var base: WatchPayload? = null; var err: Throwable? = null
+            val remoteStreams = mutableListOf<StreamSource>(); val localStreams = mutableListOf<Pair<String, List<StreamSource>>>()
+            while (left > 0) {
+                val got = if (deadline == 0L) ch.receive() else kotlinx.coroutines.withTimeoutOrNull((deadline - System.currentTimeMillis()).coerceAtLeast(1)) { ch.receive() } ?: break
+                left--
+                if (got.err != null) err = got.err
+                if (got.local == null) { if (got.base != null) base = got.base; remoteStreams += got.streams } else if (got.streams.isNotEmpty()) localStreams += got.local to got.streams
+                if (got.streams.isNotEmpty() && deadline == 0L) deadline = System.currentTimeMillis() + 1200
+            }
+            jobs.forEach { it.cancel() }
+            val all = remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second }
+            if (all.isEmpty()) throw err ?: IOException("No stream found for this episode")
             WatchPayload(audio, ep, all, base?.intro ?: all.firstNotNullOfOrNull { it.intro }, base?.outro ?: all.firstNotNullOfOrNull { it.outro })
         }
         watchCache[key] = Cached(System.currentTimeMillis(), r)
         return r
     }
 
-    /** Warms the cache for the next episode so pressing Next starts at once. */
     suspend fun prefetch(id: Int, audio: String, ep: Int, servers: List<String>) { runCatching { watch(id, audio, ep, servers) } }
 
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =
