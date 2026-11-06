@@ -293,8 +293,8 @@ object LocalSources {
 
     private fun zoneJson(page: String, after: String?, prefix: String): String? {
         val from = after?.let { page.indexOf(it).takeIf { i -> i >= 0 } } ?: 0
-        val m = Regex("$prefix\s*JSON\.parse\('(.+?)'\)", RegexOption.DOT_MATCHES_ALL).find(page, from) ?: return null
-        return decodeEntities(m.groupValues[1]).replace("\u0022", """)
+        val m = Regex("$prefix\\s*JSON\\.parse\\('(.+?)'\\)", RegexOption.DOT_MATCHES_ALL).find(page, from) ?: return null
+        return decodeEntities(m.groupValues[1]).replace("\\u0022", "\"")
     }
 
     private suspend fun zoneSeries(id: Int): ZoneSeries {
@@ -308,7 +308,7 @@ object LocalSources {
             for (e in arr) {
                 val o = e as? JsonObject ?: continue
                 val title = o["main_title"]?.jsonPrimitive?.contentOrNull ?: continue
-                val url = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\\", "")?.replace("\", "") ?: continue
+                val url = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\\", "")?.replace("\\", "") ?: continue
                 found.putIfAbsent(url, title)
             }
         }
@@ -326,10 +326,10 @@ object LocalSources {
         val arr = json.parseToJsonElement(raw).jsonArray
         return arr.mapNotNull { e ->
             val o = e as? JsonObject ?: return@mapNotNull null
-            val u = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: return@mapNotNull null
+            val u = o["url"]?.jsonPrimitive?.contentOrNull?.replace("\\", "") ?: return@mapNotNull null
             val tl = o["title_list"]
             val title = when (tl) { is JsonObject -> tl["1"]?.jsonPrimitive?.contentOrNull; is JsonArray -> tl.firstOrNull()?.jsonPrimitive?.contentOrNull; else -> null }
-            ZoneEp(u, title.orEmpty(), o["snapshot"]?.jsonPrimitive?.contentOrNull?.replace("\", ""), o["type"]?.jsonPrimitive?.contentOrNull.equals("filler", true))
+            ZoneEp(u, title.orEmpty(), o["snapshot"]?.jsonPrimitive?.contentOrNull?.replace("\\", ""), o["type"]?.jsonPrimitive?.contentOrNull.equals("filler", true))
         }
     }
 
@@ -343,12 +343,12 @@ object LocalSources {
         val page = html(e.url)
         val raw = zoneJson(page, "mb-8", "") ?: error("no stream data")
         val o = json.parseToJsonElement(raw).jsonObject
-        val src = o["src"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: error("no stream")
+        val src = o["src"]?.jsonPrimitive?.contentOrNull?.replace("\\", "") ?: error("no stream")
         val tracks = (o["subtitles"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
             .filter { it["language"]?.jsonPrimitive?.contentOrNull == "en" }
             .sortedByDescending { it["default"]?.jsonPrimitive?.booleanOrNull ?: false }
             .mapNotNull { t ->
-                val f = t["file"]?.jsonPrimitive?.contentOrNull?.replace("\", "") ?: return@mapNotNull null
+                val f = t["file"]?.jsonPrimitive?.contentOrNull?.replace("\\", "") ?: return@mapNotNull null
                 val fmt = t["format"]?.jsonPrimitive?.contentOrNull.orEmpty().lowercase()
                 if (fmt.isNotEmpty() && fmt != "vtt" && fmt != "srt" && fmt != "webvtt") null else StreamSubtitle("English", "en", f, true)
             }.take(1)
