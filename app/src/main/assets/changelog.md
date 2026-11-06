@@ -215,3 +215,7 @@
 - Suggested accounts strip on other profiles (arrow button) and in the Inbox
 - Followers / Following / Friends lists restyled as dark name cards with glass back button
 - Other profiles now use the same page colour and icon buttons as your own
+
+## 49 | Name cards and message fix | 2026-11-07
+- Search name cards redesigned: compact dark card with the banner fading behind, avatar, name, bio, follower count and a Follow button
+- Fixed "permission denied" when sending a message

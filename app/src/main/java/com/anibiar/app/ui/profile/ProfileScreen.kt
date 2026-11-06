@@ -574,48 +574,41 @@ internal fun UserCard(
     onToggle: () -> Unit,
     myFriends: Set<String> = emptySet(),
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(18.dp)
     val isOther = myUid != null && user.uid != myUid
-    Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp).clip(shape)
-            .background(Ani.Panel).border(1.dp, Ani.Border, shape).clickable(onClick = onOpen),
+    val isFriend = user.uid in myFriends
+    val followsYou = isOther && user.uid in myFollowers
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp).clip(shape)
+            .background(Color(0xFF151517)).border(1.dp, Color(0x14FFFFFF), shape).clickable(onClick = onOpen),
     ) {
-        Box(Modifier.fillMaxWidth().height(92.dp)) {
-            if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1B1B20), Color(0xFF1F2A2E)))))
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0x66151517)))))
-        }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.Top) {
-            Box(Modifier.requiredSize(72.dp).offset(y = (-34).dp)) {
-                Avatar(user.avatarUrl, user.shownName, 72.dp, Modifier.requiredSize(72.dp).border(4.dp, Ani.Panel, CircleShape))
-                StatusDot(user.status, 24.dp, Ani.Panel, Modifier.align(Alignment.BottomEnd))
+        // Banner shows through softly behind the content, fading into the card.
+        if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.requiredSize(64.dp)) {
+                Avatar(user.avatarUrl, user.shownName, 64.dp, Modifier.requiredSize(64.dp))
+                StatusDot(user.status, 20.dp, Color(0xFF151517), Modifier.align(Alignment.BottomEnd))
             }
-            Spacer(Modifier.weight(1f))
-            if (isOther) Box(Modifier.padding(top = 10.dp)) { FollowButton(user.uid, myFollowing, myFollowers, onToggle) }
-        }
-        Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp).offset(y = (-24).dp)) {
-            Text(user.shownName, style = inter(18.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("@${user.username}", style = inter(13f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (user.bio.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(user.bio, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                user.followers?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" followers") }, style = inter(12.5f), color = Ani.Muted) }
-                user.following?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" following") }, style = inter(12.5f), color = Ani.Muted) }
-            }
-            val isFriend = user.uid in myFriends
-            val followsYou = isOther && user.uid in myFollowers
-            if (isFriend || followsYou) {
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isFriend) Text("Friends", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Lime,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x22AAFF01)).padding(horizontal = 10.dp, vertical = 4.dp))
-                    if (followsYou) Text("Follows you", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Soft,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.ButtonDark).padding(horizontal = 10.dp, vertical = 4.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(user.shownName, style = inter(16.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("@${user.username}", style = inter(12.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (user.bio.isNotBlank()) Text(user.bio, style = inter(13f, lineHeight = 18f), color = Ani.Soft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    user.followers?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" followers") }, style = inter(12f), color = Ani.Muted) }
+                    if (isFriend) Text("Friends", style = inter(11f, FontWeight.SemiBold), color = Color(0xFFB7A9FF), modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x26B7A9FF)).padding(horizontal = 8.dp, vertical = 2.dp))
+                    else if (followsYou) Text("Follows you", style = inter(11f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF232326)).padding(horizontal = 8.dp, vertical = 2.dp))
                 }
+            }
+            if (isOther) {
+                Spacer(Modifier.width(10.dp))
+                val iFollow = user.uid in myFollowing
+                Text(
+                    if (iFollow) "Following" else if (user.uid in myFollowers) "Follow back" else "Follow",
+                    style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Color(0xFF0B0B0D),
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (iFollow) Color(0xFF232326) else Color(0xFFB7A9FF)).clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
         }
     }
-}
