@@ -120,7 +120,7 @@ private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
 }
-private val CAPTION_STYLES = listOf("Default", "Solid box")
+private val CAPTION_STYLES = listOf("Outline", "Dark box")
 
 private fun fmt(sec: Double): String {
     if (!sec.isFinite() || sec < 0) return "0:00"
@@ -521,21 +521,27 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (h.value * 0.052f).coerceIn(13f, 28f)
-            val face = inter(base, FontWeight.SemiBold, lineHeight = base * 1.3f).copy(
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, color = Color.White,
+            val base = (h.value * 0.058f).coerceIn(14.5f, 30f)
+            val face = inter(base, FontWeight.Bold, lineHeight = base * 1.28f).copy(
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, color = Color.White, letterSpacing = (base * 0.008f).sp,
             )
             // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
             val lifted = aCtl > 0.5f
             val bottomPad by animateDpAsState(if (lifted) (w * 0.032f).coerce(10.dp, 34.dp) + 22.dp else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
             val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
-                // Own style: clean Inter on a rounded dark box (no outline or shadow), scaled to the player size.
-                Text(
-                    line, style = face,
-                    modifier = Modifier.clip(RoundedCornerShape((base * 0.45f).dp)).background(Color(if (captionStyle == 0) 0xB3101012 else 0xF2101012))
-                        .padding(horizontal = (base * 0.7f).dp, vertical = (base * 0.28f).dp),
-                )
+                if (captionStyle == 0) {
+                    // Outline: bold Inter, white fill with a clean dark outline (no shadow), scaled to the player.
+                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
+                    Text(line, style = face.copy(color = Color(0xFF0A0A0C), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round, miter = 2f)))
+                    Text(line, style = face)
+                } else {
+                    Text(
+                        line, style = face,
+                        modifier = Modifier.clip(RoundedCornerShape((base * 0.45f).dp)).background(Color(0xCC101012))
+                            .padding(horizontal = (base * 0.7f).dp, vertical = (base * 0.28f).dp),
+                    )
+                }
             }
         }
 

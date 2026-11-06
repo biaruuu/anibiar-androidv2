@@ -173,3 +173,7 @@
 - The "closed unexpectedly" box now only appears after a real crash or freeze
 - Allowed servers that stream over plain http, and fixed a link-decoding bug for the Sakura server
 - Player errors show the real cause (HTTP code and host) and have a Copy report button
+
+## 40 | Nami server and outlined captions | 2026-11-06
+- New in-app server Nami (AniKoto): sub and dub, picks the right show by MyAnimeList id
+- Captions now default to a bold outlined style with no shadow; Dark box is the other option
