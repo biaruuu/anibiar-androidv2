@@ -357,7 +357,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             val ctx = LocalContext.current
                             Text("Copy report", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
                                 modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x80FFFFFF), RoundedCornerShape(50)).clickable {
-                                    val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
+                                    val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nplayer=${Streaming.lastPlayError ?: "-"}\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
                                     (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", report))
                                     android.widget.Toast.makeText(ctx, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
                                 }.padding(horizontal = 18.dp, vertical = 8.dp))

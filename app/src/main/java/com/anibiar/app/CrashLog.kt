@@ -19,10 +19,11 @@ object CrashLog {
                 append("Thread: ").append(t.name).append('\n')
                 append(Log.getStackTraceString(e).take(6000))
             }
-            runCatching { file(ctx).writeText(text) }
             Log.e("KiroCrash", text)
             val main = android.os.Looper.getMainLooper().thread
+            // Only an error that really closes the app is reported; background ones are swallowed silently.
             if (t !== main && e !is OutOfMemoryError) return@setDefaultUncaughtExceptionHandler
+            runCatching { file(ctx).writeText(text) }
             previous?.uncaughtException(t, e)
         }
     }
@@ -46,9 +47,6 @@ object CrashLog {
                 android.app.ApplicationExitInfo.REASON_CRASH -> "CRASH"
                 android.app.ApplicationExitInfo.REASON_CRASH_NATIVE -> "NATIVE_CRASH"
                 android.app.ApplicationExitInfo.REASON_ANR -> "NOT_RESPONDING"
-                android.app.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
-                android.app.ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
-                android.app.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
                 android.app.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INIT_FAILURE"
                 else -> return@runCatching null
             }

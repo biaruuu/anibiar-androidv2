@@ -266,6 +266,8 @@ object Streaming {
 
     /** Referer for the stream the player is playing now (only set for in-app providers). */
     @Volatile var activeReferer: String? = null
+    /** Last player error, included in the Copy report button. */
+    @Volatile var lastPlayError: String? = null
     fun isOwnHost(host: String?) = host != null && (BASE.endsWith(host) || BACKUP.endsWith(host))
 
     /** Raw text of a (proxied) subtitle file. */

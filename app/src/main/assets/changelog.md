@@ -167,3 +167,9 @@
 ## 38 | Fix freezing on long series | 2026-11-06
 - Episode and stream lookups now run off the main thread, so opening One Piece no longer freezes the app
 - Faster parsing of very long episode lists
+
+## 39 | New captions, playback fixes | 2026-11-06
+- New caption style: clean Inter on a rounded dark box, no outline or shadow, scales with the player (Default and Solid box)
+- The "closed unexpectedly" box now only appears after a real crash or freeze
+- Allowed servers that stream over plain http, and fixed a link-decoding bug for the Sakura server
+- Player errors show the real cause (HTTP code and host) and have a Copy report button

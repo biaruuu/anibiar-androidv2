@@ -120,7 +120,7 @@ private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
 }
-private val CAPTION_STYLES = listOf("Default", "Dark box")
+private val CAPTION_STYLES = listOf("Default", "Solid box")
 
 private fun fmt(sec: Double): String {
     if (!sec.isFinite() || sec < 0) return "0:00"
@@ -320,6 +320,9 @@ fun KiroPlayer(
                 // A pinned quality that fails goes back to Auto; a hiccup gets two quiet retries before trying the next server.
                 if (quality > 0) { userQuality = true; quality = -1 }
                 if (retries[0] < 2) { retries[0]++; scope.launch { delay(700); player.prepare() }; return }
+                val http = generateSequence<Throwable>(e) { it.cause }.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+                val detail = (if (http != null) "HTTP ${http.responseCode} from ${http.dataSpec.uri.host}" else (e.cause?.message ?: e.message).orEmpty().take(140))
+                com.anibiar.app.data.Streaming.lastPlayError = "${e.errorCodeName}: $detail (src=${src?.take(120)})"
                 error = "This server couldn't play the video (${e.errorCodeName})."; onFail()
             }
             override fun onVideoSizeChanged(v: VideoSize) { if (v.width > 0 && v.height > 0) videoRatio = v.width * v.pixelWidthHeightRatio / v.height }
@@ -518,32 +521,21 @@ fun KiroPlayer(
         val active = Captions.activeLine(cues, timeMs / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (h.value * 0.056f).coerceIn(13.5f, 30f)
-            val face = TextStyle(
-                fontFamily = TrebuchetFamily, fontSize = base.sp, lineHeight = (base * 1.2f).sp, fontWeight = FontWeight.Normal,
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, letterSpacing = 0.sp,
+            val base = (h.value * 0.052f).coerceIn(13f, 28f)
+            val face = inter(base, FontWeight.SemiBold, lineHeight = base * 1.3f).copy(
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, color = Color.White,
             )
             // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
             val lifted = aCtl > 0.5f
             val bottomPad by animateDpAsState(if (lifted) (w * 0.032f).coerce(10.dp, 34.dp) + 22.dp else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
             val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
-                if (captionStyle == 0) {
-                    // Crunchyroll look (from their CSS): Trebuchet, white, solid black outline ~4px at a ~32px font, plus a soft offset drop shadow.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.24f).sp.toPx() }
-                    Text(
-                        line, style = face.copy(
-                            color = Color.Black, drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round),
-                            shadow = Shadow(Color.Black, Offset(base * 0.17f, base * 0.17f), base * 0.45f),
-                        ),
-                    )
-                    Text(line, style = face.copy(color = Color.White))
-                } else {
-                    Text(
-                        line, style = face.copy(color = Color.White),
-                        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xBF000000)).padding(horizontal = 10.dp, vertical = 3.dp),
-                    )
-                }
+                // Own style: clean Inter on a rounded dark box (no outline or shadow), scaled to the player size.
+                Text(
+                    line, style = face,
+                    modifier = Modifier.clip(RoundedCornerShape((base * 0.45f).dp)).background(Color(if (captionStyle == 0) 0xB3101012 else 0xF2101012))
+                        .padding(horizontal = (base * 0.7f).dp, vertical = (base * 0.28f).dp),
+                )
             }
         }
 
@@ -578,6 +570,12 @@ fun KiroPlayer(
                 Spacer(Modifier.height(10.dp))
                 Text("Try again", style = inter(13f, FontWeight.SemiBold), color = Color.Black,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { error = null; player.prepare(); player.play() }.padding(horizontal = 18.dp, vertical = 8.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Copy report", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x80FFFFFF), RoundedCornerShape(50)).clickable {
+                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", "Kiro player report\n$e\n${com.anibiar.app.data.Streaming.lastPlayError}\n${java.util.Date()}"))
+                        android.widget.Toast.makeText(context, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
+                    }.padding(horizontal = 18.dp, vertical = 8.dp))
             }
         }
 

@@ -152,7 +152,7 @@ object LocalSources {
         val raw = bracketSlice(page, Regex("\\\\?\"stream\\\\?\":\\s*"), '{', '}', 0)
         val obj = raw?.let { runCatching { json.parseToJsonElement(unescape(it)).jsonObject }.getOrNull() }
         val source = obj?.get("source")?.jsonPrimitive?.contentOrNull
-            ?: Regex("\"source\"\\s*:\\s*\"([^\"]+)\"").find(page)?.groupValues?.get(1)?.replace("\\", "") ?: error("no stream")
+            ?: Regex("\"source\"\\s*:\\s*\"([^\"]+)\"").find(page)?.groupValues?.get(1)?.replace("\\u0026", "&")?.replace("\\/", "/")?.replace("\\", "") ?: error("no stream")
         val subs = (obj?.get("subtitles") as? JsonArray).orEmpty().mapNotNull { s ->
             val so = s as? JsonObject ?: return@mapNotNull null
             val u = so["src"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null

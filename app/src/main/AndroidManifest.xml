@@ -13,6 +13,7 @@
     <application
         android:name=".AniBiarApp"
         android:largeHeap="true"
+        android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
