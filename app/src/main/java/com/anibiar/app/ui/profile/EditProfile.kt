@@ -93,7 +93,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
     }
 
     if (showStatus) StatusSheet(profile) { showStatus = false }
-    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D))) {
         when (page) {
             "name" -> FieldPage(
                 "Name", "Your name can only be changed once every 7 days.", profile?.displayName.orEmpty(), 30,
@@ -115,19 +115,18 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
             ) { social.setBio(it); page = "main" }
             else -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
                 Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        AniIcons.ChevronLeft, "Back", tint = Color.White,
-                        modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp).size(44.dp).clip(CircleShape).clickable(onClick = onBack).padding(9.dp),
-                    )
+                    Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) {
+                        com.anibiar.app.ui.theme.GlassButton(onBack) { Icon(AniIcons.ChevronLeft, "Back", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                    }
                     Text("Edit profile", style = inter(17f, FontWeight.Bold), color = Color.White)
                 }
                 Spacer(Modifier.height(12.dp))
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
-                        Modifier.size(112.dp).clip(CircleShape).border(3.dp, Ani.Border, CircleShape).clickable { pickAvatar.launch("image/*") },
+                        Modifier.size(104.dp).clip(CircleShape).border(2.dp, Color.White, CircleShape).clickable { pickAvatar.launch("image/*") },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Avatar(profile?.avatarUrl, profile?.shownName, 112.dp)
+                        Avatar(profile?.avatarUrl, profile?.shownName, 104.dp)
                         Box(Modifier.fillMaxSize().background(Color(0x66000000)), contentAlignment = Alignment.Center) {
                             Icon(AniIcons.Photo, "Change photo", tint = Color.White, modifier = Modifier.size(38.dp))
                         }
@@ -187,7 +186,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
 
 @Composable
 private fun FormCard(content: @Composable () -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Ani.Item)) { content() }
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))) { content() }
 }
 
 @Composable
@@ -247,7 +246,7 @@ private fun FieldPage(
         Spacer(Modifier.height(22.dp))
         Row(
             Modifier.fillMaxWidth().then(if (multiline) Modifier.height(150.dp) else Modifier.height(52.dp))
-                .clip(RoundedCornerShape(12.dp)).background(Color(0xFF2A2A2E)).padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
+                .clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
             verticalAlignment = if (multiline) Alignment.Top else Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f), contentAlignment = if (multiline) Alignment.TopStart else Alignment.CenterStart) {

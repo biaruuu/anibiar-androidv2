@@ -198,3 +198,8 @@
 - Profile: full banner at the top with your name, handle and counts on it, avatar on the right, smaller text
 - Glass buttons on the profile like the video player; pencil edits your profile, share and settings at the top; no more Edit/Share buttons or "Set a status" bubble (status is in Edit profile)
 - New flat dark bottom tab bar (icon over label), also shown when you open someone's profile
+
+## 46 | Glass tab bar, matching edit profile and settings | 2026-11-07
+- Profile: sharper banner, smaller top buttons, no back arrow on your own profile
+- Bottom tab bar now uses the same glass buttons as the profile top bar
+- Edit profile and Settings restyled to match (dark page, glass buttons, rounded dark cards); the tab bar hides on Edit profile and follower lists

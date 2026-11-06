@@ -67,6 +67,7 @@ import com.anibiar.app.AniBiarApp
 import com.anibiar.app.social.ImageProc
 import com.anibiar.app.social.UserProfile
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.GlassButton
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +115,11 @@ fun ProfileScreen(
     val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
     val favCols = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.let { if (it >= 900) 6 else if (it >= 600) 4 else 3 }
     var busy by remember { mutableStateOf(false) }
+    val coverPage = editing || listTab != null
+    androidx.compose.runtime.DisposableEffect(coverPage) {
+        com.anibiar.app.ui.theme.NavState.hidden = coverPage
+        onDispose { com.anibiar.app.ui.theme.NavState.hidden = false }
+    }
 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
     val pickAvatar = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -145,12 +151,12 @@ fun ProfileScreen(
             item(key = "header") {
                 val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 // Banner fills the top; name, handle and counts sit on it, avatar on the right.
-                Box(Modifier.fillMaxWidth().height(topInset + 250.dp)) {
+                Box(Modifier.fillMaxWidth().height(topInset + 232.dp)) {
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x66000000), Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x40000000), Color.Transparent, Color(0x73000000), Color(0xFF0B0B0D)))))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
-                            Text(profile?.shownName ?: "Loading…", style = inter(24f, FontWeight.ExtraBold, lineHeight = 28f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             profile?.let { Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp)) }
                             Spacer(Modifier.height(14.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -160,8 +166,8 @@ fun ProfileScreen(
                                 BigStat("Friends", friendIds.size) { open("friends") }
                             }
                         }
-                        Box(Modifier.requiredSize(96.dp)) {
-                            Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp).border(3.dp, Color.White, CircleShape))
+                        Box(Modifier.requiredSize(92.dp)) {
+                            Avatar(profile?.avatarUrl, profile?.shownName, 92.dp, Modifier.requiredSize(92.dp).border(2.5.dp, Color.White, CircleShape))
                             StatusDot(profile?.status, 28.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
                         }
                     }
@@ -260,15 +266,15 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onBack != null) GlassButton(onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(21.dp)) }
-                    if (isMe) GlassButton({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(19.dp)) }
+                    if (onBack != null && !isMe) GlassButton(onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(19.dp)) }
+                    if (isMe) GlassButton({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isMe) onOpenInbox?.let { open ->
                         GlassButton(open) {
-                            Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(18.dp))
                             if (unread > 0) Box(
-                                Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(if (unread > 9) 18.dp else 16.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
+                                Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp).size(if (unread > 9) 16.dp else 14.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
                                 contentAlignment = Alignment.Center,
                             ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
                         }
@@ -283,8 +289,8 @@ fun ProfileScreen(
                                 "Share profile",
                             ),
                         )
-                    }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Share, "Share profile", tint = Color.White, modifier = Modifier.size(19.dp)) }
-                    if (isMe) onOpenSettings?.let { open -> GlassButton(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(20.dp)) } }
+                    }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Share, "Share profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
+                    if (isMe) onOpenSettings?.let { open -> GlassButton(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(18.dp)) } }
                 }
             }
         }
@@ -379,23 +385,11 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
         modifier = Modifier.clip(shape).border(1.dp, Ani.Border, shape).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp))
 }
 
-/** Glass circle button, the same look as the video player's controls. */
-@Composable
-private fun GlassButton(onClick: () -> Unit, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
-    Box(
-        Modifier.size(40.dp).clip(CircleShape).background(Color(0x73000000))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.06f))))
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.38f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.22f))), CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center, content = content,
-    )
-}
-
 @Composable
 private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
     Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
-        Text("$count", style = inter(17f, FontWeight.Bold), color = Color.White)
-        Text(label, style = inter(12f), color = Color(0xFFB4B1BA), maxLines = 1)
+        Text("$count", style = inter(16f, FontWeight.Bold), color = Color.White)
+        Text(label, style = inter(11.5f), color = Color(0xFFB4B1BA), maxLines = 1)
     }
 }
 

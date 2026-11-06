@@ -86,10 +86,19 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
 
     Column(
-        Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding().verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp).padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 110.dp),
     ) {
-        Text("Settings", style = inter(26f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(top = 18.dp, bottom = 16.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Settings", style = inter(22f, FontWeight.ExtraBold), color = Color.White, modifier = Modifier.weight(1f))
+            if (me != null) com.anibiar.app.ui.theme.GlassButton(onOpenInbox) {
+                Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(18.dp))
+                if (unread > 0) Box(
+                    Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp).size(if (unread > 9) 16.dp else 14.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
+                    contentAlignment = Alignment.Center,
+                ) { Text(if (unread > 9) "9+" else "$unread", style = inter(8.5f, FontWeight.Bold), color = Color.White) }
+            }
+        }
 
         if (me == null) {
             Card {
@@ -237,8 +246,8 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
 
 @Composable
 private fun Card(content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
-    Box(Modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape)) { content() }
+    val shape = RoundedCornerShape(20.dp)
+    Box(Modifier.fillMaxWidth().clip(shape).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), shape)) { content() }
 }
 
 @Composable
@@ -248,7 +257,7 @@ private fun Section(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Divider() { Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border)) }
+private fun Divider() { Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x14FFFFFF))) }
 
 @Composable
 private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {

@@ -43,12 +43,12 @@ enum class NavTab(val label: String, val icon: ImageVector) {
     Settings("Settings", AniIcons.Settings),
 }
 
-/** Flat dark tab bar: icon over label, the selected tab in white, the rest muted. Pads itself for the system nav bar. */
+/** Dark tab bar whose icons are the same glass buttons as the profile's top bar; the selected one is brighter. */
 @Composable
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().background(Color(0xFF0B0B0D)).navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0x1FFFFFFF)))
-        Row(Modifier.fillMaxWidth().height(54.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
             NavTab.entries.forEach { tab -> NavItem(tab, tab == selected, { onSelect(tab) }, Modifier.weight(1f)) }
         }
     }
@@ -56,13 +56,15 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 @Composable
 private fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val tint by animateColorAsState(if (selected) Color.White else Color(0xFF8A8A92), tween(160), label = "navTint")
+    val tint by animateColorAsState(if (selected) Color.White else Color(0xFF9B98A0), tween(160), label = "navTint")
     Column(
         modifier.fillMaxHeight().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
-        Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(25.dp))
-        Spacer(Modifier.height(2.dp))
-        Text(tab.label, style = inter(10.5f, if (selected) FontWeight.Bold else FontWeight.Medium), color = tint, maxLines = 1)
+        com.anibiar.app.ui.theme.GlassButton(onClick, size = 34.dp, selected = selected) {
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(tab.label, style = inter(10f, if (selected) FontWeight.Bold else FontWeight.Medium), color = tint, maxLines = 1)
     }
 }
