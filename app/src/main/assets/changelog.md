@@ -154,3 +154,7 @@
 - Errors on background threads (network, player loading) no longer close the app
 - If Kiro does close, the next launch shows what went wrong with a Copy report button
 - Episode list ignores duplicate episode numbers from different servers
+
+## 36 | Episode details and error reports | 2026-11-06
+- Episode titles, thumbnails and air dates are filled in live (ani.zip and MyAnimeList) when a streaming server leaves them blank
+- When an episode or server fails, a Copy report button gives you the exact error to send

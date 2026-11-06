@@ -109,7 +109,23 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         runCatching { app.repository.fetchDetails(id) }.onSuccess { value = it }
     }
 
-    var eps by remember { mutableStateOf<EpisodesPayload?>(null) }
+    var epsRaw by remember { mutableStateOf<EpisodesPayload?>(null) }
+    // Titles, thumbnails and air dates from ani.zip / Jikan fill whatever the streaming servers left blank (cached copy first, then live).
+    val epsInfo by produceState<List<com.anibiar.app.data.EpisodeInfo>>(emptyList(), id, anime?.idMal) {
+        app.repository.cachedEpisodes(id)?.let { value = it }
+        runCatching { app.repository.fetchEpisodes(id, anime?.idMal) }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { value = it }
+    }
+    val eps: EpisodesPayload? = remember(epsRaw, epsInfo) {
+        val raw = epsRaw ?: return@remember null
+        if (epsInfo.isEmpty()) return@remember raw
+        val by = epsInfo.associateBy { it.number }
+        fun fill(l: List<WatchEpisode>) = l.map { e ->
+            val i = by[e.number] ?: return@map e
+            val generic = e.title.isBlank() || Regex("^episode\\s*\\d+$", RegexOption.IGNORE_CASE).matches(e.title.trim())
+            e.copy(title = if (generic && !i.title.isNullOrBlank()) i.title else e.title, image = e.image ?: i.image, airDate = e.airDate ?: i.date)
+        }
+        raw.copy(sub = fill(raw.sub), dub = fill(raw.dub))
+    }
     var epsError by remember { mutableStateOf<String?>(null) }
     var epsTry by remember { mutableIntStateOf(0) }
     var audio by remember { mutableStateOf(joinRoom?.audio ?: "sub") }
@@ -179,8 +195,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
 
     LaunchedEffect(id, epsTry) {
-        eps = null; epsError = null
-        runCatching { Streaming.episodesLive(id) { eps = it } }.onSuccess { }.onFailure { epsError = it.message ?: "Couldn't load episodes" }
+        epsRaw = null; epsError = null
+        runCatching { Streaming.episodesLive(id) { epsRaw = it } }.onSuccess { }.onFailure { epsError = it.message ?: "Couldn't load episodes" }
     }
     val list: List<WatchEpisode> = eps?.let { if (audio == "dub" && it.dub.isNotEmpty()) it.dub else it.sub }.orEmpty()
     LaunchedEffect(eps, audio) {
@@ -338,6 +354,14 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             Spacer(Modifier.height(4.dp))
                             Text(err, style = inter(12f, lineHeight = 16f), color = Color(0xB3FFFFFF))
                             Spacer(Modifier.height(10.dp))
+                            val ctx = LocalContext.current
+                            Text("Copy report", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x80FFFFFF), RoundedCornerShape(50)).clickable {
+                                    val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
+                                    (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", report))
+                                    android.widget.Toast.makeText(ctx, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
+                                }.padding(horizontal = 18.dp, vertical = 8.dp))
+                            Spacer(Modifier.height(8.dp))
                             Text("Try again", style = inter(12.5f, FontWeight.SemiBold), color = Color.Black,
                                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { if (epsError != null) epsTry++ else watchTry++ }.padding(horizontal = 18.dp, vertical = 8.dp))
                         } else {
