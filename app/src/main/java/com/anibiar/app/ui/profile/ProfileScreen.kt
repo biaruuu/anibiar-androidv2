@@ -301,7 +301,7 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onBack != null && !isMe) GlassButton(onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(19.dp)) }
+                    if (onBack != null) com.anibiar.app.ui.theme.GlassBack(onBack)
                     if (isMe) GlassButton({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

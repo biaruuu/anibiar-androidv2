@@ -23,9 +23,10 @@ import androidx.compose.ui.unit.dp
 fun GlassButton(onClick: () -> Unit, size: Dp = 36.dp, selected: Boolean = false, content: @Composable BoxScope.() -> Unit) {
     val hi = if (selected) 0.30f else 0.14f
     Box(
-        Modifier.size(size).clip(CircleShape).background(Color(if (selected) 0x59FFFFFF else 0x73000000))
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = hi), Color.White.copy(alpha = 0.02f), Color.White.copy(alpha = 0.06f))))
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (selected) 0.55f else 0.38f), Color.White.copy(alpha = 0.06f), Color.White.copy(alpha = 0.22f))), CircleShape)
+        Modifier.size(size).clip(CircleShape)
+            .background(Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036))))
+            .then(if (selected) Modifier.background(Color(0x40FFFFFF)) else Modifier)
+            .border(1.dp, Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF))), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center, content = content,
     )
@@ -55,4 +56,18 @@ fun GlassMenuItem(label: String, icon: String, color: Color = Color.White, onCli
         leadingIcon = { androidx.compose.material3.Text(icon, fontSize = androidx.compose.ui.unit.TextUnit(16f, androidx.compose.ui.unit.TextUnitType.Sp)) },
         onClick = onClick,
     )
+}
+
+/** The round glass "<" back button used on every full page. */
+@Composable
+fun GlassBack(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier) {
+        GlassButton(onClick = onClick, size = 36.dp) {
+            androidx.compose.foundation.Canvas(Modifier.size(20.dp)) {
+                val w = size.width; val h = size.height
+                val path = androidx.compose.ui.graphics.Path().apply { moveTo(w * 0.62f, h * 0.2f); lineTo(w * 0.3f, h * 0.5f); lineTo(w * 0.62f, h * 0.8f) }
+                drawPath(path, Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.11f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            }
+        }
+    }
 }

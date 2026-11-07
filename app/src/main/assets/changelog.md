@@ -240,3 +240,7 @@
 - Only the newest bubble in a run keeps the tail; older ones are plain rounded
 - Smaller + button; long-press and three-dot menus restyled as glass popups
 - Inbox, Profile, Settings and Edit profile cards now use the same glass surface
+
+## 55 | One back button, no tab bar on Inbox, Profile, Settings | 2026-11-07
+- Inbox, Profile and Settings drop the bottom bar and use a glass < button instead
+- All round icon buttons share the same glass style as the chat

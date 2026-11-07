@@ -108,7 +108,7 @@ private val Int.sp get() = androidx.compose.ui.unit.TextUnit(this.toFloat(), and
 
 /** The Inbox tab: Activity entry on top, then chats with unread badges and streaks. */
 @Composable
-fun InboxTab(onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUser: (String) -> Unit) {
+fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUser: (String) -> Unit) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     val social = app.social
     val chats by remember { social.conversations() }.collectAsStateWithLifecycle(emptyList())
@@ -126,7 +126,8 @@ fun InboxTab(onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUse
     LaunchedEffect(following.size) { suggested = social.suggestions(ids.toSet(), 10) }
 
     Column(Modifier.fillMaxSize().background(Bg).windowInsetsPadding(WindowInsets.statusBars)) {
-        Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+            com.anibiar.app.ui.theme.GlassBack(onBack, Modifier.align(Alignment.CenterStart))
             Text("Inbox", style = inter(19f, FontWeight.ExtraBold), color = Color.White)
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 90.dp)) {

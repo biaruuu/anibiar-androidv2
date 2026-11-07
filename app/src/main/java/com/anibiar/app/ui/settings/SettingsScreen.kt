@@ -71,7 +71,8 @@ private sealed interface Dlg {
 
 /** Account information, profile link, privacy and log out. One scrolling page, no sub-screens. */
 @Composable
-fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: () -> Unit) {
+fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: () -> Unit, onBack: () -> Unit = {}) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val social = app.social
@@ -90,6 +91,8 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
             .padding(horizontal = 16.dp).padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 110.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            com.anibiar.app.ui.theme.GlassBack(onBack)
+            Spacer(Modifier.width(12.dp))
             Text("Settings", style = inter(22f, FontWeight.ExtraBold), color = Color.White, modifier = Modifier.weight(1f))
             if (me != null) com.anibiar.app.ui.theme.GlassButton(onOpenInbox) {
                 Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(18.dp))

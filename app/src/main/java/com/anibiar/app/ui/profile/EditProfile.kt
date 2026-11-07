@@ -116,7 +116,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
             else -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
                 Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) {
-                        com.anibiar.app.ui.theme.GlassButton(onBack) { Icon(AniIcons.ChevronLeft, "Back", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                        com.anibiar.app.ui.theme.GlassBack(onBack)
                     }
                     Text("Edit profile", style = inter(17f, FontWeight.Bold), color = Color.White)
                 }

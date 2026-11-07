@@ -75,7 +75,7 @@ internal fun FollowListScreen(
     Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp)) {
             Box(Modifier.align(Alignment.CenterStart)) {
-                com.anibiar.app.ui.theme.GlassButton(onClick = onBack) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(19.dp).align(Alignment.Center)) }
+                com.anibiar.app.ui.theme.GlassBack(onBack)
             }
             Text("@$username", style = inter(17f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.Center).padding(horizontal = 56.dp))
         }

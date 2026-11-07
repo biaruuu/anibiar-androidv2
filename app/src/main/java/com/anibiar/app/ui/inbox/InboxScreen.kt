@@ -65,10 +65,8 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
 
     Column(Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                AniIcons.ArrowBack, "Back", tint = Color.White,
-                modifier = Modifier.padding(start = 8.dp).size(44.dp).clip(CircleShape).clickable(onClick = onBack).padding(10.dp),
-            )
+            Spacer(Modifier.width(12.dp))
+            com.anibiar.app.ui.theme.GlassBack(onBack)
             Spacer(Modifier.width(8.dp))
             Text("Inbox", style = inter(20f, FontWeight.Bold), color = Color.White)
         }

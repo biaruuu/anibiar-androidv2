@@ -231,6 +231,7 @@ private fun AppNavigation() {
         if (inboxTab && authState != null) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 com.anibiar.app.ui.inbox.InboxTab(
+                    onBack = { inboxTab = false },
                     onOpenActivity = { inboxOpen = true },
                     onOpenChat = { chatUid = it },
                     onOpenUser = { userStack.add(it) },
@@ -243,6 +244,7 @@ private fun AppNavigation() {
                     onLogin = { settingsOpen = false; profileOpen = true },
                     onOpenInbox = { inboxOpen = true },
                     onOpenProfile = { settingsOpen = false; profileOpen = true },
+                    onBack = { settingsOpen = false },
                 )
             }
         }
@@ -376,7 +378,7 @@ private fun AppNavigation() {
         val noticeUnread by social.unread.collectAsStateWithLifecycle()
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !inboxOpen && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
+            visible = stack.isEmpty() && !inboxOpen && !inboxTab && !profileOpen && !settingsOpen && userStack.isEmpty() && chatUid == null && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),
