@@ -340,7 +340,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
 private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
     Column(
-        Modifier.width(92.dp).clip(shape).background(if (selected) Color(0xFF2A2A2E) else com.anibiar.app.ui.theme.GlassFill)
+        Modifier.width(92.dp).clip(shape).background(if (selected) SolidColor(Color(0xFF2A2A2E)) else com.anibiar.app.ui.theme.GlassFill)
             .border(1.dp, if (selected) Color(0x99FFFFFF) else Color(0x1AFFFFFF), shape).clickable(onClick = onClick).padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
