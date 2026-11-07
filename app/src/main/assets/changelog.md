@@ -258,3 +258,6 @@
 - Home card badges are lighter, bolder glass pills; the + / bookmark buttons are glass
 - Removed the Kiro header and search icon from Home and Details (search lives in the Search tab)
 - Details page icons (bookmark, site links, card badges) restyled as glass
+
+## 60 | Compact liquid-glass tab bar | 2026-11-07
+- Tab bar is smaller and narrower; press and slide across it and a glass lens follows your finger and magnifies the icons
