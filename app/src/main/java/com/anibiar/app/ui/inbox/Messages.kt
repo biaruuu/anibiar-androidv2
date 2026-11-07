@@ -115,6 +115,7 @@ fun InboxTab(onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUse
     var people by remember { mutableStateOf<Map<String, UserProfile>>(emptyMap()) }
     var suggested by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     val scope = rememberCoroutineScope()
+    val pinned by social.pinnedChats.collectAsStateWithLifecycle()
     val ids = chats.map { it.otherId }
     LaunchedEffect(ids) {
         val missing = ids.filter { it !in people }
@@ -154,7 +155,7 @@ fun InboxTab(onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUse
                     }
                 }
             }
-            items(chats, key = { it.otherId }) { c -> ChatRow(c, people[c.otherId], { onOpenChat(c.otherId) }, { onOpenUser(c.otherId) }) }
+            items(chats.sortedByDescending { it.otherId in pinned }, key = { it.otherId }) { c -> ChatRow(c, people[c.otherId], c.otherId in pinned, { onOpenChat(c.otherId) }, { onOpenUser(c.otherId) }) }
             if (suggested.isNotEmpty()) {
                 item {
                     Text("Suggested accounts", style = inter(14f, FontWeight.Bold), color = Muted, modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp))
@@ -188,13 +189,14 @@ private fun Badge(n: Int) {
 }
 
 @Composable
-private fun ChatRow(c: DmConversation, p: UserProfile?, onClick: () -> Unit, onAvatar: () -> Unit) {
+private fun ChatRow(c: DmConversation, p: UserProfile?, pinned: Boolean, onClick: () -> Unit, onAvatar: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Avatar(p?.avatarUrl, p?.username, 52.dp, Modifier.clickable(onClick = onAvatar))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(p?.shownName ?: "…", style = inter(15.5f, if (c.unread > 0) FontWeight.ExtraBold else FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (pinned) Text("★", fontSize = 14.sp, color = Color(0xFFFFD25A), modifier = Modifier.padding(start = 5.dp))
                 StreakBadge(c.streak, Modifier.padding(start = 6.dp))
             }
             Text(
@@ -247,20 +249,42 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     val glass = Brush.verticalGradient(listOf(Color(0xCC2E2E34), Color(0xE61A1A1E)))
     val rim = Brush.verticalGradient(listOf(Color(0x66FFFFFF), Color(0x14FFFFFF)))
     Column(Modifier.fillMaxSize().background(Color.Black).imePadding()) {
-        Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(84.dp).padding(horizontal = 14.dp)) {
-            Box(Modifier.align(Alignment.CenterStart)) {
-                GlassButton(onClick = onBack, size = 40.dp) { Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp).align(Alignment.Center)) }
+        Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(76.dp).padding(horizontal = 14.dp)) {
+            Box(Modifier.align(Alignment.CenterStart).size(36.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
+                ChevronBack(Color.White, Modifier.size(20.dp))
             }
             Column(Modifier.align(Alignment.Center).clickable { onOpenUser(uid) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(person?.avatarUrl, person?.username, 44.dp)
+                Avatar(person?.avatarUrl, person?.username, 40.dp)
                 Text(
-                    person?.shownName ?: "…", style = inter(12.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.offset(y = (-6).dp).clip(RoundedCornerShape(50)).background(Color(0xE61E1E22)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp).widthIn(max = 160.dp),
+                    person?.shownName ?: "…", style = inter(12f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.offset(y = (-6).dp).clip(RoundedCornerShape(50)).background(Color(0xE61E1E22)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 1.dp).widthIn(max = 140.dp),
                 )
             }
-            if (streak >= 2) Box(
-                Modifier.align(Alignment.CenterEnd).clip(RoundedCornerShape(50)).background(glass).border(1.dp, rim, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 8.dp),
-            ) { StreakBadge(streak, big = true) }
+            var menu by remember { mutableStateOf(false) }
+            val pinned by social.pinnedChats.collectAsStateWithLifecycle()
+            val isPinned = uid in pinned
+            Row(
+                Modifier.align(Alignment.CenterEnd).height(36.dp).clip(RoundedCornerShape(50)).background(glass).border(1.dp, rim, RoundedCornerShape(50)).padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (streak >= 2) StreakBadge(streak, Modifier.padding(horizontal = 6.dp))
+                Text(
+                    if (isPinned) "★" else "☆", fontSize = 20.sp, color = if (isPinned) Color(0xFFFFD25A) else Color.White,
+                    modifier = Modifier.clip(CircleShape).clickable {
+                        social.togglePin(uid)
+                        Toast.makeText(context, if (isPinned) "Unpinned" else "Pinned to top of Inbox", Toast.LENGTH_SHORT).show()
+                    }.padding(horizontal = 9.dp),
+                )
+                Box {
+                    Row(Modifier.clip(CircleShape).clickable { menu = true }.padding(horizontal = 9.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+                        repeat(3) { Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White)) }
+                    }
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Color(0xFF1E1E22)) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("View profile", color = Color.White) }, onClick = { menu = false; onOpenUser(uid) })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(if (isPinned) "Unpin chat" else "Pin chat", color = Color.White) }, onClick = { menu = false; social.togglePin(uid) })
+                    }
+                }
+            }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
             if (msgs.isEmpty()) item {
@@ -281,19 +305,19 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     stamp(m.at), style = inter(11.5f, FontWeight.Medium), color = Muted,
                     modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 14.dp, bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
-                val tail = if (lastInGroup) 5.dp else 20.dp
-                val shape = if (m.mine) RoundedCornerShape(20.dp, 20.dp, tail, 20.dp) else RoundedCornerShape(20.dp, 20.dp, 20.dp, tail)
+                val tail = if (lastInGroup) 4.dp else 18.dp
+                val shape = if (m.mine) RoundedCornerShape(18.dp, 18.dp, tail, 18.dp) else RoundedCornerShape(18.dp, 18.dp, 18.dp, tail)
                 Row(Modifier.fillMaxWidth().padding(top = if (firstInGroup) 0.dp else 2.dp), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
                     if (!m.mine) {
-                        Box(Modifier.size(30.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 30.dp) }
+                        Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp) }
                         Spacer(Modifier.width(8.dp))
                     }
                     Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
                         Text(
-                            m.body, style = inter(15.5f, FontWeight.Normal, 21f), color = Color.White,
-                            modifier = Modifier.widthIn(max = 280.dp).clip(shape)
+                            m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White,
+                            modifier = Modifier.widthIn(max = 270.dp).clip(shape)
                                 .background(if (m.mine) Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0))) else Brush.verticalGradient(listOf(Color(0xFF2C2C31), Color(0xFF232327))))
-                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
                         )
                         if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
                     }
@@ -301,24 +325,24 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             }
         }
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
-                Text("+", style = inter(24f, FontWeight.Light), color = Color.White)
+            Box(Modifier.size(34.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
+                Text("+", style = inter(20f, FontWeight.Light), color = Color.White)
             }
-            Spacer(Modifier.width(10.dp))
-            Row(Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(26.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(26.dp)).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(8.dp))
+            Row(Modifier.weight(1f).heightIn(min = 36.dp).clip(RoundedCornerShape(22.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(22.dp)).padding(start = 14.dp, end = 4.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f).padding(vertical = 4.dp)) {
-                    if (text.isEmpty()) Text("Message…", style = inter(15.5f), color = Muted)
+                    if (text.isEmpty()) Text("Message…", style = inter(14f), color = Muted)
                     BasicTextField(
                         value = text, onValueChange = { if (it.length <= 2000) text = it },
-                        textStyle = inter(15.5f).copy(color = Color.White), cursorBrush = SolidColor(Accent), maxLines = 5,
+                        textStyle = inter(14f).copy(color = Color.White), cursorBrush = SolidColor(Accent), maxLines = 5,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 val ready = text.isNotBlank() && !sending
                 if (ready) Box(
-                    Modifier.size(34.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0)))).clickable { send() },
+                    Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0)))).clickable { send() },
                     contentAlignment = Alignment.Center,
-                ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = 90f }) }
+                ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f }) }
             }
         }
     }
@@ -330,4 +354,14 @@ private fun stamp(at: Long): String {
     val d = day.format(java.util.Date(at)); val now = day.format(java.util.Date())
     val yest = day.format(java.util.Date(System.currentTimeMillis() - 86400000))
     return when (d) { now -> "Today $time"; yest -> "Yesterday $time"; else -> java.text.SimpleDateFormat("MMM d, h:mm a", java.util.Locale.getDefault()).format(java.util.Date(at)) }
+}
+
+/** A thin "<" chevron. */
+@Composable
+private fun ChevronBack(color: Color, modifier: Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = size.width; val h = size.height
+        val path = androidx.compose.ui.graphics.Path().apply { moveTo(w * 0.62f, h * 0.2f); lineTo(w * 0.3f, h * 0.5f); lineTo(w * 0.62f, h * 0.8f) }
+        drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.11f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    }
 }

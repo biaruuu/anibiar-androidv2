@@ -126,6 +126,14 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     private val _dmUnread = MutableStateFlow(0)
     /** Unread direct messages across all chats, for the Inbox tab badge. */
     val dmUnread: StateFlow<Int> = _dmUnread.asStateFlow()
+    private val _pinned = MutableStateFlow<Set<String>>(prefs.getStringSet("pinned_chats", emptySet())?.toSet() ?: emptySet())
+    /** Chats I pinned to the top of the Inbox (kept on this device). */
+    val pinnedChats: StateFlow<Set<String>> = _pinned.asStateFlow()
+    fun togglePin(uid: String) {
+        val next = if (uid in _pinned.value) _pinned.value - uid else _pinned.value + uid
+        _pinned.value = next
+        prefs.edit().putStringSet("pinned_chats", next).apply()
+    }
     private val tick = MutableStateFlow(0)
 
     /** Bumped when a confirmation link signs the user in, so the UI can jump to the profile. */

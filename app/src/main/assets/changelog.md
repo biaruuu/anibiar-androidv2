@@ -223,3 +223,7 @@
 ## 50 | Liquid glass tab bar and chat | 2026-11-07
 - Bottom bar is now a floating liquid-glass pill with a glass capsule on the selected tab
 - Chat redesigned with rounded gradient bubbles, grouped messages with tails, avatars, time stamps, glass input bar and glass streak pill
+
+## 51 | Chat header, pin and smaller bubbles | 2026-11-07
+- Chat header: thin back chevron, star to pin the chat to the top of the Inbox, and a three-dot menu
+- Smaller bubbles, smaller + button and message bar
