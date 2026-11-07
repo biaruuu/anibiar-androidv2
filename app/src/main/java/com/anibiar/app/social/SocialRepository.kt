@@ -47,7 +47,7 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
-data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean)
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null)
 
 data class UserProfile(
     val uid: String,
@@ -473,7 +473,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
-        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at&order=id.desc&limit=200"
+        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to&order=id.desc&limit=200"
         return getRows(q).map {
             val o = it.jsonObject
             DmMessage(
@@ -482,6 +482,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 body = o["body"]!!.jsonPrimitive.content,
                 at = isoMs(o["created_at"]?.jsonPrimitive?.contentOrNull),
                 read = o["read_at"]?.jsonPrimitive?.contentOrNull != null,
+                replyTo = o["reply_to"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
             )
         }.reversed()
     }
@@ -499,13 +500,13 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    suspend fun sendMessage(to: String, body: String) = net {
+    suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
         val text = body.trim()
         if (text.isEmpty()) return@net
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         val (code, resp) = raw(
             "POST", "/rest/v1/dm_messages",
-            buildJsonObject { put("sender_id", me); put("recipient_id", to); put("body", text) }.toString().toByteArray(),
+            buildJsonObject { put("sender_id", me); put("recipient_id", to); put("body", text); if (replyTo != null) put("reply_to", replyTo) }.toString().toByteArray(),
             extra = mapOf("Prefer" to "return=minimal"),
         )
         if (code !in 200..299) {
@@ -514,6 +515,17 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         }
         chatTick.value++; refreshSoon()
     }
+
+    /** Tell [peer] I'm typing (or stopped). Fire and forget. */
+    suspend fun setTyping(peer: String, on: Boolean) {
+        runCatching { raw("POST", "/rest/v1/rpc/dm_set_typing", buildJsonObject { put("peer", peer); put("is_on", on) }.toString().toByteArray()) }
+    }
+
+    /** Is [peer] typing to me right now? (Server-side clock, last 5 s.) */
+    suspend fun isTyping(peer: String): Boolean = try {
+        val (code, text) = raw("POST", "/rest/v1/rpc/dm_is_typing", buildJsonObject { put("peer", peer) }.toString().toByteArray())
+        code in 200..299 && text.trim() == "true"
+    } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
 
     suspend fun unsendMessage(id: Long) = net {
         val (code, text) = raw("DELETE", "/rest/v1/dm_messages?id=eq.$id", extra = mapOf("Prefer" to "return=minimal"))

@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import com.anibiar.app.social.DmMessage
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.offset
@@ -233,7 +236,18 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     val streak = chats.firstOrNull { it.otherId == uid }?.streak ?: 0
     var text by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
+    var replyTo by remember { mutableStateOf<DmMessage?>(null) }
+    var theirTyping by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    LaunchedEffect(uid) { while (true) { theirTyping = social.isTyping(uid); kotlinx.coroutines.delay(1500) } }
+    var typingSentAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(text) {
+        val now = System.currentTimeMillis()
+        if (text.isNotBlank()) { if (now - typingSentAt > 2500) { typingSentAt = now; social.setTyping(uid, true) } }
+        else if (typingSentAt != 0L) { typingSentAt = 0L; social.setTyping(uid, false) }
+    }
+    LaunchedEffect(theirTyping) { if (theirTyping) list.animateScrollToItem(msgs.size) }
     LaunchedEffect(uid) { person = social.fetchProfile(uid) }
     LaunchedEffect(msgs.size) {
         if (msgs.isNotEmpty()) list.animateScrollToItem(msgs.size - 1)
@@ -245,7 +259,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
         if (t.isEmpty() || sending) return
         sending = true
         scope.launch {
-            try { social.sendMessage(uid, t); text = "" }
+            try { social.sendMessage(uid, t, replyTo?.id); text = ""; replyTo = null }
             catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
             sending = false
         }
@@ -286,8 +300,8 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                         repeat(3) { Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White)) }
                     }
                     com.anibiar.app.ui.theme.GlassMenu(expanded = menu, onDismiss = { menu = false }) {
-                        com.anibiar.app.ui.theme.GlassMenuItem("View profile", "👤") { menu = false; onOpenUser(uid) }
-                        com.anibiar.app.ui.theme.GlassMenuItem(if (isPinned) "Unpin chat" else "Pin chat", "📌") { menu = false; social.togglePin(uid) }
+                        com.anibiar.app.ui.theme.GlassMenuItem("View profile", AniIcons.Person) { menu = false; onOpenUser(uid) }
+                        com.anibiar.app.ui.theme.GlassMenuItem(if (isPinned) "Unpin chat" else "Pin chat", AniIcons.Pin) { menu = false; social.togglePin(uid) }
                     }
                 }
             }
@@ -312,36 +326,101 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 14.dp, bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 val shape = BubbleShape(m.mine, lastInGroup)
-                Row(Modifier.fillMaxWidth().padding(top = if (firstInGroup) 0.dp else 2.dp), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
-                    if (!m.mine) {
-                        Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp) }
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
-                        var menuOpen by remember { mutableStateOf(false) }
-                        Box {
-                            Text(
-                                m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White,
-                                modifier = Modifier.widthIn(max = 276.dp).clip(shape)
-                                    .background(if (m.mine) Color(0xFF7F6BF5) else Color(0xFF2A2A2E))
-                                    .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                                    .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
-                            )
-                            com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
-                                com.anibiar.app.ui.theme.GlassMenuItem("Copy text", "📋") {
-                                    menuOpen = false
-                                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(m.body))
-                                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                val drag = remember { androidx.compose.animation.core.Animatable(0f) }
+                val maxDrag = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
+                val dir = if (m.mine) -1f else 1f
+                Box(
+                    Modifier.fillMaxWidth().padding(top = if (firstInGroup) 0.dp else 2.dp)
+                        .pointerInput(m.id) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    scope.launch {
+                                        if (kotlin.math.abs(drag.value) > maxDrag * 0.72f) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); replyTo = m }
+                                        drag.animateTo(0f, androidx.compose.animation.core.spring(0.55f, 500f))
+                                    }
+                                },
+                                onDragCancel = { scope.launch { drag.animateTo(0f) } },
+                            ) { change, dx ->
+                                change.consume()
+                                val next = (drag.value + dx * 0.6f)
+                                scope.launch { drag.snapTo(if (dir > 0) next.coerceIn(0f, maxDrag) else next.coerceIn(-maxDrag, 0f)) }
+                            }
+                        },
+                ) {
+                    val pull = (kotlin.math.abs(drag.value) / maxDrag).coerceIn(0f, 1f)
+                    Icon(
+                        AniIcons.Reply, null, tint = Color.White,
+                        modifier = Modifier.align(if (m.mine) Alignment.CenterEnd else Alignment.CenterStart).padding(horizontal = 8.dp).size(20.dp)
+                            .graphicsLayer { alpha = pull; scaleX = 0.6f + 0.5f * pull; scaleY = 0.6f + 0.5f * pull },
+                    )
+                    Row(
+                        Modifier.fillMaxWidth().graphicsLayer { translationX = drag.value },
+                        horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom,
+                    ) {
+                        if (!m.mine) {
+                            Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp) }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
+                            var menuOpen by remember { mutableStateOf(false) }
+                            Box {
+                                Column(
+                                    Modifier.widthIn(max = 276.dp).clip(shape)
+                                        .background(if (m.mine) Color(0xFF7F6BF5) else Color(0xFF2A2A2E))
+                                        .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
+                                        .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
+                                ) {
+                                    m.replyTo?.let { rid ->
+                                        val t = msgs.firstOrNull { it.id == rid }
+                                        Row(
+                                            Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x33000000)).padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(AniIcons.Reply, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(12.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text(t?.body ?: "Message unsent", style = inter(12f), color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                    Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White)
                                 }
-                                if (m.mine) com.anibiar.app.ui.theme.GlassMenuItem("Unsend", "🗑", Color(0xFFFF6B6B)) {
-                                    menuOpen = false
-                                    scope.launch { runCatching { social.unsendMessage(m.id) }.onFailure { Toast.makeText(context, it.message ?: "Couldn't unsend", Toast.LENGTH_SHORT).show() } }
+                                com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
+                                    com.anibiar.app.ui.theme.GlassMenuItem("Reply", AniIcons.Reply) { menuOpen = false; replyTo = m }
+                                    com.anibiar.app.ui.theme.GlassMenuItem("Copy text", AniIcons.Copy) {
+                                        menuOpen = false
+                                        clipboard.setText(androidx.compose.ui.text.AnnotatedString(m.body))
+                                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                                    }
+                                    if (m.mine) com.anibiar.app.ui.theme.GlassMenuItem("Unsend", AniIcons.Delete, Color(0xFFFF6B6B)) {
+                                        menuOpen = false
+                                        scope.launch { runCatching { social.unsendMessage(m.id) }.onFailure { Toast.makeText(context, it.message ?: "Couldn't unsend", Toast.LENGTH_SHORT).show() } }
+                                    }
                                 }
                             }
+                            if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
                         }
-                        if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
                     }
                 }
+            }
+            if (theirTyping) item(key = "typing") {
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
+                    Avatar(person?.avatarUrl, person?.username, 26.dp)
+                    Spacer(Modifier.width(8.dp))
+                    TypingBubble()
+                }
+            }
+        }
+        replyTo?.let { r ->
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(16.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(16.dp)).padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AniIcons.Reply, null, tint = Accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Replying to " + (if (r.mine) "yourself" else person?.shownName ?: ""), style = inter(11.5f, FontWeight.SemiBold), color = Accent, maxLines = 1)
+                    Text(r.body, style = inter(12.5f), color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Box(Modifier.size(30.dp).clip(CircleShape).clickable { replyTo = null }, contentAlignment = Alignment.Center) { Text("✕", style = inter(13f, FontWeight.Bold), color = Muted) }
             }
         }
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
@@ -420,5 +499,20 @@ private class BubbleShape(val mine: Boolean, val tail: Boolean) : androidx.compo
             val ap = path.asAndroidPath(); ap.transform(m)
         }
         return androidx.compose.ui.graphics.Outline.Generic(path)
+    }
+}
+
+/** Three bouncing dots in a bubble: "they're typing". */
+@Composable
+private fun TypingBubble() {
+    val t = rememberInfiniteTransition(label = "typing")
+    Row(
+        Modifier.clip(BubbleShape(false, true)).background(Color(0xFF2A2A2E)).padding(start = 18.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(3) { i ->
+            val v by t.animateFloat(0f, 1f, infiniteRepeatable(tween(520, delayMillis = i * 140), RepeatMode.Reverse), label = "dot$i")
+            Box(Modifier.size(7.dp).offset(y = (-4f * v).dp).clip(CircleShape).background(Color(0xFFB4B1BA).copy(alpha = 0.55f + 0.45f * v)))
+        }
     }
 }

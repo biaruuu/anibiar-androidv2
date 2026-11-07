@@ -473,15 +473,7 @@ internal fun AniTopBar(
         label = "topBarBackground",
     )
     Column(Modifier.fillMaxWidth().background(background)) {
-        Row(
-            modifier = Modifier
-                .statusBarsPadding()
-                .height(56.dp)
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.weight(1f))
-        }
+        Spacer(Modifier.statusBarsPadding())
         if (scrolled) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))
         }

@@ -272,3 +272,9 @@
 ## 63 | TikTok-style Inbox list | 2026-11-07
 - Inbox chats are a flat list (avatar, name, message and time, red unread badge) instead of cards
 - New chat-bubble icon for the Inbox tab; Activity row uses a glass bell circle
+
+## 64 | Swipe to reply, typing indicator, dark liquid menus | 2026-11-07
+- Swipe a message sideways to reply; the reply shows quoted above the bubble
+- Typing indicator: bouncing dots in a bubble when the other person is typing
+- Long-press menu is dark glass with real icons (Reply, Copy, Unsend) that press like liquid
+- Removed the empty header bar on Home
