@@ -300,24 +300,27 @@ fun ProfileScreen(
                 Modifier.fillMaxWidth().padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp, start = 12.dp, end = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (onBack != null) com.anibiar.app.ui.theme.GlassBack(onBack)
-                    if (isMe) GlassButton({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // One icon: round glass button. Two or more: they share one glass pill.
+                if (isMe) {
+                    com.anibiar.app.ui.theme.GlassPill {
+                        if (onBack != null) com.anibiar.app.ui.theme.PillIcon(onBack) { com.anibiar.app.ui.theme.ChevronIcon() }
+                        com.anibiar.app.ui.theme.PillIcon({ editing = true }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Edit, "Edit profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
+                    }
+                } else if (onBack != null) com.anibiar.app.ui.theme.GlassBack(onBack)
+                com.anibiar.app.ui.theme.GlassPill {
                     if (isMe) onOpenInbox?.let { open ->
-                        GlassButton(open) {
+                        com.anibiar.app.ui.theme.PillIcon(open) {
                             Icon(AniIcons.Bell, "Inbox", tint = Color.White, modifier = Modifier.size(18.dp))
                             if (unread > 0) Box(
-                                Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp).size(if (unread > 9) 16.dp else 14.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
+                                Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 5.dp).size(if (unread > 9) 16.dp else 14.dp).clip(CircleShape).background(Color(0xFFFF4D5E)),
                                 contentAlignment = Alignment.Center,
                             ) { Text(if (unread > 9) "9+" else "$unread", style = inter(9.5f, FontWeight.Bold), color = Color.White) }
                         }
                     }
-                    if (!isMe && me != null) GlassButton({
+                    if (!isMe && me != null) com.anibiar.app.ui.theme.PillIcon({
                         if (targetUid in myFollowing || targetUid in myFollowers) onMessage(targetUid) else toast("Follow ${profile?.shownName ?: "them"} to send a message")
                     }) { Icon(AniIcons.Mail, "Message", tint = Color.White, modifier = Modifier.size(18.dp)) }
-                    GlassButton({
+                    com.anibiar.app.ui.theme.PillIcon({
                         val slug = profile?.linkSlug
                         if (slug.isNullOrBlank()) toast(if (isMe) "Set your profile link in Edit profile first" else "This profile has no share link")
                         else context.startActivity(
@@ -328,7 +331,7 @@ fun ProfileScreen(
                             ),
                         )
                     }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Share, "Share profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
-                    if (isMe) onOpenSettings?.let { open -> GlassButton(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(18.dp)) } }
+                    if (isMe) onOpenSettings?.let { open -> com.anibiar.app.ui.theme.PillIcon(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(18.dp)) } }
                 }
             }
         }

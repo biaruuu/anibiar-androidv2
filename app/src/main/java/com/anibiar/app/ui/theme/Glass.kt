@@ -71,3 +71,31 @@ fun GlassBack(onClick: () -> Unit, modifier: Modifier = Modifier) {
         }
     }
 }
+
+@Composable
+fun ChevronIcon(modifier: Modifier = Modifier.size(20.dp)) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = size.width; val h = size.height
+        val path = androidx.compose.ui.graphics.Path().apply { moveTo(w * 0.62f, h * 0.2f); lineTo(w * 0.3f, h * 0.5f); lineTo(w * 0.62f, h * 0.8f) }
+        drawPath(path, Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(width = w * 0.11f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+    }
+}
+
+/** Two or more icons share one glass pill, like the star and dots in the chat header. */
+@Composable
+fun GlassPill(modifier: Modifier = Modifier, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
+    androidx.compose.foundation.layout.Row(
+        modifier.height(36.dp).clip(shape)
+            .background(Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036))))
+            .border(1.dp, Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF))), shape)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, content = content,
+    )
+}
+
+/** One tappable icon inside a [GlassPill]. */
+@Composable
+fun PillIcon(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
+    Box(Modifier.size(width = 40.dp, height = 36.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = content)
+}

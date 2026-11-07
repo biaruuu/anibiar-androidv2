@@ -244,3 +244,6 @@
 ## 55 | One back button, no tab bar on Inbox, Profile, Settings | 2026-11-07
 - Inbox, Profile and Settings drop the bottom bar and use a glass < button instead
 - All round icon buttons share the same glass style as the chat
+
+## 56 | Glass pills for grouped icons | 2026-11-07
+- Profile top bar: back + edit share one glass pill, bell + share + settings share another; single icons stay round glass buttons
