@@ -119,3 +119,11 @@ val GlassRimBrush: Brush = Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(
 /** iMessage glass: clip, translucent sheen fill and a bright rim. Use on any button, pill or chip. */
 fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier =
     this.clip(shape).background(GlassBtnBrush).border(1.dp, GlassRimBrush, shape)
+
+/** The round glass "<" back button used on every full page. */
+@Composable
+fun GlassBack(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier) {
+        GlassButton(onClick = onClick, size = 36.dp) { ChevronIcon(Modifier.size(20.dp)) }
+    }
+}
