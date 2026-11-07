@@ -299,9 +299,9 @@ private fun Hint(text: String) {
 
 @Composable
 private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(50)
     Row(
-        modifier.height(40.dp).clip(shape).border(1.dp, Ani.Border, shape),
+        modifier.height(42.dp).glass(shape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
@@ -317,7 +317,7 @@ private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Box(Modifier.width(1.dp).fillMaxSize().background(Ani.Border))
+        Box(Modifier.width(1.dp).fillMaxSize().background(Color(0x26FFFFFF)))
         Box(
             Modifier.width(44.dp).fillMaxSize().clickable(onClick = onSubmit),
             contentAlignment = Alignment.Center,

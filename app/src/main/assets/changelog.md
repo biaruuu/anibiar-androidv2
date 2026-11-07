@@ -261,3 +261,6 @@
 
 ## 60 | Compact liquid-glass tab bar | 2026-11-07
 - Tab bar is smaller and narrower; press and slide across it and a glass lens follows your finger and magnifies the icons
+
+## 61 | Glass finish pass | 2026-11-07
+- Search fields, login fields and buttons, call buttons and the Home page arrows now use the same glass style

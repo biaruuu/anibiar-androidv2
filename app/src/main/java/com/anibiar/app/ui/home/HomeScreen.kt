@@ -868,7 +868,7 @@ internal fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: ()
             imageVector = AniIcons.ChevronLeft,
             contentDescription = "Previous page",
             tint = Color.White.copy(alpha = if (page > 0) 0.9f else 0.35f),
-            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page > 0, onClick = onPrev),
+            modifier = Modifier.size(28.dp).glass(CircleShape).clickable(enabled = page > 0, onClick = onPrev).padding(4.dp),
         )
         Text(
             text = "${page + 1}/$pageCount",
@@ -880,7 +880,7 @@ internal fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: ()
             imageVector = AniIcons.ChevronRight,
             contentDescription = "Next page",
             tint = Color.White.copy(alpha = if (page < pageCount - 1) 0.9f else 0.35f),
-            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext),
+            modifier = Modifier.size(28.dp).glass(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext).padding(4.dp),
         )
     }
 }

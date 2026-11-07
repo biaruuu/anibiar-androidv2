@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.watch
 
+import com.anibiar.app.ui.theme.glass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,7 +72,7 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
 
 @Composable
 private fun RoundButton(icon: ImageVector, bg: Color, tint: Color, onClick: () -> Unit) {
-    Box(Modifier.size(48.dp).clip(CircleShape).background(bg).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(48.dp).then(if (bg == Color(0xFF232326)) Modifier.glass(CircleShape) else Modifier.clip(CircleShape).background(bg)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(26.dp))
     }
 }

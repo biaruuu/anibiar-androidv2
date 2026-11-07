@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.auth
 
+import com.anibiar.app.ui.theme.glass
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
@@ -244,7 +245,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 val pill = RoundedCornerShape(50)
                 val canResend = cooldown == 0 && gate == 0 && !busy
                 Box(
-                    Modifier.fillMaxWidth().height(44.dp).clip(pill).background(Ani.ButtonDark)
+                    Modifier.fillMaxWidth().height(44.dp).glass(pill)
                         .clickable(enabled = canResend) {
                             busy = true; note = null
                             scope.launch {
@@ -283,8 +284,8 @@ private fun EmailField(value: String, onValue: (String) -> Unit, onDone: () -> U
     val shape = RoundedCornerShape(50)
     var focused by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().height(44.dp).clip(shape).background(Ani.Item)
-            .border(1.dp, if (focused) Ani.Lavender else Color.Transparent, shape).padding(horizontal = 16.dp),
+        Modifier.fillMaxWidth().height(44.dp).glass(shape)
+            .then(if (focused) Modifier.border(1.5.dp, Ani.Lavender, shape) else Modifier).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(AniIcons.Mail, null, tint = Ani.Muted, modifier = Modifier.size(18.dp))

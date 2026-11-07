@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.search
 
+import com.anibiar.app.ui.theme.glass
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -121,7 +122,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
-                Row(Modifier.weight(1f).height(40.dp).clip(shape).border(1.dp, Ani.Border, shape), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).height(42.dp).glass(RoundedCornerShape(50)), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
                         if (query.isEmpty()) Text("Search users by username…", style = inter(14f), color = Ani.Muted)
                         BasicTextField(
