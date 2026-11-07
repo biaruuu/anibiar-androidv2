@@ -703,10 +703,12 @@ private fun HeroSlide(
 internal fun HeroChip(label: String) {
     Box(
         modifier = Modifier
-            .glass(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(50))
+            .background(Brush.linearGradient(listOf(Color(0x99202028), Color(0xB3050507), Color(0x99181820))))
+            .border(1.dp, Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x14FFFFFF), Color(0x4DFFFFFF))), RoundedCornerShape(50))
             .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
-        Text(label, style = inter(11.5f, FontWeight.Medium), color = Color(0xFFE3E0E6), maxLines = 1, softWrap = false)
+        Text(label, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, softWrap = false)
     }
 }
 
@@ -868,7 +870,7 @@ internal fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: ()
             imageVector = AniIcons.ChevronLeft,
             contentDescription = "Previous page",
             tint = Color.White.copy(alpha = if (page > 0) 0.9f else 0.35f),
-            modifier = Modifier.size(28.dp).glass(CircleShape).clickable(enabled = page > 0, onClick = onPrev).padding(4.dp),
+            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page > 0, onClick = onPrev),
         )
         Text(
             text = "${page + 1}/$pageCount",
@@ -880,7 +882,7 @@ internal fun PagerPill(page: Int, pageCount: Int, onPrev: () -> Unit, onNext: ()
             imageVector = AniIcons.ChevronRight,
             contentDescription = "Next page",
             tint = Color.White.copy(alpha = if (page < pageCount - 1) 0.9f else 0.35f),
-            modifier = Modifier.size(28.dp).glass(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext).padding(4.dp),
+            modifier = Modifier.size(20.dp).clip(CircleShape).clickable(enabled = page < pageCount - 1, onClick = onNext),
         )
     }
 }

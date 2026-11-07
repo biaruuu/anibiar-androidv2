@@ -264,3 +264,7 @@
 
 ## 61 | Glass finish pass | 2026-11-07
 - Search fields, login fields and buttons, call buttons and the Home page arrows now use the same glass style
+
+## 62 | Dark glass hero chips, pager arrows, profile counts | 2026-11-07
+- Home pager arrows (1/5) back to the plain icons; hero chips are dark liquid glass
+- Profile Following / Followers / Friends counts no longer cut off

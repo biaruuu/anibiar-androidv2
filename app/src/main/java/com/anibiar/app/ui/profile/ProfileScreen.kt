@@ -165,8 +165,8 @@ fun ProfileScreen(
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
                             Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 6f)), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             profile?.let { Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp)) }
-                            Spacer(Modifier.height(14.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                            Spacer(Modifier.height(10.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                                 val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
                                 BigStat("Following", followingIds.size) { open("following") }
                                 BigStat("Followers", followerIds.size) { open("followers") }
@@ -433,9 +433,9 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
-    Column(Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
-        Text("$count", style = inter(16f, FontWeight.Bold), color = Color.White)
-        Text(label, style = inter(11.5f), color = Color(0xFFB4B1BA), maxLines = 1)
+    Column(Modifier.clickable(onClick = onClick).padding(vertical = 4.dp)) {
+        Text("$count", style = inter(17f, FontWeight.Bold, lineHeight = 22f), color = Color.White)
+        Text(label, style = inter(12f, FontWeight.Normal, lineHeight = 17f), color = Color(0xFFC9C6CF), maxLines = 1, softWrap = false)
     }
 }
 
