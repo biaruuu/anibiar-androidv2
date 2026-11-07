@@ -1,7 +1,5 @@
 package com.anibiar.app.ui.profile
 
-import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -9,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,64 +17,64 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
-import com.anibiar.app.R
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
 
-/** How a decoration moves around the avatar. */
-enum class DecoMotion { Bob, Spin, Pulse, Float, Shake }
-
-class Deco(val id: String, val name: String, @DrawableRes val res: Int, val motion: DecoMotion)
+class Deco(val id: String, val name: String)
 class Fx(val id: String, val name: String)
 
-/** The avatar decorations and namecard effects people can pick. Artwork for decorations lives in res/drawable-nodpi/deco_*.png. */
+/**
+ * The avatar decorations and namecard effects people can pick. Decorations are the animated WebP files in
+ * assets/deco (`<id>.webp` animated, `<id>_s.webp` first frame); they carry their own motion, so none is added here.
+ */
 object Looks {
     val decos = listOf(
-        Deco("cat", "Kitty", R.drawable.deco_cat, DecoMotion.Bob),
-        Deco("bolt", "Thunder", R.drawable.deco_bolt, DecoMotion.Spin),
-        Deco("burst", "Burst", R.drawable.deco_burst, DecoMotion.Pulse),
-        Deco("butterfly", "Butterflies", R.drawable.deco_butterfly, DecoMotion.Float),
-        Deco("notes", "Study buddy", R.drawable.deco_notes, DecoMotion.Bob),
-        Deco("rage", "Furious", R.drawable.deco_rage, DecoMotion.Shake),
+        Deco("cat", "Kitty"), Deco("bolt", "Thunder"), Deco("burst", "Burst"),
+        Deco("butterfly", "Butterflies"), Deco("notes", "Study buddy"), Deco("rage", "Furious"),
     )
     val effects = listOf(
-        Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"),
+        Fx("storm", "Storm"), Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"),
     )
     fun deco(id: String?) = decos.firstOrNull { it.id == id }
 }
 
-/** A decoration drawn 20% larger than the avatar it sits on, with a little motion. Does not clip, so it can overhang. */
+/** Avatars at least this big play the decoration's animation; smaller ones (lists) show its first frame to stay light. */
+private val AnimateFrom = 56.dp
+
+/** A decoration drawn 20% larger than the avatar it sits on. Does not clip, so it can overhang. */
 @Composable
 fun DecoOverlay(id: String?, size: Dp, modifier: Modifier = Modifier) {
     val d = Looks.deco(id) ?: return
-    val t = rememberInfiniteTransition(label = "deco")
-    val spin by t.animateFloat(0f, 360f, infiniteRepeatable(tween(16000, easing = LinearEasing)), label = "spin")
-    val pulse by t.animateFloat(0.97f, 1.05f, infiniteRepeatable(tween(1500, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse")
-    val sway by t.animateFloat(-1f, 1f, infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "sway")
-    val shake by t.animateFloat(-1f, 1f, infiniteRepeatable(tween(220), RepeatMode.Reverse), label = "shake")
-    Image(
-        painterResource(d.res), null,
-        modifier = modifier.requiredSize(size * 1.2f).graphicsLayer {
-            when (d.motion) {
-                DecoMotion.Bob -> translationY = sway * size.toPx() * 0.012f
-                DecoMotion.Spin -> rotationZ = spin
-                DecoMotion.Pulse -> { scaleX = pulse; scaleY = pulse; rotationZ = spin * 0.15f }
-                DecoMotion.Float -> { translationY = sway * size.toPx() * 0.015f; rotationZ = sway * 4f }
-                DecoMotion.Shake -> rotationZ = shake * 3f
-            }
-        },
-    )
+    val ctx = LocalContext.current
+    val box = size * 1.2f
+    val px = with(LocalDensity.current) { box.roundToPx() }
+    val animated = size >= AnimateFrom
+    val req = remember(d.id, px, animated) {
+        ImageRequest.Builder(ctx).data("file:///android_asset/deco/${d.id}${if (animated) "" else "_s"}.webp").size(px).build()
+    }
+    AsyncImage(req, null, modifier = modifier.requiredSize(box), contentScale = ContentScale.Fit)
 }
 
 /** Animated particles drawn over a namecard or banner. Cheap: a few dozen shapes from a seeded random. */
 @Composable
 fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
     if (id == null || Looks.effects.none { it.id == id }) return
+    if (id == "storm") {
+        AsyncImage(
+            ImageRequest.Builder(LocalContext.current).data("file:///android_asset/deco/storm.webp").build(), null,
+            modifier = modifier, contentScale = ContentScale.Crop, alignment = androidx.compose.ui.BiasAlignment(0f, -0.85f),
+        )
+        return
+    }
     val t = rememberInfiniteTransition(label = "fx")
     val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(12000, easing = LinearEasing)), label = "p")
     val pts = remember(id) { List(if (id == "aura") 1 else 28) { i -> java.util.Random(i * 7919L + id.hashCode()).let { r -> floatArrayOf(r.nextFloat(), r.nextFloat(), r.nextFloat(), r.nextFloat()) } } }

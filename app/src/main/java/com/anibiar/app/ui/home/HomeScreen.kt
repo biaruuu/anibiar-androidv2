@@ -1205,6 +1205,7 @@ private fun RankRow(
             contentDescription = null,
             colorFilter = if (active) null else grayscale,
             alpha = if (active) 0.30f else 0.20f,
+            maxSide = 640,
             modifier = Modifier.fillMaxSize(),
         )
         Box(
@@ -1287,12 +1288,13 @@ internal fun PosterImage(
     modifier: Modifier = Modifier,
     colorFilter: ColorFilter? = null,
     alpha: Float = 1f,
+    maxSide: Int = 0,
 ) {
     val context = LocalContext.current
-    val request = remember(url) {
+    val request = remember(url, maxSide) {
         ImageRequest.Builder(context)
             .data(url)
-            .size(Size.ORIGINAL)
+            .size(if (maxSide > 0) Size(maxSide, maxSide) else Size.ORIGINAL)
             .crossfade(true)
             .build()
     }

@@ -409,9 +409,11 @@ fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier,
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Box(Modifier.size(size).clip(CircleShape).background(Ani.Item), contentAlignment = Alignment.Center) {
             if (url != null) {
+                val ctx = LocalContext.current
+                val px = with(androidx.compose.ui.platform.LocalDensity.current) { (size * 2f).roundToPx().coerceIn(96, 512) }
+                val req = remember(url, px) { coil.request.ImageRequest.Builder(ctx).data(url).size(px).build() }
                 AsyncImage(
-                    model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).size(coil.size.Size.ORIGINAL).crossfade(true).build(),
-                    contentDescription = null, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                    model = req, contentDescription = null, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

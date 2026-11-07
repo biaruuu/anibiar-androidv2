@@ -297,3 +297,8 @@
 - Added a Rust library (kiro_core) to the app; the subtitle parser and ranked follower search now run in Rust, with the old Kotlin code as automatic backup
 - Settings > Rust core shows if it loaded on your phone
 - Fixed "permission denied for table profiles" when saving an avatar decoration or effect
+
+## 68 | Real animated decorations, Storm effect, lighter images | 2026-11-08
+- Avatar decorations now play their own animation (no extra motion added); small avatars in lists show a still frame to stay smooth
+- New Storm namecard effect (blue lightning)
+- Avatars and Home row backdrops load at the size they are shown, which uses less memory and scrolls smoother
