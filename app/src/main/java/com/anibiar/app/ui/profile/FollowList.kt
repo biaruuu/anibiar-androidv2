@@ -94,7 +94,7 @@ internal fun FollowListScreen(
         }
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth().height(40.dp)
-                .clip(RoundedCornerShape(50)).background(Color(0xFF151517)).padding(horizontal = 14.dp),
+                .clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.GlassFill).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(AniIcons.Search, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
@@ -129,7 +129,7 @@ internal fun FollowListScreen(
                 val theyFollow = u.uid in myFollowers
                 val isMe = u.uid == myUid
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517)).clickable { onOpenUser(u.uid) }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(com.anibiar.app.ui.theme.GlassFill).clickable { onOpenUser(u.uid) }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Avatar(u.avatarUrl, u.shownName, 54.dp)

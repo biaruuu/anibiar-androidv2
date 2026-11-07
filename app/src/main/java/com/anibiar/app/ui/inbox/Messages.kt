@@ -127,12 +127,12 @@ fun InboxTab(onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUse
 
     Column(Modifier.fillMaxSize().background(Bg).windowInsetsPadding(WindowInsets.statusBars)) {
         Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
-            Text("Inbox", style = inter(18f, FontWeight.Bold), color = Color.White)
+            Text("Inbox", style = inter(19f, FontWeight.ExtraBold), color = Color.White)
         }
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 90.dp)) {
             item {
                 Row(
-                    Modifier.fillMaxWidth().clickable(onClick = onOpenActivity).padding(horizontal = 16.dp, vertical = 10.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(20.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(20.dp)).clickable(onClick = onOpenActivity).padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.size(52.dp).clip(CircleShape).background(Panel), contentAlignment = Alignment.Center) {
@@ -192,7 +192,7 @@ private fun Badge(n: Int) {
 
 @Composable
 private fun ChatRow(c: DmConversation, p: UserProfile?, pinned: Boolean, onClick: () -> Unit, onAvatar: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(20.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(20.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Avatar(p?.avatarUrl, p?.username, 52.dp, Modifier.clickable(onClick = onAvatar))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -283,9 +283,9 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     Row(Modifier.clip(CircleShape).clickable { menu = true }.padding(horizontal = 9.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                         repeat(3) { Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White)) }
                     }
-                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, containerColor = Color(0xFF1E1E22)) {
-                        androidx.compose.material3.DropdownMenuItem(text = { Text("View profile", color = Color.White) }, onClick = { menu = false; onOpenUser(uid) })
-                        androidx.compose.material3.DropdownMenuItem(text = { Text(if (isPinned) "Unpin chat" else "Pin chat", color = Color.White) }, onClick = { menu = false; social.togglePin(uid) })
+                    com.anibiar.app.ui.theme.GlassMenu(expanded = menu, onDismiss = { menu = false }) {
+                        com.anibiar.app.ui.theme.GlassMenuItem("View profile", "👤") { menu = false; onOpenUser(uid) }
+                        com.anibiar.app.ui.theme.GlassMenuItem(if (isPinned) "Unpin chat" else "Pin chat", "📌") { menu = false; social.togglePin(uid) }
                     }
                 }
             }
@@ -309,7 +309,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     stamp(m.at), style = inter(11.5f, FontWeight.Medium), color = Muted,
                     modifier = Modifier.fillMaxWidth().padding(top = if (i == 0) 0.dp else 14.dp, bottom = 8.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
-                val shape = BubbleShape(m.mine, true)
+                val shape = BubbleShape(m.mine, lastInGroup)
                 Row(Modifier.fillMaxWidth().padding(top = if (firstInGroup) 0.dp else 2.dp), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom) {
                     if (!m.mine) {
                         Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp) }
@@ -323,19 +323,20 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                                 modifier = Modifier.widthIn(max = 276.dp).clip(shape)
                                     .background(if (m.mine) Color(0xFF7F6BF5) else Color(0xFF2A2A2E))
                                     .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                                    .padding(start = if (m.mine) 12.dp else 18.dp, end = if (m.mine) 18.dp else 12.dp, top = 7.dp, bottom = 7.dp),
+                                    .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
                             )
-                            androidx.compose.material3.DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = Color(0xFF1E1E22)) {
-                                androidx.compose.material3.DropdownMenuItem(text = { Text("Copy text", color = Color.White) }, onClick = {
+                            com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
+                                com.anibiar.app.ui.theme.GlassMenuItem("Copy text", "📋") {
                                     menuOpen = false
                                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(m.body))
                                     Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                                })
-                                if (m.mine) androidx.compose.material3.DropdownMenuItem(text = { Text("Unsend", color = Color(0xFFFF6B6B)) }, onClick = {
+                                }
+                                if (m.mine) com.anibiar.app.ui.theme.GlassMenuItem("Unsend", "🗑", Color(0xFFFF6B6B)) {
                                     menuOpen = false
                                     scope.launch { runCatching { social.unsendMessage(m.id) }.onFailure { Toast.makeText(context, it.message ?: "Couldn't unsend", Toast.LENGTH_SHORT).show() } }
-                                })
+                                }
                             }
+                        }
                         }
                         if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
                     }
@@ -343,15 +344,15 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             }
         }
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
-            Box(Modifier.size(44.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.Canvas(Modifier.size(20.dp)) {
-                    val st = 2.2.dp.toPx(); val c = size.width / 2f
+            Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
+                    val st = 2.dp.toPx(); val c = size.width / 2f
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(0f, c), androidx.compose.ui.geometry.Offset(size.width, c), st, androidx.compose.ui.graphics.StrokeCap.Round)
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(c, 0f), androidx.compose.ui.geometry.Offset(c, size.height), st, androidx.compose.ui.graphics.StrokeCap.Round)
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Row(Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(22.dp)).padding(start = 16.dp, end = 7.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).heightIn(min = 38.dp).clip(RoundedCornerShape(20.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(20.dp)).padding(start = 16.dp, end = 7.dp, top = 3.dp, bottom = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.weight(1f).padding(vertical = 4.dp)) {
                     if (text.isEmpty()) Text("Message…", style = inter(14f), color = Muted)
                     BasicTextField(
@@ -396,7 +397,7 @@ private class BubbleShape(val mine: Boolean, val tail: Boolean) : androidx.compo
         val w = size.width; val h = size.height
         val path = androidx.compose.ui.graphics.Path()
         // Build as "mine" (tail on the right), mirror for theirs.
-        val bw = w - t
+        val bw = if (tail) w - t else w
         path.moveTo(r, 0f)
         path.lineTo(bw - r, 0f)
         path.arcTo(androidx.compose.ui.geometry.Rect(bw - 2 * r, 0f, bw, 2 * r), -90f, 90f, false)

@@ -186,7 +186,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
 
 @Composable
 private fun FormCard(content: @Composable () -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))) { content() }
+    Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp))) { content() }
 }
 
 @Composable

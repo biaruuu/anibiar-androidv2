@@ -449,14 +449,14 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Color.White else Color(0xFF151517)).border(1.dp, if (primary) Color.White else Color(0x33FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Brush.linearGradient(listOf(Color.White, Color.White)) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Color.White else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
 }
 
 @Composable
 private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit, onDismiss: () -> Unit) {
-    Box(Modifier.width(150.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onOpen)) {
+    Box(Modifier.width(150.dp).clip(RoundedCornerShape(14.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onOpen)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Avatar(u.avatarUrl, u.shownName, 64.dp)
             Spacer(Modifier.height(8.dp))
@@ -476,7 +476,7 @@ private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit
 @Composable
 private fun ActionButton(label: String, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(Color(0xFF151517)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = Color.White) }
 }
@@ -580,7 +580,7 @@ internal fun UserCard(
     val followsYou = isOther && user.uid in myFollowers
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp).clip(shape)
-            .background(Color(0xFF151517)).border(1.dp, Color(0x14FFFFFF), shape).clickable(onClick = onOpen),
+            .background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape).clickable(onClick = onOpen),
     ) {
         // Banner shows through softly behind the content, fading into the card.
         if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())

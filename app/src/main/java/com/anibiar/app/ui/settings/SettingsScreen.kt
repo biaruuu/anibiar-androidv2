@@ -247,7 +247,7 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
-    Box(Modifier.fillMaxWidth().clip(shape).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), shape)) { content() }
+    Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) { content() }
 }
 
 @Composable

@@ -35,3 +35,24 @@ fun GlassButton(onClick: () -> Unit, size: Dp = 36.dp, selected: Boolean = false
 object NavState {
     var hidden by androidx.compose.runtime.mutableStateOf(false)
 }
+
+/** The shared glass card fill used by the Inbox, Profile and Settings surfaces. */
+val GlassFill: Brush = Brush.linearGradient(listOf(Color(0xFF26262B), Color(0xFF18181B), Color(0xFF212125)))
+
+@Composable
+fun GlassMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    androidx.compose.material3.DropdownMenu(
+        expanded = expanded, onDismissRequest = onDismiss,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp), containerColor = Color(0xF2202024),
+        tonalElevation = 0.dp, shadowElevation = 14.dp, content = content,
+    )
+}
+
+@Composable
+fun GlassMenuItem(label: String, icon: String, color: Color = Color.White, onClick: () -> Unit) {
+    androidx.compose.material3.DropdownMenuItem(
+        text = { androidx.compose.material3.Text(label, color = color, style = inter(15f, androidx.compose.ui.text.font.FontWeight.Medium)) },
+        leadingIcon = { androidx.compose.material3.Text(icon, fontSize = androidx.compose.ui.unit.TextUnit(16f, androidx.compose.ui.unit.TextUnitType.Sp)) },
+        onClick = onClick,
+    )
+}

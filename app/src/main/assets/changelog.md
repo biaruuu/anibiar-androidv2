@@ -235,3 +235,8 @@
 - Every chat bubble now has the tail, not just the last one
 - Bigger + button matching the message bar height
 - Long-press a message to copy its text; long-press your own message to unsend it
+
+## 54 | Tail on newest bubble, glass menus and cards | 2026-11-07
+- Only the newest bubble in a run keeps the tail; older ones are plain rounded
+- Smaller + button; long-press and three-dot menus restyled as glass popups
+- Inbox, Profile, Settings and Edit profile cards now use the same glass surface
