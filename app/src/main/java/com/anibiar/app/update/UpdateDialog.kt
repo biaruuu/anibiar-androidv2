@@ -59,7 +59,7 @@ fun UpdateDialog(info: UpdateInfo, onDismiss: () -> Unit) {
     }
 
     Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Ani.Panel).padding(22.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(com.anibiar.app.ui.theme.GlassFill).padding(22.dp)) {
             Text("Update available", style = inter(19f, FontWeight.Bold), color = Color.White)
             Spacer(Modifier.height(6.dp))
             Text(

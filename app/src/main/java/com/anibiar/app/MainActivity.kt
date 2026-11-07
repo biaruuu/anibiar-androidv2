@@ -347,12 +347,12 @@ private fun AppNavigation() {
             val edge = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
             Row(
                 Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(12.dp).fillMaxWidth()
-                    .clip(edge).background(androidx.compose.ui.graphics.Color(0xFF151517)).border(1.dp, androidx.compose.ui.graphics.Color(0x40B7A9FF), edge).padding(12.dp),
+                    .clip(edge).background(androidx.compose.ui.graphics.Color(0xFF1B1B1F)).border(1.dp, androidx.compose.ui.graphics.Color(0x40B7A9FF), edge).padding(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
                 if (r.cover != null) coil.compose.AsyncImage(
                     r.cover, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                    modifier = Modifier.width(48.dp).height(66.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).background(androidx.compose.ui.graphics.Color(0xFF1A1A1C)),
+                    modifier = Modifier.width(48.dp).height(66.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Color(0xFF1A1A1C)),
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {

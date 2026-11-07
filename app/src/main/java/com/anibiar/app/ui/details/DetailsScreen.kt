@@ -383,8 +383,8 @@ private fun Header(
                 modifier = Modifier
                     .width(posterWidth)
                     .height(posterWidth * 1.5f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, Ani.Border, RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, Ani.Border, RoundedCornerShape(16.dp)),
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
@@ -417,7 +417,7 @@ private fun Header(
                 onClick = onWatch,
                 modifier = Modifier.weight(1f),
             )
-            val favShape = RoundedCornerShape(10.dp)
+            val favShape = RoundedCornerShape(14.dp)
             Box(
                 Modifier.size(40.dp).clip(favShape)
                     .background(Color.White.copy(alpha = 0.10f))
@@ -461,7 +461,7 @@ private fun ActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(14.dp)
     val content = if (filled) Color.Black else Color.White
     Row(
         modifier = modifier
@@ -601,7 +601,7 @@ private fun About(
                         color = Color.White,
                         maxLines = 1,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .background(Ani.Chip)
                             .padding(horizontal = 9.dp, vertical = 5.dp),
                     )
@@ -620,7 +620,7 @@ private fun About(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 visible.forEachIndexed { index, (name, isMain) ->
-                    val shape = RoundedCornerShape(10.dp)
+                    val shape = RoundedCornerShape(14.dp)
                     Text(
                         text = name,
                         style = inter(11.5f, FontWeight.Medium),
@@ -640,8 +640,8 @@ private fun About(
                         style = inter(11.5f, FontWeight.Medium),
                         color = Ani.Soft,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(1.dp, Ani.Border, RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, Ani.Border, RoundedCornerShape(14.dp))
                             .clickable { showAllStudios = !showAllStudios }
                             .padding(horizontal = 9.dp, vertical = 5.dp),
                     )
@@ -918,7 +918,7 @@ private fun Trailer(
                             style = inter(14f, FontWeight.SemiBold),
                             color = Color.Black,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White)
                                 .clickable { openUrl(context, watchUrl(kind, videoId)) }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1035,7 +1035,7 @@ private fun TrailerFullscreen(trailer: FsTrailer, onClose: () -> Unit) {
                     style = inter(14f, FontWeight.SemiBold),
                     color = Color.Black,
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Color.White)
                         .clickable { openUrl(context, watchUrl(trailer.kind, trailer.videoId)) }
                         .padding(horizontal = 18.dp, vertical = 10.dp),
@@ -1098,7 +1098,7 @@ private fun Episodes(
                 val title = info?.title?.takeIf { it.isNotBlank() }
                     ?: stream?.first?.takeIf { it.isNotBlank() }
                     ?: "Episode $number"
-                val shape = RoundedCornerShape(12.dp)
+                val shape = RoundedCornerShape(16.dp)
                 val hover = com.anibiar.app.ui.home.rememberCardHover()
                 val arm = com.anibiar.app.ui.home.LocalCardArm.current
                 val active = hover.active() || arm?.armed == "E$number"
@@ -1381,7 +1381,7 @@ private fun Characters(total: Int, edges: List<CharacterEdge>, modifier: Modifie
                 Modifier
                     .fillMaxWidth()
                     .height(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(Ani.Item)
                     .clickable { showAll = !showAll },
                 contentAlignment = Alignment.Center,
@@ -1398,14 +1398,14 @@ private fun Characters(total: Int, edges: List<CharacterEdge>, modifier: Modifie
 
 @Composable
 private fun CharacterRow(edge: CharacterEdge, language: String) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     val actor = edge.voiceActors.firstOrNull { it.languageV2 == language }
     Row(
         Modifier
             .fillMaxWidth()
             .height(73.dp)
             .clip(shape)
-            .background(Ani.Panel)
+            .background(com.anibiar.app.ui.theme.GlassFill)
             .border(1.dp, Ani.Border, shape),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1452,7 +1452,7 @@ private fun CharacterRow(edge: CharacterEdge, language: String) {
 @Composable
 private fun OutlinedDropdown(current: String, options: List<String>, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(14.dp)
     Box {
         Row(
             Modifier
@@ -1509,7 +1509,7 @@ private fun LazyListScope.artworkItems(
     item(key = "art-header") {
         Row(pad.fillMaxWidth().padding(top = 36.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Ani.Chip),
+                Modifier.size(40.dp).clip(RoundedCornerShape(14.dp)).background(Ani.Chip),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(AniIcons.Photo, contentDescription = null, tint = Ani.Soft, modifier = Modifier.size(22.dp))
@@ -1559,7 +1559,7 @@ private fun LazyListScope.artworkItems(
                 pad
                     .fillMaxWidth()
                     .height(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable(onClick = onToggle),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,

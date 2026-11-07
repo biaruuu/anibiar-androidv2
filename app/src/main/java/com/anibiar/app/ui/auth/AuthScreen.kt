@@ -217,7 +217,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
             val shape = RoundedCornerShape(18.dp)
             Row(
                 Modifier.widthIn(max = 460.dp).fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp).clip(shape)
-                    .background(Ani.Panel).border(1.dp, Ani.Border, shape).padding(horizontal = 16.dp, vertical = 14.dp),
+                    .background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Ani.Border, shape).padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(AniIcons.CheckCircle, null, tint = Ani.Lime, modifier = Modifier.size(24.dp))

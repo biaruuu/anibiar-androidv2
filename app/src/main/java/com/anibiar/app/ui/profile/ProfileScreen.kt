@@ -253,7 +253,7 @@ fun ProfileScreen(
             }
             if (!canSeeFavs) item(key = "fav-locked") {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(Ani.Panel).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(AniIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(28.dp))
@@ -262,7 +262,7 @@ fun ProfileScreen(
                 }
             } else if (favs.isEmpty()) item(key = "fav-empty") {
                 Column(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(Ani.Panel).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(AniIcons.Bookmark, null, tint = Ani.Muted, modifier = Modifier.size(28.dp))
@@ -371,7 +371,7 @@ fun ProfileScreen(
                 Column {
                     Text("This is how friends find you. 3-20 letters, numbers, _ or .", style = inter(13.5f, lineHeight = 19f), color = Ani.Muted)
                     Spacer(Modifier.height(10.dp))
-                    Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Ani.Border, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                    Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, Ani.Border, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
                         if (name.isEmpty()) Text("username", style = inter(15f), color = Ani.Muted)
                         BasicTextField(name, { name = it.filter { c -> c.isLetterOrDigit() || c == '_' || c == '.' }.take(20) }, singleLine = true, textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lavender), modifier = Modifier.fillMaxWidth())
                     }
@@ -432,7 +432,7 @@ private fun OutlineChip(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
-    Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
+    Column(Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(vertical = 2.dp)) {
         Text("$count", style = inter(16f, FontWeight.Bold), color = Color.White)
         Text(label, style = inter(11.5f), color = Color(0xFFB4B1BA), maxLines = 1)
     }
@@ -441,7 +441,7 @@ private fun BigStat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun Stat(label: String, count: Int, onClick: () -> Unit) {
     Column(
-        Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
+        Modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text("$count", style = inter(18f, FontWeight.Bold), color = Color.White)

@@ -80,7 +80,7 @@ fun TogetherSheet(
             Spacer(Modifier.height(14.dp))
             if (room == null) {
                 Box(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Lime).clickable(enabled = !starting, onClick = onStart),
+                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(16.dp)).background(Ani.Lime).clickable(enabled = !starting, onClick = onStart),
                     contentAlignment = Alignment.Center,
                 ) { Text(if (starting) "Starting…" else "Start a room", style = inter(15f, FontWeight.Bold), color = Color.Black) }
             } else {
@@ -93,7 +93,7 @@ fun TogetherSheet(
                     items(friends, key = { it.uid }) { f ->
                         val here = f.uid in members
                         val sent = f.uid in invited
-                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF1B1B1F)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Avatar(f.avatarUrl, f.shownName, 40.dp)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
@@ -143,7 +143,7 @@ fun TogetherSheet(
                 ) { Text(if (isHost) "Change anime" else "Request an anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
                 Spacer(Modifier.height(8.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onLeave),
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF1B1B1F)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onLeave),
                     contentAlignment = Alignment.Center,
                 ) { Text(if (isHost) "End room for everyone" else "Leave room", style = inter(14.5f, FontWeight.SemiBold), color = Color(0xFFFF6B6B)) }
             }

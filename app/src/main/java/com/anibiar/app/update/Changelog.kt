@@ -71,7 +71,7 @@ fun ChangeList(entries: List<ChangeEntry>) {
 @Composable
 fun WhatsNewDialog(entries: List<ChangeEntry>, title: String = "What's new", onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose) {
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Ani.Panel).padding(22.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(com.anibiar.app.ui.theme.GlassFill).padding(22.dp)) {
             Text(title, style = inter(19f, FontWeight.Bold), color = Color.White)
             Spacer(Modifier.height(10.dp))
             Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) { ChangeList(entries) }

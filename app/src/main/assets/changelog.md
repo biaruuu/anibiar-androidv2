@@ -247,3 +247,6 @@
 
 ## 56 | Glass pills for grouped icons | 2026-11-07
 - Profile top bar: back + edit share one glass pill, bell + share + settings share another; single icons stay round glass buttons
+
+## 57 | App-wide iOS glass restyle | 2026-11-07
+- Darker near-black pages, softer surfaces, rounder buttons and cards, glass card fill, tighter large text, rounder dialogs and menus across the whole app

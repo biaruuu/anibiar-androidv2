@@ -112,7 +112,7 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
                     Text("Log in to manage your account, profile link and privacy.", style = inter(14f, lineHeight = 20f), color = Ani.Muted, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
                     Box(
-                        Modifier.widthIn(min = 160.dp).height(40.dp).clip(RoundedCornerShape(10.dp)).background(Color.White).clickable(onClick = onLogin),
+                        Modifier.widthIn(min = 160.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(Color.White).clickable(onClick = onLogin),
                         contentAlignment = Alignment.Center,
                     ) { Text("Log in", style = inter(14f, FontWeight.Medium), color = Color.Black) }
                 }
@@ -193,7 +193,7 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
 
         Spacer(Modifier.height(20.dp))
         Box(
-            Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { dlg = Dlg.Logout },
+            Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(16.dp)).background(Ani.ButtonDark).clickable { dlg = Dlg.Logout },
             contentAlignment = Alignment.Center,
         ) { Text("Log out", style = inter(15f, FontWeight.SemiBold), color = Color(0xFFFF8A80)) }
     }
@@ -287,7 +287,7 @@ internal fun ChoiceDialog(title: String, current: String, options: List<Pair<Str
             Column {
                 options.forEach { (key, label) ->
                     Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onPick(key); onDismiss() }.padding(vertical = 12.dp, horizontal = 4.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { onPick(key); onDismiss() }.padding(vertical = 12.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(label, style = inter(15f), color = Color.White, modifier = Modifier.weight(1f))
@@ -323,7 +323,7 @@ private fun TextDialog(
                 Text(hint, style = inter(13.5f, lineHeight = 19f), color = Ani.Muted)
                 Spacer(Modifier.height(10.dp))
                 Row(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).border(1.dp, Ani.Border, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp),
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(16.dp)).border(1.dp, Ani.Border, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (prefix.isNotEmpty()) Text(prefix, style = inter(14.5f), color = Ani.Muted)

@@ -171,7 +171,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                     FormRow(
                         "Banner", "", onClick = { pickBanner.launch("image/*") },
                         trailing = {
-                            Box(Modifier.width(72.dp).height(34.dp).clip(RoundedCornerShape(8.dp)).background(Ani.Panel)) {
+                            Box(Modifier.width(72.dp).height(34.dp).clip(RoundedCornerShape(8.dp)).background(com.anibiar.app.ui.theme.GlassFill)) {
                                 if (profile?.bannerUrl != null) AsyncImage(profile.bannerUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                                 else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1F2A2E)))))
                             }
@@ -246,7 +246,7 @@ private fun FieldPage(
         Spacer(Modifier.height(22.dp))
         Row(
             Modifier.fillMaxWidth().then(if (multiline) Modifier.height(150.dp) else Modifier.height(52.dp))
-                .clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
+                .clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = if (multiline) 14.dp else 0.dp),
             verticalAlignment = if (multiline) Alignment.Top else Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f), contentAlignment = if (multiline) Alignment.TopStart else Alignment.CenterStart) {

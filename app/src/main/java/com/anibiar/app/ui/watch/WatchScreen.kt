@@ -379,7 +379,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             requests.firstOrNull()?.let { rq ->
                 val who = roomProfiles[rq.from]?.shownName ?: "Someone"
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Ani.Panel).border(1.dp, Ani.Lavender.copy(alpha = 0.6f), RoundedCornerShape(14.dp)).padding(12.dp),
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Ani.Lavender.copy(alpha = 0.6f), RoundedCornerShape(14.dp)).padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -433,7 +433,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             // Audio + provider
             var audioOpen by remember { mutableStateOf(false) }
             var serverOpen by remember { mutableStateOf(false) }
-            val menuBg = Modifier.background(Color(0xF716161C)).border(1.5.dp, Color(0x38FFFFFF), RoundedCornerShape(12.dp))
+            val menuBg = Modifier.background(Color(0xF716161C)).border(1.5.dp, Color(0x38FFFFFF), RoundedCornerShape(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) {
                     PickerButton(if (audio == "sub") VidIcons.ClosedCaptions else AniIcons.Mic, if (audio == "sub") "Sub" else "Dub", audioOpen) { audioOpen = true }
@@ -487,7 +487,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             // Watch together
             if (room == null) Row(
                 Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF151517))
+                    .background(Color(0xFF1B1B1F))
                     .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp))
                     .clickable {
                         if (social.myId == null) android.widget.Toast.makeText(context, "Log in to watch together", android.widget.Toast.LENGTH_SHORT).show()
@@ -544,7 +544,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             // Anime card
             com.anibiar.app.ui.watch.WebCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val ps = RoundedCornerShape(10.dp)
+                    val ps = RoundedCornerShape(14.dp)
                     Box(Modifier.width(50.dp).aspectRatio(2f / 3f).clip(ps).border(1.5.dp, Color(0x38FFFFFF), ps).background(Ani.Item).clickable { onOpenDetails(id) }) {
                         anime?.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                     }
@@ -558,7 +558,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     }
                     anime?.let { m ->
                         val (fav, toggle) = rememberFav(m)
-                        val shape = RoundedCornerShape(12.dp)
+                        val shape = RoundedCornerShape(16.dp)
                         Box(Modifier.size(44.dp).clip(shape).background(Color(0x0FFFFFFF)).border(1.dp, if (fav) FavYellow.copy(alpha = 0.6f) else Color(0x40FFFFFF), shape).clickable(onClick = toggle), contentAlignment = Alignment.Center) {
                             Icon(if (fav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (fav) "Remove from favorites" else "Add to favorites", tint = if (fav) FavYellow else Color.White, modifier = Modifier.size(22.dp))
                         }

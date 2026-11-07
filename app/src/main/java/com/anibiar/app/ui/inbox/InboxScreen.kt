@@ -153,7 +153,7 @@ private fun NoticeRow(
 @Composable
 private fun Pill(label: String, primary: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.height(32.dp).clip(RoundedCornerShape(10.dp)).background(if (primary) Color.White else Ani.ButtonDark)
+        Modifier.height(32.dp).clip(RoundedCornerShape(14.dp)).background(if (primary) Color.White else Ani.ButtonDark)
             .clickable(onClick = onClick).padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13f, FontWeight.SemiBold), color = if (primary) Color.Black else Color.White, maxLines = 1) }

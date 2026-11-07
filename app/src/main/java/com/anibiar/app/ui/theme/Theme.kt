@@ -11,18 +11,19 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anibiar.app.R
 
 /** Onyx palette sampled from the Miruro reference screenshots. */
 object Ani {
-    val Onyx = Color(0xFF121214)
-    val Panel = Color(0xFF151517)
-    val Item = Color(0xFF1A1A1C)
-    val Border = Color(0xFF343338)
-    val Chip = Color(0xFF1C1B20)
-    val ChipOnItem = Color(0xFF26252A)
-    val ButtonDark = Color(0xFF232325)
+    val Onyx = Color(0xFF0B0B0D)
+    val Panel = Color(0xFF1B1B1F)
+    val Item = Color(0xFF212125)
+    val Border = Color(0xFF3A3A40)
+    val Chip = Color(0xFF222226)
+    val ChipOnItem = Color(0xFF2C2C31)
+    val ButtonDark = Color(0xFF2A2A2E)
     val Muted = Color(0xFF9B98A0)
     val Soft = Color(0xFFD7D3DA)
     val Lavender = Color(0xFFB9A1DF)
@@ -48,7 +49,7 @@ fun inter(
     size: Float,
     weight: FontWeight = FontWeight.Normal,
     lineHeight: Float = 0f,
-    letterSpacing: Float = 0f,
+    letterSpacing: Float = if (size >= 16f) -0.01f * size else 0f,
 ): TextStyle = TextStyle(
     fontFamily = InterFamily,
     fontSize = size.sp,
@@ -66,6 +67,18 @@ fun AniBiarTheme(content: @Composable () -> Unit) {
             surface = Ani.Onyx,
             onBackground = Color.White,
             onSurface = Color.White,
+            surfaceContainer = Color(0xFF1E1E22),
+            surfaceContainerHigh = Color(0xFF232327),
+            surfaceContainerHighest = Color(0xFF2A2A2E),
+            surfaceVariant = Color(0xFF2A2A2E),
+            outline = Color(0xFF3A3A40),
+        ),
+        shapes = androidx.compose.material3.Shapes(
+            extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+            small = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            medium = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            large = androidx.compose.foundation.shape.RoundedCornerShape(26.dp),
+            extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
         ),
     ) {
         Surface(

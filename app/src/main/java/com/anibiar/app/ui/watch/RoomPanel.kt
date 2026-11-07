@@ -37,7 +37,7 @@ import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 
 private val Speaking = Color(0xFF23A559)
-private val Tile = Color(0xFF151517)
+private val Tile = Color(0xFF1B1B1F)
 private val Danger = Color(0xFFED4245)
 
 /** One person in the call: big avatar, green ring while talking, mic-off badge when muted. */
@@ -62,7 +62,7 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
             }
         }
         if (muted) {
-            Box(Modifier.align(Alignment.BottomEnd).padding(10.dp).size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xCC1E1F22)), contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.BottomEnd).padding(10.dp).size(34.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xCC1E1F22)), contentAlignment = Alignment.Center) {
                 Icon(AniIcons.MicOff, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
         }
@@ -107,7 +107,7 @@ fun RoomPanel(
                 }
             }
         }
-        Row(Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(Color(0xFF151517)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(50)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
+        Row(Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp).clip(RoundedCornerShape(50)).background(Color(0xFF1B1B1F)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(50)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
             RoundButton(if (!micOk || myMuted) AniIcons.MicOff else AniIcons.Mic, if (!micOk || myMuted) Color.White else Color(0xFF232326), if (!micOk || myMuted) Color.Black else Color.White, onMic)
             RoundButton(AniIcons.Menu, Color(0xFF232326), Color.White, onEpisodes)
             RoundButton(AniIcons.Search, Color(0xFF232326), Color.White, onAnime)

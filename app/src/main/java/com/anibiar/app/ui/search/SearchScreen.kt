@@ -301,7 +301,7 @@ private fun Hint(text: String) {
 
 @Composable
 private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier.height(40.dp).clip(shape).border(1.dp, Ani.Border, shape),
         verticalAlignment = Alignment.CenterVertically,
@@ -329,7 +329,7 @@ private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -
 
 @Composable
 private fun ToolBar(activeCount: Int, expanded: Boolean, onApply: () -> Unit, onReset: () -> Unit, onToggle: () -> Unit) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(40.dp).clip(shape).border(1.dp, Ani.Border, shape),
     ) {
@@ -371,7 +371,7 @@ private fun FilterRow(a: FilterDropdown, b: FilterDropdown?) {
 @Composable
 private fun FilterBox(f: FilterDropdown) {
     var open by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     val active = f.selected.isNotEmpty() && !(f.sortStyle && !f.clearable && f.selected == setOf("NON"))
     val shown = when {
         f.selected.isEmpty() -> f.label
@@ -403,7 +403,7 @@ private fun FilterBox(f: FilterDropdown) {
         DropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
-            modifier = Modifier.background(Ani.Panel).heightIn(max = 360.dp).border(1.dp, Ani.Border, RoundedCornerShape(8.dp)),
+            modifier = Modifier.background(com.anibiar.app.ui.theme.GlassFill).heightIn(max = 360.dp).border(1.dp, Ani.Border, RoundedCornerShape(8.dp)),
         ) {
             if (f.clearable && f.selected.isNotEmpty()) {
                 DropdownMenuItem(
@@ -430,7 +430,7 @@ private fun FilterBox(f: FilterDropdown) {
 
 @Composable
 private fun OutlineButton(label: String, enabled: Boolean, onClick: () -> Unit, leading: ImageVector? = null, trailing: ImageVector? = null) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     val tint = if (enabled) Color.White else Ani.Muted.copy(alpha = 0.6f)
     Row(
         Modifier.height(42.dp).width(if (leading != null || trailing != null) 116.dp else 90.dp).clip(shape)

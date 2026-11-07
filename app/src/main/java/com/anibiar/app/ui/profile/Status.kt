@@ -187,7 +187,7 @@ internal fun StatusSheet(profile: UserProfile?, onDismiss: () -> Unit) {
             err?.let { Spacer(Modifier.height(8.dp)); Text(it, style = inter(13f), color = Color(0xFFFF8A80)) }
             Spacer(Modifier.height(16.dp))
             Box(
-                Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).clickable {
+                Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).clickable {
                     scope.launch {
                         runCatching { social.setCustomStatus(emoji.ifBlank { null }, text.ifBlank { null }) }.onSuccess { onDismiss() }.onFailure(::fail)
                     }

@@ -72,7 +72,7 @@ fun AnimePickerSheet(onPick: (Media) -> Unit, onDismiss: () -> Unit, isHost: Boo
     }
     FullScreenPanel(if (isHost) "Change anime" else "Request an anime", onDismiss) {
         Column(Modifier.fillMaxWidth().weight(1f)) {
-            Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp)).background(Ani.Item).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
+            Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(16.dp)).background(Ani.Item).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
                 if (q.isEmpty()) Text("Search anime…", style = inter(15f), color = Ani.Muted)
                 BasicTextField(q, { q = it }, singleLine = true, textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Ani.Lime), modifier = Modifier.fillMaxWidth())
             }

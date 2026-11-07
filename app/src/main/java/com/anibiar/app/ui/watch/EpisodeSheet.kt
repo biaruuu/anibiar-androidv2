@@ -53,7 +53,7 @@ private fun fmtDate(iso: String?): String = iso?.take(10)?.let { d ->
 
 @Composable
 private fun ToolBtn(active: Boolean = false, onClick: () -> Unit, content: @Composable () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(14.dp)
     Box(
         Modifier.size(33.dp).clip(shape).border(1.5.dp, if (active) WebAccent else WebLine, shape).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

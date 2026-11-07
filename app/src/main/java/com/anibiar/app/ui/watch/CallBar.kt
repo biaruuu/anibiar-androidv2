@@ -39,7 +39,7 @@ fun CallBar(session: RoomSession, myId: String?, onOpen: () -> Unit, modifier: M
     val members by (together?.members ?: remember { kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>()) }).collectAsStateWithLifecycle()
     val muted by (session.voice?.muted ?: remember { kotlinx.coroutines.flow.MutableStateFlow(false) }).collectAsStateWithLifecycle()
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151517))
+        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF1B1B1F))
             .border(1.dp, Color(0x66B7A9FF), RoundedCornerShape(16.dp)).clickable(onClick = onOpen).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

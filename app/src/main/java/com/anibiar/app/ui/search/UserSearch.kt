@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun ModeDropdown(mode: String, onChange: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     val turn by animateFloatAsState(if (open) 180f else 0f, tween(250), label = "modeTurn")
     Box {
         Row(
@@ -74,7 +74,7 @@ internal fun ModeDropdown(mode: String, onChange: (String) -> Unit) {
             Spacer(Modifier.width(6.dp))
             Icon(AniIcons.ArrowDown, null, tint = Ani.Muted, modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = turn })
         }
-        DropdownMenu(open, { open = false }, modifier = Modifier.background(Ani.Panel)) {
+        DropdownMenu(open, { open = false }, modifier = Modifier.background(com.anibiar.app.ui.theme.GlassFill)) {
             listOf("anime" to "Anime", "users" to "Users").forEach { (value, label) ->
                 DropdownMenuItem(
                     text = { Text(label, style = inter(15f), color = if (value == mode) Ani.Lavender else Color.White) },
@@ -109,7 +109,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
         loading = false
     }
 
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     LazyColumn(
         Modifier.fillMaxSize().background(Ani.Onyx),
         contentPadding = PaddingValues(

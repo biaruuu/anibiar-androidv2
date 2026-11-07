@@ -675,7 +675,7 @@ private fun HeroSlide(
                 Row(
                     modifier = Modifier
                         .height(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Color.White)
                         .clickable(onClick = onWatch)
                         .padding(horizontal = 14.dp),
@@ -688,7 +688,7 @@ private fun HeroSlide(
                 Row(
                     modifier = Modifier
                         .height(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Ani.ButtonDark)
                         .clickable(onClick = onDetails)
                         .padding(horizontal = 14.dp),
@@ -702,7 +702,7 @@ private fun HeroSlide(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Ani.ButtonDark)
                         .clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
@@ -1145,7 +1145,7 @@ private fun ListPanel(
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(shape)
-            .background(Ani.Panel)
+            .background(com.anibiar.app.ui.theme.GlassFill)
             .border(1.dp, Ani.Border, shape)
             .padding(12.dp),
     ) {
@@ -1174,7 +1174,7 @@ private fun ListPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(Ani.Item)
                     .clickable { expanded = !expanded },
                 contentAlignment = Alignment.Center,
@@ -1211,7 +1211,7 @@ private fun RankRow(
     val titleColor by accentColor(active, accent, Color.White)
     val tint by accentColor(active, accent.copy(alpha = 0.30f), Ani.Item)
     val rowBorder by accentColor(active, accent.copy(alpha = 0.55f), Color.Transparent)
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
 
     Box(
         Modifier
@@ -1346,7 +1346,7 @@ internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier
         Box(
             modifier = Modifier
                 .height(42.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(RoundedCornerShape(14.dp))
                 .background(Ani.Lavender)
                 .clickable(onClick = onRetry)
                 .padding(horizontal = 24.dp),
