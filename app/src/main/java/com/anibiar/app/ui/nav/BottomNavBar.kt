@@ -56,7 +56,7 @@ import kotlin.math.roundToInt
 enum class NavTab(val label: String, val icon: ImageVector) {
     Home("Home", AniIcons.Home),
     Search("Search", AniIcons.Search),
-    Inbox("Inbox", AniIcons.Mail),
+    Inbox("Inbox", AniIcons.Chat),
     Profile("Profile", AniIcons.Person),
     Settings("Settings", AniIcons.Settings),
 }

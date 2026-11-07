@@ -68,6 +68,7 @@ import com.anibiar.app.ui.profile.Avatar
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.GlassButton
 import com.anibiar.app.ui.theme.NavState
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.launch
 
@@ -133,11 +134,11 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 90.dp)) {
             item {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(20.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(20.dp)).clickable(onClick = onOpenActivity).padding(horizontal = 14.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().clickable(onClick = onOpenActivity).padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.size(52.dp).clip(CircleShape).background(Panel), contentAlignment = Alignment.Center) {
-                        Icon(AniIcons.Bell, null, tint = Accent, modifier = Modifier.size(26.dp))
+                    Box(Modifier.size(56.dp).glass(CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(AniIcons.Bell, null, tint = Color.White, modifier = Modifier.size(26.dp))
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
@@ -150,7 +151,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
             if (chats.isEmpty()) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(AniIcons.Mail, null, tint = Muted, modifier = Modifier.size(40.dp))
+                        Icon(AniIcons.Chat, null, tint = Muted, modifier = Modifier.size(40.dp))
                         Spacer(Modifier.height(10.dp))
                         Text("No messages yet", style = inter(16f, FontWeight.Bold), color = Color.White)
                         Spacer(Modifier.height(4.dp))
@@ -173,7 +174,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                         }
                         Text(
                             "Follow", style = inter(13f, FontWeight.Bold), color = Color(0xFF0B0B0D),
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Accent)
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(Accent)
                                 .clickable { scope.launch { runCatching { social.follow(u.uid) }; suggested = suggested.filter { it.uid != u.uid } } }
                                 .padding(horizontal = 18.dp, vertical = 7.dp),
                         )
@@ -193,26 +194,26 @@ private fun Badge(n: Int) {
 
 @Composable
 private fun ChatRow(c: DmConversation, p: UserProfile?, pinned: Boolean, onClick: () -> Unit, onAvatar: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clip(RoundedCornerShape(20.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), RoundedCornerShape(20.dp)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(p?.avatarUrl, p?.username, 52.dp, Modifier.clickable(onClick = onAvatar))
-        Spacer(Modifier.width(12.dp))
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Avatar(p?.avatarUrl, p?.username, 56.dp, Modifier.clickable(onClick = onAvatar))
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(p?.shownName ?: "…", style = inter(15.5f, if (c.unread > 0) FontWeight.ExtraBold else FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (pinned) Text("★", fontSize = 14.sp, color = Color(0xFFFFD25A), modifier = Modifier.padding(start = 5.dp))
+                Text(p?.shownName ?: "…", style = inter(16f, if (c.unread > 0) FontWeight.Bold else FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (pinned) Text("★", fontSize = 13.sp, color = Color(0xFFFFD25A), modifier = Modifier.padding(start = 5.dp))
                 StreakBadge(c.streak, Modifier.padding(start = 6.dp))
             }
-            Text(
-                (if (c.lastMine) "You: " else "") + c.lastBody,
-                style = inter(13.5f, if (c.unread > 0) FontWeight.SemiBold else FontWeight.Normal), color = if (c.unread > 0) Color.White else Muted,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    (if (c.lastMine) "You: " else "") + c.lastBody,
+                    style = inter(14f, if (c.unread > 0) FontWeight.Bold else FontWeight.Normal), color = if (c.unread > 0) Color.White else Muted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                )
+                Text("  ·  " + ago(c.lastAt), style = inter(14f), color = Muted, maxLines = 1, softWrap = false)
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(ago(c.lastAt), style = inter(12f), color = Muted)
-            if (c.unread > 0) { Spacer(Modifier.height(4.dp)); Badge(c.unread) }
-        }
+        if (c.unread > 0) { Spacer(Modifier.width(10.dp)); Badge(c.unread) }
     }
 }
 

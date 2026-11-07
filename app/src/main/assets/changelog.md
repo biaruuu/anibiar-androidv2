@@ -268,3 +268,7 @@
 ## 62 | Dark glass hero chips, pager arrows, profile counts | 2026-11-07
 - Home pager arrows (1/5) back to the plain icons; hero chips are dark liquid glass
 - Profile Following / Followers / Friends counts no longer cut off
+
+## 63 | TikTok-style Inbox list | 2026-11-07
+- Inbox chats are a flat list (avatar, name, message and time, red unread badge) instead of cards
+- New chat-bubble icon for the Inbox tab; Activity row uses a glass bell circle
