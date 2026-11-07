@@ -3,6 +3,7 @@
 
 pub mod captions;
 pub mod fuzzy;
+pub mod streams;
 pub mod text;
 
 #[cfg(feature = "jni-glue")]

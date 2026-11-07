@@ -306,3 +306,8 @@
 ## 69 | More Rust: title matching and text cleanup | 2026-11-08
 - Title matching for stream sources and HTML/description cleanup now run in Rust (with Kotlin backup)
 - Regexes are compiled once instead of on every call, so Home descriptions and source searches do less work
+
+## 70 | Soft-sub first streams, episode descriptions, providers | 2026-11-08
+- Best-stream picking (done in Rust) now prefers soft subtitles, English first, so captions use Kiro's own caption style; hard-sub streams come last, then picture quality decides
+- Episode descriptions now show in the episode list (from ani.zip summaries)
+- Each episode row shows which providers have it; the Server menu shows s-sub / h-sub and the picture quality

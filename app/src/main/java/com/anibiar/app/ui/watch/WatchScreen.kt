@@ -123,7 +123,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         fun fill(l: List<WatchEpisode>) = l.map { e ->
             val i = by[e.number] ?: return@map e
             val generic = e.title.isBlank() || Regex("^episode\\s*\\d+$", RegexOption.IGNORE_CASE).matches(e.title.trim())
-            e.copy(title = if (generic && !i.title.isNullOrBlank()) i.title else e.title, image = e.image ?: i.image, airDate = e.airDate ?: i.date)
+            e.copy(title = if (generic && !i.title.isNullOrBlank()) i.title else e.title, description = e.description?.takeIf { it.isNotBlank() } ?: i.overview, image = e.image ?: i.image, airDate = e.airDate ?: i.date)
         }
         raw.copy(sub = fill(raw.sub), dub = fill(raw.dub))
     }
@@ -473,7 +473,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             MenuTitle("Server")
                             all.forEach { sv ->
                                 DropdownMenuItem(
-                                    text = { Text(sv.name + if (audio == "sub") (if (sv.kind == "soft") "  ·  s-sub" else "  ·  h-sub") else "", style = inter(14.5f), color = if (stream?.id == sv.id) WebAccent else Color.White) },
+                                    text = { Text(sv.name + (if (audio == "sub") (if (sv.kind == "soft") "  ·  s-sub" else "  ·  h-sub") else "") + (if (sv.height > 0) "  ·  ${sv.height}p" else ""), style = inter(14.5f), color = if (stream?.id == sv.id) WebAccent else Color.White) },
                                     onClick = { streamName = sv.name; serverOpen = false },
                                     trailingIcon = { if (stream?.id == sv.id) Icon(VidIcons.Check, null, tint = WebAccent, modifier = Modifier.size(20.dp)) },
                                 )

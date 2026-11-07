@@ -1,7 +1,7 @@
 //! JNI entry points for `com.anibiar.app.nativecore.Native`. Each call is panic-safe: on any failure it returns null
 //! and the Kotlin side falls back to its own implementation.
 
-use crate::{captions, fuzzy, text};
+use crate::{captions, fuzzy, streams, text};
 use jni::objects::{JClass, JString};
 use jni::sys::{jdouble, jint, jintArray, jstring};
 use jni::JNIEnv;
@@ -50,4 +50,16 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_htmlText<'l>(mut e
     let Some(input) = read(&mut env, &s) else { return null_mut() };
     let Ok(out) = catch_unwind(|| text::html_text(&input, mode)) else { return null_mut() };
     env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}
+
+/// `rows` is one `soft,english,tracks,hls,height` line per stream. Returns indices, best first.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_rankStreams<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, sub_audio: jint, rows: JString<'l>) -> jintArray {
+    let Some(text) = read(&mut env, &rows) else { return null_mut() };
+    let Ok(ranked) = catch_unwind(|| streams::rank(sub_audio != 0, &streams::parse(&text))) else { return null_mut() };
+    let Ok(arr) = env.new_int_array(ranked.len() as i32) else { return null_mut() };
+    if env.set_int_array_region(&arr, 0, &ranked).is_err() {
+        return null_mut();
+    }
+    arr.into_raw()
 }

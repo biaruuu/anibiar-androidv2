@@ -251,6 +251,20 @@ object Streaming {
         return if (h > 0) s.copy(height = h) else s
     }
 
+    private fun isEnglish(t: StreamSubtitle) = t.srclang.startsWith("en", true) || t.label.contains("english", true)
+
+    /**
+     * Best stream first. For sub audio, soft subtitles (separate tracks the app styles itself) come before burned-in
+     * ones, English tracks first, then picture height. Done in Rust, with the same rules in Kotlin as backup.
+     */
+    internal fun rankStreams(audio: String, list: List<StreamSource>): List<StreamSource> {
+        val sub = audio == "sub"
+        val rows = list.map { intArrayOf(if (it.kind == "soft") 1 else 0, if (it.subtitles.any(::isEnglish)) 1 else 0, if (it.subtitles.isNotEmpty()) 1 else 0, if (it.format == "hls") 1 else 0, it.height) }
+        com.anibiar.app.nativecore.Native.rank(sub, rows)?.let { order -> return order.map { list[it] } }
+        fun tier(s: StreamSource) = if (!sub || s.kind != "soft") 0 else if (s.subtitles.any(::isEnglish)) 3 else if (s.subtitles.isNotEmpty()) 2 else 1
+        return list.sortedWith(compareByDescending<StreamSource> { tier(it) }.thenByDescending { it.height }.thenByDescending { it.format == "hls" })
+    }
+
     private suspend fun probeAll(l: List<StreamSource>): List<StreamSource> = kotlinx.coroutines.coroutineScope { l.map { async { probe(it) } }.awaitAll() }
 
     private class Res(val base: WatchPayload?, val streams: List<StreamSource>, val err: Throwable?, val local: String?)
@@ -288,7 +302,7 @@ object Streaming {
                 if (got.streams.isNotEmpty() && deadline == 0L) deadline = System.currentTimeMillis() + 1200
             }
             jobs.forEach { it.cancel() }
-            val all = (remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second }).sortedByDescending { it.height }
+            val all = rankStreams(audio, remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second })
             if (all.isEmpty()) throw err ?: IOException("No stream found for this episode")
             WatchPayload(audio, ep, all, base?.intro ?: all.firstNotNullOfOrNull { it.intro }, base?.outro ?: all.firstNotNullOfOrNull { it.outro })
         }

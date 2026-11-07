@@ -307,6 +307,8 @@ data class EpisodeInfo(
     val date: String?,
     val runtime: Int?,
     val image: String?,
+    /** Short plot summary of the episode, when ani.zip has one. */
+    val overview: String? = null,
 )
 
 

@@ -177,6 +177,10 @@ fun EpisodeSheet(
                             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(VidIcons.ClosedCaptions, null, tint = Muted, modifier = Modifier.size(15.dp).alpha(if (e.number in subNumbers) 1f else 0.28f))
                                 Icon(AniIcons.Mic, null, tint = Muted, modifier = Modifier.size(14.dp).alpha(if (e.number in dubNumbers) 1f else 0.28f))
+                                e.providers.take(3).forEach { pv ->
+                                    Text(pv.replaceFirstChar { it.uppercase() }, style = inter(9.5f, FontWeight.SemiBold), color = Muted, maxLines = 1,
+                                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 1.dp))
+                                }
                                 Spacer(Modifier.weight(1f))
                                 Text(fmtDate(e.airDate), style = inter(11f), color = Muted, maxLines = 1)
                             }

@@ -235,6 +235,7 @@ class AnimeRepository(context: Context) {
                 byNumber[jk.number] = if (cur == null) jk else cur.copy(
                     title = cur.title?.takeIf { it.isNotBlank() } ?: jk.title,
                     date = cur.date ?: jk.date,
+                    overview = cur.overview,
                 )
             }
         }
@@ -244,7 +245,7 @@ class AnimeRepository(context: Context) {
             list.forEach {
                 arr.put(
                     org.json.JSONObject().put("n", it.number).put("t", it.title ?: "").put("d", it.date ?: "")
-                        .put("r", it.runtime ?: 0).put("i", it.image ?: ""),
+                        .put("r", it.runtime ?: 0).put("i", it.image ?: "").put("o", it.overview ?: ""),
                 )
             }
             cache.write("eps_$id.json", arr.toString())
@@ -258,7 +259,7 @@ class AnimeRepository(context: Context) {
             val o = arr.getJSONObject(i)
             EpisodeInfo(
                 o.getInt("n"), o.optString("t").ifBlank { null }, o.optString("d").ifBlank { null },
-                o.optInt("r", 0).takeIf { it > 0 }, o.optString("i").ifBlank { null },
+                o.optInt("r", 0).takeIf { it > 0 }, o.optString("i").ifBlank { null }, o.optString("o").ifBlank { null },
             )
         }.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
@@ -289,7 +290,8 @@ class AnimeRepository(context: Context) {
             val date = prettyDate(e.optString("airdate")) ?: prettyDate(e.optString("airDateUtc"))
             val runtime = e.optInt("runtime", 0).takeIf { it > 0 } ?: e.optInt("length", 0).takeIf { it > 0 }
             val image = e.optString("image").takeIf { it.startsWith("http") }
-            out += EpisodeInfo(n, title, date, runtime, image)
+            val overview = listOf("overview", "summary").firstNotNullOfOrNull { k -> e.optString(k).trim().takeIf { it.isNotBlank() && it != "null" } }
+            out += EpisodeInfo(n, title, date, runtime, image, overview)
         }
         return out.sortedBy { it.number }.takeIf { it.isNotEmpty() }
     }
