@@ -230,3 +230,8 @@
 
 ## 52 | Flat iMessage bubbles | 2026-11-07
 - Chat bubbles are flat solid colours with a small curled tail, like iMessage; header buttons get a glossier glass look
+
+## 53 | Tails on every bubble, copy and unsend | 2026-11-07
+- Every chat bubble now has the tail, not just the last one
+- Bigger + button matching the message bar height
+- Long-press a message to copy its text; long-press your own message to unsend it

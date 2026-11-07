@@ -515,6 +515,12 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         chatTick.value++; refreshSoon()
     }
 
+    suspend fun unsendMessage(id: Long) = net {
+        val (code, text) = raw("DELETE", "/rest/v1/dm_messages?id=eq.$id", extra = mapOf("Prefer" to "return=minimal"))
+        if (code !in 200..299) fail(code, text)
+        chatTick.value++; refreshSoon()
+    }
+
     suspend fun markChatRead(other: String) {
         val me = session?.uid ?: return
         runCatching {
