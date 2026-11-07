@@ -120,7 +120,7 @@ private fun NoticeRow(
             .clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(n.actor?.avatarUrl, name, 48.dp)
+        Avatar(n.actor?.avatarUrl, name, 48.dp, deco = n.actor?.avatarDeco)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(

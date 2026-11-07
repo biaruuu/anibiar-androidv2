@@ -442,7 +442,7 @@ private fun HomeContent(
                                 title = "UPCOMING",
                                 keyPrefix = "U",
                                 items = state.upcoming,
-                                dot = Ani.Amber,
+                                dot = Ani.Lime,
                                 onClick = { onOpen(it.id) },
                                 saved = saved,
                                 onToggleSaved = onToggleSaved,
@@ -956,7 +956,7 @@ internal fun MediaGridCard(
     modifier: Modifier = Modifier,
 ) {
     val hover = rememberCardHover()
-    val active = hover.active() || armed
+    val active = hover.pressed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
     val chipText by accentColor(active, accent, Color(0xFFE4E1EA))
     val chipBg by accentColor(active, accent.copy(alpha = 0.28f), Color(0x2EFFFFFF))
@@ -1197,7 +1197,7 @@ private fun RankRow(
             .clip(shape)
             .background(Ani.Item)
             .border(1.dp, rowBorder, shape)
-            .hoverCard(hover, { onClick(media) }, onArm = onArm),
+            .hoverCard(hover, { onClick(media) }),
     ) {
         // Artwork on the right (grayscale at rest, full colour on hover), fading into the row colour.
         PosterImage(

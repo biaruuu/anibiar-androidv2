@@ -173,7 +173,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                 }
                 items(suggested.take(6), key = { "s" + it.uid }) { u ->
                     Row(Modifier.fillMaxWidth().clickable { onOpenUser(u.uid) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(u.avatarUrl, u.username, 46.dp)
+                        Avatar(u.avatarUrl, u.username, 46.dp, deco = u.avatarDeco)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(u.shownName, style = inter(14.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -202,7 +202,7 @@ private fun Badge(n: Int) {
 @Composable
 private fun ChatRow(c: DmConversation, p: UserProfile?, pinned: Boolean, onClick: () -> Unit, onAvatar: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Avatar(p?.avatarUrl, p?.username, 56.dp, Modifier.clickable(onClick = onAvatar))
+        Avatar(p?.avatarUrl, p?.username, 56.dp, Modifier.clickable(onClick = onAvatar), deco = p?.avatarDeco)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -263,24 +263,21 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
         if (text.isNotBlank()) { if (now - typingSentAt > 2000) { typingSentAt = now; social.sendDm(uid, "typing", mapOf("on" to "true")) } }
         else if (typingSentAt != 0L) { typingSentAt = 0L; social.sendDm(uid, "typing", mapOf("on" to "false")) }
     }
-    var panel by remember { mutableStateOf(0) }          // 0 none, 1 attach menu, 2 stickers, 3 bubble styles
     var viewer by remember { mutableStateOf<String?>(null) }
-    val myStyle by social.bubbleStyle.collectAsStateWithLifecycle()
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
-    fun sendPicked(uri: android.net.Uri, sticker: Boolean) {
+    fun sendPicked(uri: android.net.Uri) {
         if (sending) return
         sending = true
         scope.launch {
             try {
-                val prepared = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { prepareImage(context, uri, sticker) }
+                val prepared = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { prepareImage(context, uri) }
                     ?: throw IllegalStateException("Couldn't read that file.")
-                social.sendMedia(uid, prepared.first, prepared.second, sticker, replyTo?.id); replyTo = null; panel = 0
+                social.sendMedia(uid, prepared.first, prepared.second, replyTo?.id); replyTo = null
             } catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
             sending = false
         }
     }
-    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u, false) }
-    val pickSticker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u, true) }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u) }
     LaunchedEffect(theirTyping) { if (theirTyping) list.animateScrollToItem(msgs.size) }
     LaunchedEffect(uid) { person = social.fetchProfile(uid) }
     LaunchedEffect(msgs.size) {
@@ -315,7 +312,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                 ChevronBack(Color.White, Modifier.size(20.dp))
             }
             Column(Modifier.align(Alignment.Center).clickable { onOpenUser(uid) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Avatar(person?.avatarUrl, person?.username, 40.dp)
+                Avatar(person?.avatarUrl, person?.username, 40.dp, deco = person?.avatarDeco)
                 Text(
                     person?.shownName ?: "…", style = inter(12f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.offset(y = (-6).dp).clip(RoundedCornerShape(50)).background(Color(0xE61E1E22)).border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 1.dp).widthIn(max = 140.dp),
@@ -350,7 +347,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
             if (msgs.isEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Avatar(person?.avatarUrl, person?.username, 84.dp)
+                    Avatar(person?.avatarUrl, person?.username, 84.dp, deco = person?.avatarDeco)
                     Spacer(Modifier.height(10.dp))
                     Text(person?.shownName ?: "", style = inter(17f, FontWeight.Bold), color = Color.White)
                     Text("Say hi. Message each other every day to build a 🔥 streak.", style = inter(13.5f, FontWeight.Normal, 19f), color = Muted, modifier = Modifier.padding(horizontal = 36.dp, vertical = 6.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
@@ -399,48 +396,35 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                         horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Bottom,
                     ) {
                         if (!m.mine) {
-                            Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp) }
+                            Box(Modifier.size(26.dp)) { if (lastInGroup) Avatar(person?.avatarUrl, person?.username, 26.dp, deco = person?.avatarDeco) }
                             Spacer(Modifier.width(8.dp))
                         }
                         Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
                             var menuOpen by remember { mutableStateOf(false) }
                             Box {
-                                val st = BubbleStyles.of(m.style)
-                                val styled = m.kind == "text" && m.style != null && m.style != "default"
                                 val longPress = { menuOpen = true }
-                                when (m.kind) {
-                                    "sticker" -> StickerView(m.mediaUrl, Modifier.combinedClickable(onClick = {}, onLongClick = longPress))
-                                    "image" -> coil.compose.AsyncImage(
-                                        model = m.mediaUrl, contentDescription = "Photo", contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
-                                        modifier = Modifier.width(224.dp).heightIn(min = 100.dp, max = 340.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF1C1C1E))
-                                            .combinedClickable(onClick = { viewer = m.mediaUrl }, onLongClick = longPress),
-                                    )
-                                    else -> Box(Modifier.padding(top = if (styled && st.deco != null) (st.decoHeight * 0.55f).dp else 0.dp)) {
-                                        Column(
-                                            Modifier.widthIn(max = 276.dp).clip(shape)
-                                                .background(if (styled) st.brush else if (m.mine) BubbleStyles.all[0].brush else Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF2A2A2E))))
-                                                .combinedClickable(onClick = {}, onLongClick = longPress)
-                                                .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
+                                if (m.kind == "image") coil.compose.AsyncImage(
+                                    model = m.mediaUrl, contentDescription = "Photo", contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
+                                    modifier = Modifier.width(224.dp).heightIn(min = 100.dp, max = 340.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF1C1C1E))
+                                        .combinedClickable(onClick = { viewer = m.mediaUrl }, onLongClick = longPress),
+                                ) else Column(
+                                    Modifier.widthIn(max = 276.dp).clip(shape)
+                                        .background(if (m.mine) Brush.linearGradient(listOf(Color(0xFF3D7BFF), Color(0xFF2B58F0))) else Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF2A2A2E))))
+                                        .combinedClickable(onClick = {}, onLongClick = longPress)
+                                        .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
+                                ) {
+                                    m.replyTo?.let { rid ->
+                                        val t = msgs.firstOrNull { it.id == rid }
+                                        Row(
+                                            Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x33000000)).padding(horizontal = 8.dp, vertical = 5.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
                                         ) {
-                                            m.replyTo?.let { rid ->
-                                                val t = msgs.firstOrNull { it.id == rid }
-                                                Row(
-                                                    Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x33000000)).padding(horizontal = 8.dp, vertical = 5.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                ) {
-                                                    Icon(AniIcons.Reply, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(12.dp))
-                                                    Spacer(Modifier.width(5.dp))
-                                                    Text(t?.body ?: "Message unsent", style = inter(12f), color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                }
-                                            }
-                                            Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = if (styled) st.text else Color.White)
+                                            Icon(AniIcons.Reply, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(12.dp))
+                                            Spacer(Modifier.width(5.dp))
+                                            Text(t?.body ?: "Message unsent", style = inter(12f), color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         }
-                                        if (styled && st.deco != null) androidx.compose.foundation.Image(
-                                            painterResource(st.deco), null,
-                                            modifier = Modifier.align(st.alignment).offset(x = if (st.spot == DecoSpot.TopEnd) (-6).dp else if (st.spot == DecoSpot.TopStart) 8.dp else 0.dp, y = -(st.decoHeight * 0.55f).dp)
-                                                .size(st.decoWidth.dp, st.decoHeight.dp),
-                                        )
                                     }
+                                    Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White)
                                 }
                                 com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
                                     com.anibiar.app.ui.theme.GlassMenuItem("Reply", AniIcons.Reply) { menuOpen = false; replyTo = m }
@@ -462,7 +446,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             }
             if (theirTyping) item(key = "typing") {
                 Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.Bottom) {
-                    Avatar(person?.avatarUrl, person?.username, 26.dp)
+                    Avatar(person?.avatarUrl, person?.username, 26.dp, deco = person?.avatarDeco)
                     Spacer(Modifier.width(8.dp))
                     TypingBubble()
                 }
@@ -486,18 +470,9 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                 }
             }
         }
-        androidx.compose.animation.AnimatedVisibility(visible = panel != 0, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
-            ChatPanel(
-                panel = panel, onPanel = { panel = it },
-                onPhoto = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onUploadSticker = { pickSticker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                onSticker = { name -> panel = 0; scope.launch { try { social.sendSticker(uid, name, replyTo?.id); replyTo = null } catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() } } },
-                styleId = myStyle, onSaveStyle = { social.setBubbleStyle(it); panel = 0; Toast.makeText(context, "Bubble style saved", Toast.LENGTH_SHORT).show() },
-            )
-        }
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
-            Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable { focus.clearFocus(); panel = if (panel == 0) 1 else 0 }, contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.Canvas(Modifier.size(16.dp).graphicsLayer { rotationZ = if (panel != 0) 45f else 0f }) {
+            Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable { focus.clearFocus(); if (!sending) pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }, contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
                     val st = 2.dp.toPx(); val c = size.width / 2f
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(0f, c), androidx.compose.ui.geometry.Offset(size.width, c), st, androidx.compose.ui.graphics.StrokeCap.Round)
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(c, 0f), androidx.compose.ui.geometry.Offset(c, size.height), st, androidx.compose.ui.graphics.StrokeCap.Round)
@@ -589,22 +564,15 @@ private fun TypingBubble() {
     }
 }
 
-@Composable
-private fun StickerView(url: String?, modifier: Modifier = Modifier) {
-    val res = url?.takeIf { it.startsWith("kiro:") }?.removePrefix("kiro:")?.let { n -> Stickers.all.firstOrNull { it.first == n }?.second }
-    if (res != null) androidx.compose.foundation.Image(painterResource(res), "Sticker", modifier.size(132.dp))
-    else coil.compose.AsyncImage(model = url, contentDescription = "Sticker", contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = modifier.size(150.dp))
-}
-
 /** Reads a picked image and shrinks it. GIF and WebP are sent as they are so they keep moving. */
-private fun prepareImage(context: android.content.Context, uri: android.net.Uri, sticker: Boolean): Pair<ByteArray, String>? {
+private fun prepareImage(context: android.content.Context, uri: android.net.Uri): Pair<ByteArray, String>? {
     val cr = context.contentResolver
     val mime = cr.getType(uri) ?: "image/jpeg"
     val raw = cr.openInputStream(uri)?.use { it.readBytes() } ?: return null
     if (mime == "image/gif" || mime == "image/webp") return raw to mime
     val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
     android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
-    val limit = if (sticker) 640 else 1600
+    val limit = 1600
     var sample = 1
     while (maxOf(bounds.outWidth, bounds.outHeight) / sample > limit * 2) sample *= 2
     var bmp = android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
@@ -613,89 +581,4 @@ private fun prepareImage(context: android.content.Context, uri: android.net.Uri,
     val out = java.io.ByteArrayOutputStream()
     return if (bmp.hasAlpha()) { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out); out.toByteArray() to "image/png" }
     else { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 86, out); out.toByteArray() to "image/jpeg" }
-}
-
-/** The "+" panel: attach menu, sticker pack and bubble-style picker. */
-@Composable
-private fun ChatPanel(
-    panel: Int, onPanel: (Int) -> Unit, onPhoto: () -> Unit, onUploadSticker: () -> Unit,
-    onSticker: (String) -> Unit, styleId: String, onSaveStyle: (String) -> Unit,
-) {
-    var pending by remember(styleId) { mutableStateOf(styleId) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF161618)).padding(14.dp)) {
-        when (panel) {
-            1 -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                PanelTile("Photo", AniIcons.Image, onPhoto)
-                PanelTile("My sticker", AniIcons.Upload, onUploadSticker)
-                PanelTile("Stickers", AniIcons.Sticker) { onPanel(2) }
-                PanelTile("Bubble", AniIcons.Palette) { onPanel(3) }
-            }
-            2 -> {
-                PanelHeader("Stickers") { onPanel(1) }
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(76.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    items(Stickers.all.size) { i ->
-                        val (name, res) = Stickers.all[i]
-                        androidx.compose.foundation.Image(painterResource(res), name, Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)).clickable { onSticker(name) }.padding(6.dp))
-                    }
-                }
-            }
-            3 -> {
-                PanelHeader("Bubble style") { onPanel(1) }
-                Text("Applies to messages you send after saving.", style = inter(12.5f), color = Muted, modifier = Modifier.padding(bottom = 8.dp))
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(BubbleStyles.all.size) { i ->
-                        val st = BubbleStyles.all[i]
-                        val sel = pending == st.id
-                        Column(
-                            Modifier.clip(RoundedCornerShape(16.dp)).background(if (sel) Color(0xFF2A2A2E) else Color.Transparent)
-                                .border(1.dp, if (sel) Color(0x66FFFFFF) else Color.Transparent, RoundedCornerShape(16.dp))
-                                .clickable { pending = st.id }.padding(vertical = 10.dp, horizontal = 6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Box(Modifier.height(54.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-                                Box(Modifier.fillMaxWidth(0.82f).height(34.dp).clip(RoundedCornerShape(14.dp)).background(st.brush), contentAlignment = Alignment.Center) {
-                                    Text("Aa", style = inter(14f, FontWeight.SemiBold), color = st.text)
-                                }
-                                if (st.deco != null) androidx.compose.foundation.Image(
-                                    painterResource(st.deco), null,
-                                    Modifier.align(when (st.spot) { DecoSpot.TopEnd -> Alignment.TopEnd; DecoSpot.TopStart -> Alignment.TopStart; DecoSpot.TopCenter -> Alignment.TopCenter }).padding(horizontal = 8.dp).size((st.decoWidth * 0.72f).dp, (st.decoHeight * 0.72f).dp),
-                                )
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Text(st.name, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "Save", style = inter(15f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSaveStyle(pending) }.padding(vertical = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PanelHeader(title: String, onBack: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(32.dp).glass(CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) { com.anibiar.app.ui.theme.ChevronIcon(Modifier.size(18.dp)) }
-        Spacer(Modifier.width(12.dp))
-        Text(title, style = inter(16f, FontWeight.Bold), color = Color.White)
-    }
-}
-
-@Composable
-private fun PanelTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    Column(Modifier.clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(54.dp).glass(CircleShape), contentAlignment = Alignment.Center) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp)) }
-        Spacer(Modifier.height(6.dp))
-        Text(label, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1)
-    }
 }

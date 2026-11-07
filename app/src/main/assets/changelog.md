@@ -285,3 +285,10 @@
 - Send photos, GIFs, your own stickers, or pick from the built-in sticker pack with the + button
 - New bubble styles with little decorations on top; choose and save yours from + > Bubble
 - Default bubble is blue; tap a photo to view it full screen
+
+## 66 | Avatar decorations and namecard effects | 2026-11-07
+- Removed stickers and chat bubble styles; the + button now just sends a photo
+- New avatar decorations (Kitty, Thunder, Burst, Butterflies, Study buddy, Furious) that animate around your photo and show everywhere your avatar appears
+- New namecard effects (Sparkles, Sakura, Embers, Snowfall, Aura) that animate on your name card and profile banner
+- Pick both in Edit profile > Avatar decoration & effect, with a live preview
+- Top Airing and Upcoming now look the same

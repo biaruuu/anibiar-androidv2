@@ -94,7 +94,7 @@ fun TogetherSheet(
                         val here = f.uid in members
                         val sent = f.uid in invited
                         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF1B1B1F)).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Avatar(f.avatarUrl, f.shownName, 40.dp)
+                            Avatar(f.avatarUrl, f.shownName, 40.dp, deco = f.avatarDeco)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(f.shownName, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

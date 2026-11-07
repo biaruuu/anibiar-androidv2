@@ -50,7 +50,7 @@ private fun Tile(p: UserProfile?, uid: String, speaking: Boolean, muted: Boolean
         contentAlignment = Alignment.Center,
     ) {
         val d: Dp = (if (maxWidth < maxHeight) maxWidth else maxHeight) * 0.5f
-        Avatar(p?.avatarUrl, p?.shownName ?: "?", d)
+        Avatar(p?.avatarUrl, p?.shownName ?: "?", d, deco = p?.avatarDeco)
         Row(Modifier.align(Alignment.BottomStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color(0x99000000)).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text((p?.shownName ?: "…") + if (me) " (you)" else "", style = inter(12.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (host) Text("  HOST", style = inter(10f, FontWeight.Bold), color = Ani.Lime)
@@ -128,7 +128,7 @@ fun AvatarStrip(members: List<String>, profiles: Map<String, UserProfile>, speak
                     Modifier.size(42.dp).clip(CircleShape).background(Color(0x66000000))
                         .then(if (uid in speaking) Modifier.border(3.dp, Speaking, CircleShape) else Modifier.border(1.dp, Color(0x55FFFFFF), CircleShape))
                         .padding(3.dp),
-                ) { Avatar(profiles[uid]?.avatarUrl, profiles[uid]?.shownName ?: "?", 36.dp) }
+                ) { Avatar(profiles[uid]?.avatarUrl, profiles[uid]?.shownName ?: "?", 36.dp, deco = profiles[uid]?.avatarDeco) }
                 if (uid in muted) Box(Modifier.align(Alignment.BottomEnd).size(16.dp).clip(CircleShape).background(Danger), contentAlignment = Alignment.Center) {
                     Icon(AniIcons.MicOff, null, tint = Color.White, modifier = Modifier.size(10.dp))
                 }

@@ -160,6 +160,7 @@ fun ProfileScreen(
                 // Banner fills the top; name, handle and counts sit on it, avatar on the right.
                 Box(Modifier.fillMaxWidth().height(topInset + 232.dp)) {
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
+                    EffectLayer(profile?.profileEffect, Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
@@ -174,7 +175,7 @@ fun ProfileScreen(
                             }
                         }
                         Box(Modifier.requiredSize(96.dp)) {
-                            Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp))
+                            Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
                             StatusDot(profile?.status, 24.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
                         }
                     }
@@ -404,17 +405,20 @@ private fun Banner(url: String?, modifier: Modifier) {
 }
 
 @Composable
-fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier) {
-    Box(modifier.size(size).clip(CircleShape).background(Ani.Item), contentAlignment = Alignment.Center) {
-        if (url != null) {
-            AsyncImage(
-                model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).size(coil.size.Size.ORIGINAL).crossfade(true).build(),
-                contentDescription = null, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text((name?.firstOrNull() ?: '?').uppercase(), style = inter((size.value * 0.42f), FontWeight.Bold), color = Ani.Lavender)
+fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier, deco: String? = null) {
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(size).clip(CircleShape).background(Ani.Item), contentAlignment = Alignment.Center) {
+            if (url != null) {
+                AsyncImage(
+                    model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).size(coil.size.Size.ORIGINAL).crossfade(true).build(),
+                    contentDescription = null, contentScale = ContentScale.Crop, filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text((name?.firstOrNull() ?: '?').uppercase(), style = inter((size.value * 0.42f), FontWeight.Bold), color = Ani.Lavender)
+            }
         }
+        if (deco != null && size >= 36.dp) DecoOverlay(deco, size)
     }
 }
 
@@ -462,7 +466,7 @@ private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, o
 private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit, onDismiss: () -> Unit) {
     Box(Modifier.width(150.dp).clip(RoundedCornerShape(14.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x1AFFFFFF), RoundedCornerShape(14.dp)).clickable(onClick = onOpen)) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Avatar(u.avatarUrl, u.shownName, 64.dp)
+            Avatar(u.avatarUrl, u.shownName, 64.dp, deco = u.avatarDeco)
             Spacer(Modifier.height(8.dp))
             Text(u.shownName, style = inter(13.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text("@${u.username}", style = inter(12f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -517,7 +521,7 @@ internal fun UserRow(
         Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(user.avatarUrl, user.shownName, 44.dp)
+        Avatar(user.avatarUrl, user.shownName, 44.dp, deco = user.avatarDeco)
         Spacer(Modifier.width(12.dp))
         Text(user.shownName, style = inter(15f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (myUid != null && user.uid != myUid) FollowButton(user.uid, myFollowing, myFollowers, onToggle)
@@ -589,9 +593,10 @@ internal fun UserCard(
         // Banner shows through softly behind the content, fading into the card.
         if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
         Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+        EffectLayer(user.profileEffect, Modifier.matchParentSize())
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.requiredSize(64.dp)) {
-                Avatar(user.avatarUrl, user.shownName, 64.dp, Modifier.requiredSize(64.dp))
+                Avatar(user.avatarUrl, user.shownName, 64.dp, Modifier.requiredSize(64.dp), deco = user.avatarDeco)
                 StatusDot(user.status, 20.dp, Color(0xFF151517), Modifier.align(Alignment.BottomEnd))
             }
             Spacer(Modifier.width(14.dp))

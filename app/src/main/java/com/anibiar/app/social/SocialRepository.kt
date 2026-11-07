@@ -47,7 +47,7 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
-data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null, val style: String? = null)
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null)
 
 data class UserProfile(
     val uid: String,
@@ -70,6 +70,8 @@ data class UserProfile(
     val statusEmoji: String? = null,
     /** "everyone", "friends" or "me". */
     val favoritesVisibility: String = "everyone",
+    val avatarDeco: String? = null,
+    val profileEffect: String? = null,
 ) {
     /** The name people see: the display name if set, otherwise the username. */
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
@@ -401,6 +403,8 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         statusText = o["status_text"]?.jsonPrimitive?.contentOrNull,
         statusEmoji = o["status_emoji"]?.jsonPrimitive?.contentOrNull,
         favoritesVisibility = o["favorites_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
+        avatarDeco = o["avatar_deco"]?.jsonPrimitive?.contentOrNull,
+        profileEffect = o["profile_effect"]?.jsonPrimitive?.contentOrNull,
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -421,7 +425,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -473,7 +477,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
-        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url,style&order=id.desc&limit=200"
+        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url&order=id.desc&limit=200"
         return getRows(q).map {
             val o = it.jsonObject
             DmMessage(
@@ -485,7 +489,6 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 replyTo = o["reply_to"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
                 kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "text",
                 mediaUrl = o["media_url"]?.jsonPrimitive?.contentOrNull,
-                style = o["style"]?.jsonPrimitive?.contentOrNull,
             )
         }.reversed()
     }
@@ -503,11 +506,6 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val _style = MutableStateFlow(prefs.getString("bubble_style", "default") ?: "default")
-    /** My chosen chat bubble style; it is stored on each message I send so the other person sees it too. */
-    val bubbleStyle: StateFlow<String> = _style.asStateFlow()
-    fun setBubbleStyle(id: String) { _style.value = id; prefs.edit().putString("bubble_style", id).apply() }
-
     private suspend fun insertDm(to: String, body: String, kind: String, mediaUrl: String?, replyTo: Long?) {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         val (code, resp) = raw(
@@ -516,7 +514,6 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 put("sender_id", me); put("recipient_id", to); put("body", body); put("kind", kind)
                 if (mediaUrl != null) put("media_url", mediaUrl)
                 if (replyTo != null) put("reply_to", replyTo)
-                if (kind == "text" && _style.value != "default") put("style", _style.value)
             }.toString().toByteArray(),
             extra = mapOf("Prefer" to "return=minimal"),
         )
@@ -527,23 +524,21 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         chatTick.value++; refreshSoon(); sendDm(to, "msg")
     }
 
-    suspend fun sendSticker(to: String, name: String, replyTo: Long? = null) = net { insertDm(to, "Sticker", "sticker", "kiro:$name", replyTo) }
-
     suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
         val text = body.trim()
         if (text.isEmpty()) return@net
         insertDm(to, text, "text", null, replyTo)
     }
 
-    /** Uploads [bytes] to the dm-media bucket and sends it as a photo or a sticker. */
-    suspend fun sendMedia(to: String, bytes: ByteArray, mime: String, sticker: Boolean, replyTo: Long? = null) = net {
+    /** Uploads [bytes] to the dm-media bucket and sends it as a photo. */
+    suspend fun sendMedia(to: String, bytes: ByteArray, mime: String, replyTo: Long? = null) = net {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         if (bytes.size > 8 * 1024 * 1024) throw IllegalStateException("That file is over 8 MB.")
         val ext = when (mime) { "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> "jpg" }
         val path = "$me/${java.util.UUID.randomUUID()}.$ext"
         val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = mime)
         if (code !in 200..299) fail(code, resp)
-        insertDm(to, if (sticker) "Sticker" else "Photo", if (sticker) "sticker" else "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
+        insertDm(to, "Photo", "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
     }
 
     // ---- instant nudges over the shared realtime socket ("dmu-<uid>" is my own inbox channel)
@@ -769,6 +764,12 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         patchProfile(buildJsonObject {
             put("status_text", if (t.isEmpty()) JsonNull else JsonPrimitive(t))
             put("status_emoji", if (e.isEmpty()) JsonNull else JsonPrimitive(e))
+        })
+    }
+    suspend fun setLook(deco: String?, effect: String?) = net {
+        patchProfile(buildJsonObject {
+            put("avatar_deco", if (deco == null) JsonNull else JsonPrimitive(deco))
+            put("profile_effect", if (effect == null) JsonNull else JsonPrimitive(effect))
         })
     }
     suspend fun setFavoritesVisibility(v: String) = net { patchProfile(buildJsonObject { put("favorites_visibility", v) }) }

@@ -60,6 +60,8 @@ import com.anibiar.app.social.ImageProc
 import com.anibiar.app.social.UserProfile
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniIcons
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -109,6 +111,10 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                 profile?.linkSlug.orEmpty(), 30, filter = { it.isLetterOrDigit() || it == '_' || it == '.' || it == '-' }, allowEmpty = true, minLen = 3,
                 previewPrefix = "kiro://u/", onCancel = { page = "main" },
             ) { social.setLinkSlug(it); page = "main" }
+            "look" -> LookPage(
+                profile, onBack = { page = "main" },
+                onSave = { d, e -> scope.launch { try { social.setLook(d, e) } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }; page = "main" },
+            )
             "bio" -> FieldPage(
                 "Bio", "You can edit your bio anytime.", profile?.bio.orEmpty(), 200,
                 filter = { true }, allowEmpty = true, multiline = true, placeholder = "My account is all about…", onCancel = { page = "main" },
@@ -122,12 +128,9 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(12.dp))
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        Modifier.size(104.dp).clip(CircleShape).border(2.dp, Color.White, CircleShape).clickable { pickAvatar.launch("image/*") },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Avatar(profile?.avatarUrl, profile?.shownName, 104.dp)
-                        Box(Modifier.fillMaxSize().background(Color(0x66000000)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(104.dp).clickable { pickAvatar.launch("image/*") }, contentAlignment = Alignment.Center) {
+                        Avatar(profile?.avatarUrl, profile?.shownName, 104.dp, Modifier.border(2.dp, Color.White, CircleShape), deco = profile?.avatarDeco)
+                        Box(Modifier.size(104.dp).clip(CircleShape).background(Color(0x66000000)), contentAlignment = Alignment.Center) {
                             Icon(AniIcons.Photo, "Change photo", tint = Color.White, modifier = Modifier.size(38.dp))
                         }
                     }
@@ -167,6 +170,11 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                         listOfNotNull(profile?.statusEmoji?.takeIf { it.isNotBlank() }, profile?.statusText?.takeIf { it.isNotBlank() }).joinToString(" ").ifBlank { com.anibiar.app.ui.profile.statusLabel(profile?.status) },
                         onClick = { showStatus = true },
                         trailing = { com.anibiar.app.ui.profile.StatusDot(profile?.status, 22.dp, Ani.Item) },
+                    )
+                    FormRow(
+                        "Avatar decoration & effect",
+                        listOfNotNull(Looks.deco(profile?.avatarDeco)?.name, Looks.effects.firstOrNull { it.id == profile?.profileEffect }?.name).joinToString(" + ").ifBlank { "None" },
+                        onClick = { page = "look" },
                     )
                     FormRow(
                         "Banner", "", onClick = { pickBanner.launch("image/*") },
@@ -279,5 +287,65 @@ private fun FieldPage(
             Text("${text.length}/$max", style = inter(14.5f), color = Ani.Muted)
         }
         err?.let { Spacer(Modifier.height(10.dp)); Text(it, style = inter(14f, lineHeight = 20f), color = Color(0xFFFF8A80)) }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?, String?) -> Unit) {
+    var deco by remember { mutableStateOf(profile?.avatarDeco) }
+    var fx by remember { mutableStateOf(profile?.profileEffect) }
+    BackHandler(onBack = onBack)
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) { com.anibiar.app.ui.theme.GlassBack(onBack) }
+            Text("Decoration & effect", style = inter(17f, FontWeight.Bold), color = Color.White)
+        }
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            // Live preview of the namecard
+            val shape = RoundedCornerShape(18.dp)
+            Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) {
+                if (profile?.bannerUrl != null) AsyncImage(profile.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
+                Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+                EffectLayer(fx, Modifier.matchParentSize())
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Avatar(profile?.avatarUrl, profile?.shownName, 64.dp, deco = deco)
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(profile?.shownName.orEmpty(), style = inter(16.5f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("@${profile?.username.orEmpty()}", style = inter(12.5f), color = Ani.Muted, maxLines = 1)
+                    }
+                }
+            }
+            Text("Avatar decoration", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LookTile("None", deco == null, { deco = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
+                Looks.decos.forEach { d -> LookTile(d.name, deco == d.id, { deco = d.id }) { Avatar(null, profile?.shownName, 44.dp, deco = d.id) } }
+            }
+            Text("Namecard effect", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LookTile("None", fx == null, { fx = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
+                Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize()) } } }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+        Text(
+            "Save", style = inter(15f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSave(deco, fx) }.padding(vertical = 13.dp),
+        )
+    }
+}
+
+@Composable
+private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier.width(92.dp).clip(shape).background(if (selected) Color(0xFF2A2A2E) else com.anibiar.app.ui.theme.GlassFill)
+            .border(1.dp, if (selected) Color(0x99FFFFFF) else Color(0x1AFFFFFF), shape).clickable(onClick = onClick).padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.height(66.dp), contentAlignment = Alignment.Center) { content() }
+        Spacer(Modifier.height(6.dp))
+        Text(label, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

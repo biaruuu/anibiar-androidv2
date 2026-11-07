@@ -124,7 +124,7 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
         // Account card
         Card {
             Row(Modifier.fillMaxWidth().clickable(onClick = onOpenProfile).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Avatar(profile?.avatarUrl, profile?.username, 56.dp)
+                Avatar(profile?.avatarUrl, profile?.username, 56.dp, deco = profile?.avatarDeco)
                 Spacer(Modifier.size(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(profile?.username ?: "…", style = inter(18f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

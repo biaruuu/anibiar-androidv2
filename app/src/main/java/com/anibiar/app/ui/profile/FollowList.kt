@@ -132,7 +132,7 @@ internal fun FollowListScreen(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(com.anibiar.app.ui.theme.GlassFill).clickable { onOpenUser(u.uid) }.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Avatar(u.avatarUrl, u.shownName, 54.dp)
+                    Avatar(u.avatarUrl, u.shownName, 54.dp, deco = u.avatarDeco)
                     Spacer(Modifier.size(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(u.shownName, style = inter(15f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
