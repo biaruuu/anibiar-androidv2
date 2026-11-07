@@ -302,3 +302,7 @@
 - Avatar decorations now play their own animation (no extra motion added); small avatars in lists show a still frame to stay smooth
 - New Storm namecard effect (blue lightning)
 - Avatars and Home row backdrops load at the size they are shown, which uses less memory and scrolls smoother
+
+## 69 | More Rust: title matching and text cleanup | 2026-11-08
+- Title matching for stream sources and HTML/description cleanup now run in Rust (with Kotlin backup)
+- Regexes are compiled once instead of on every call, so Home descriptions and source searches do less work

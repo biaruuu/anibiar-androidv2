@@ -70,12 +70,17 @@ object LocalSources {
         }
     }
 
-    private fun decodeEntities(s: String) = s.replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() }
+    private val numEntity = Regex("&#(\\d+);")
+    private val anyTag = Regex("<[^>]*>")
+    private val spaces = Regex("\\s+")
+    private val nonAlnum = Regex("[^a-z0-9]")
+    private fun decodeEntities(s: String): String = com.anibiar.app.nativecore.Native.html(s, 2) ?: s.replace(numEntity) { it.groupValues[1].toInt().toChar().toString() }
         .replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").trim()
-    private fun stripTags(s: String) = decodeEntities(s.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " "))
+    private fun stripTags(s: String): String = com.anibiar.app.nativecore.Native.html(s, 1) ?: decodeEntities(s.replace(anyTag, " ").replace(spaces, " "))
     private fun attr(tag: String, name: String) = Regex("$name=[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE).find(tag)?.groupValues?.get(1)?.let(::decodeEntities).orEmpty()
-    private fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9]"), "")
-    private fun dice(a: String, b: String): Double {
+    private fun norm(s: String) = s.lowercase().replace(nonAlnum, "")
+    private fun dice(a: String, b: String): Double = com.anibiar.app.nativecore.Native.diceOrNull(a, b) ?: diceKotlin(a, b)
+    private fun diceKotlin(a: String, b: String): Double {
         val na = norm(a); val nb = norm(b)
         if (na == nb) return 1.0
         if (na.length < 2 || nb.length < 2) return 0.0

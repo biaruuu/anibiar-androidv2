@@ -213,18 +213,23 @@ val Media.posterUrl: String?
 val Media.backdropUrl: String?
     get() = bannerImage ?: coverImage.extraLarge ?: coverImage.large
 
+private val BR_RE = Regex("(?i)<br\\s*/?>")
+private val TAG_RE = Regex("<[^>]+>")
+private val WS_RE = Regex("\\s+")
+
 val Media.cleanDescription: String
     get() {
         val raw = description ?: return ""
+        com.anibiar.app.nativecore.Native.html(raw, 0)?.let { return it }
         return raw
-            .replace(Regex("(?i)<br\\s*/?>"), " ")
-            .replace(Regex("<[^>]+>"), "")
+            .replace(BR_RE, " ")
+            .replace(TAG_RE, "")
             .replace("&quot;", "\"")
             .replace("&amp;", "&")
             .replace("&#039;", "'")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
-            .replace(Regex("\\s+"), " ")
+            .replace(WS_RE, " ")
             .trim()
     }
 
