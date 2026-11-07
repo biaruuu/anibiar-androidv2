@@ -1,7 +1,8 @@
 //! Ranks the streams found for an episode so the best one plays first.
-//! For sub audio, soft subtitles (separate tracks the app can restyle) beat burned-in ones: English tracks first,
-//! then other languages, then "soft" streams that carry no tracks, then hard subs. Within a tier: taller picture,
-//! then HLS (adaptive) over plain files, then the original provider order.
+//! 1. Picture quality (2160 / 1080 / 720 / 480 / 360 / lower / unknown).
+//! 2. For sub audio, soft subtitles (separate tracks the app can restyle) before burned-in ones: English tracks first,
+//!    then other languages, then "soft" streams that carry no tracks, then hard subs.
+//! 3. Exact height, then HLS (adaptive) over plain files, then the original provider order.
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Row {
@@ -26,13 +27,26 @@ fn tier(sub_audio: bool, r: &Row) -> i32 {
     }
 }
 
+fn bucket(h: i32) -> i32 {
+    match h {
+        i32::MIN..=0 => 0,
+        1..=299 => 240,
+        300..=449 => 360,
+        450..=699 => 480,
+        700..=999 => 720,
+        1000..=1999 => 1080,
+        _ => 2160,
+    }
+}
+
 /// Indices into `rows`, best first.
 pub fn rank(sub_audio: bool, rows: &[Row]) -> Vec<i32> {
     let mut idx: Vec<usize> = (0..rows.len()).collect();
     idx.sort_by(|&a, &b| {
         let (x, y) = (&rows[a], &rows[b]);
-        tier(sub_audio, y)
-            .cmp(&tier(sub_audio, x))
+        bucket(y.height)
+            .cmp(&bucket(x.height))
+            .then(tier(sub_audio, y).cmp(&tier(sub_audio, x)))
             .then(y.height.cmp(&x.height))
             .then(y.hls.cmp(&x.hls))
             .then(a.cmp(&b))
@@ -60,9 +74,16 @@ mod tests {
     }
 
     #[test]
-    fn soft_english_beats_a_taller_hard_sub_for_sub_audio() {
-        let rows = [r(false, false, false, true, 1080), r(true, true, true, true, 480), r(true, false, true, true, 720)];
-        assert_eq!(rank(true, &rows), vec![1, 2, 0]);
+    fn quality_first_then_soft_english() {
+        // 1080 hard beats 720 soft; at equal quality soft English beats soft other beats hard.
+        let rows = [r(false, false, false, true, 1080), r(true, true, true, true, 720), r(true, false, true, true, 1080), r(true, true, true, true, 1080)];
+        assert_eq!(rank(true, &rows), vec![3, 2, 0, 1]);
+    }
+
+    #[test]
+    fn near_equal_heights_count_as_one_quality() {
+        let rows = [r(false, false, false, true, 1080), r(true, true, true, true, 1072)];
+        assert_eq!(rank(true, &rows), vec![1, 0]);
     }
 
     #[test]

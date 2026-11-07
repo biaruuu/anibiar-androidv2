@@ -3,6 +3,7 @@
 
 pub mod captions;
 pub mod fuzzy;
+pub mod hls;
 pub mod streams;
 pub mod text;
 

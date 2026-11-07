@@ -13,6 +13,11 @@ object Native {
     @JvmStatic private external fun dice(a: String, b: String): Double
     @JvmStatic private external fun htmlText(s: String, mode: Int): String?
 
+    @JvmStatic private external fun hlsMaxHeight(text: String): Int
+
+    /** Tallest RESOLUTION in an HLS master playlist (0 = none). Null when Rust isn't usable. */
+    fun hlsHeight(text: String): Int? = if (available) runCatching { hlsMaxHeight(text) }.getOrNull()?.takeIf { it >= 0 } else null
+
     @JvmStatic private external fun rankStreams(subAudio: Int, rows: String): IntArray?
 
     /** Row per stream: soft, english, tracks, hls (0/1) and picture height. Returns indices best first, or null. */

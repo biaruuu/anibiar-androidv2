@@ -243,7 +243,7 @@ object Streaming {
                     LocalSources.referers[s.src]?.let { b.header("Referer", it).header("Origin", it.trimEnd('/')) }
                     Http.plain.newCall(b.build()).execute().use { r ->
                         val text = r.body?.string().orEmpty()
-                        Regex("RESOLUTION=\\d+x(\\d+)").findAll(text).maxOfOrNull { it.groupValues[1].toInt() } ?: 0
+                        com.anibiar.app.nativecore.Native.hlsHeight(text) ?: (resolutionRe.findAll(text).maxOfOrNull { it.groupValues[1].toInt() } ?: 0)
                     }
                 }
             }.getOrNull()
@@ -251,18 +251,20 @@ object Streaming {
         return if (h > 0) s.copy(height = h) else s
     }
 
+    private val resolutionRe = Regex("RESOLUTION=\\d+x(\\d+)")
     private fun isEnglish(t: StreamSubtitle) = t.srclang.startsWith("en", true) || t.label.contains("english", true)
 
     /**
-     * Best stream first. For sub audio, soft subtitles (separate tracks the app styles itself) come before burned-in
-     * ones, English tracks first, then picture height. Done in Rust, with the same rules in Kotlin as backup.
+     * Best stream first: picture quality, then (for sub audio) soft subtitles before burned-in ones with English
+     * tracks first. Done in Rust, with the same rules in Kotlin as backup.
      */
     internal fun rankStreams(audio: String, list: List<StreamSource>): List<StreamSource> {
         val sub = audio == "sub"
         val rows = list.map { intArrayOf(if (it.kind == "soft") 1 else 0, if (it.subtitles.any(::isEnglish)) 1 else 0, if (it.subtitles.isNotEmpty()) 1 else 0, if (it.format == "hls") 1 else 0, it.height) }
         com.anibiar.app.nativecore.Native.rank(sub, rows)?.let { order -> return order.map { list[it] } }
         fun tier(s: StreamSource) = if (!sub || s.kind != "soft") 0 else if (s.subtitles.any(::isEnglish)) 3 else if (s.subtitles.isNotEmpty()) 2 else 1
-        return list.sortedWith(compareByDescending<StreamSource> { tier(it) }.thenByDescending { it.height }.thenByDescending { it.format == "hls" })
+        fun bucket(h: Int) = when { h <= 0 -> 0; h < 300 -> 240; h < 450 -> 360; h < 700 -> 480; h < 1000 -> 720; h < 2000 -> 1080; else -> 2160 }
+        return list.sortedWith(compareByDescending<StreamSource> { bucket(it.height) }.thenByDescending { tier(it) }.thenByDescending { it.height }.thenByDescending { it.format == "hls" })
     }
 
     private suspend fun probeAll(l: List<StreamSource>): List<StreamSource> = kotlinx.coroutines.coroutineScope { l.map { async { probe(it) } }.awaitAll() }

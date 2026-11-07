@@ -311,3 +311,7 @@
 - Best-stream picking (done in Rust) now prefers soft subtitles, English first, so captions use Kiro's own caption style; hard-sub streams come last, then picture quality decides
 - Episode descriptions now show in the episode list (from ani.zip summaries)
 - Each episode row shows which providers have it; the Server menu shows s-sub / h-sub and the picture quality
+
+## 71 | Quality first stream picking | 2026-11-08
+- Best stream is now the highest picture quality first; among equal quality, soft subs (English first) come before hard subs
+- Stream quality is read from the playlist in Rust

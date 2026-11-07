@@ -1,7 +1,7 @@
 //! JNI entry points for `com.anibiar.app.nativecore.Native`. Each call is panic-safe: on any failure it returns null
 //! and the Kotlin side falls back to its own implementation.
 
-use crate::{captions, fuzzy, streams, text};
+use crate::{captions, fuzzy, hls, streams, text};
 use jni::objects::{JClass, JString};
 use jni::sys::{jdouble, jint, jintArray, jstring};
 use jni::JNIEnv;
@@ -62,4 +62,10 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_rankStreams<'l>(mu
         return null_mut();
     }
     arr.into_raw()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_hlsMaxHeight<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, text: JString<'l>) -> jint {
+    let Some(t) = read(&mut env, &text) else { return -1 };
+    catch_unwind(|| hls::max_height(&t)).unwrap_or(-1)
 }
