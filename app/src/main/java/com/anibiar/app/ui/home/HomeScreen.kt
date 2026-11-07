@@ -480,21 +480,7 @@ internal fun AniTopBar(
                 .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Image(
-                bitmap = androidx.compose.ui.graphics.ImageBitmap.imageResource(R.drawable.kiro_wordmark),
-                contentDescription = "Kiro",
-                contentScale = ContentScale.Fit,
-                filterQuality = FilterQuality.High,
-                alignment = Alignment.CenterStart,
-                modifier = Modifier.height(18.dp).width(51.dp).then(if (onLogo != null) Modifier.clickable(onClick = onLogo) else Modifier),
-            )
             Spacer(Modifier.weight(1f))
-            Icon(
-                imageVector = AniIcons.Search,
-                contentDescription = "Search",
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(28.dp).clickable(onClick = onSearch),
-            )
         }
         if (scrolled) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))
@@ -676,7 +662,7 @@ private fun HeroSlide(
                 Row(
                     modifier = Modifier
                         .height(40.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(50))
                         .background(Color.White)
                         .clickable(onClick = onWatch)
                         .padding(horizontal = 14.dp),
@@ -689,8 +675,7 @@ private fun HeroSlide(
                 Row(
                     modifier = Modifier
                         .height(40.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Ani.ButtonDark)
+                        .glass(RoundedCornerShape(50))
                         .clickable(onClick = onDetails)
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -703,8 +688,7 @@ private fun HeroSlide(
                 Box(
                     modifier = Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Ani.ButtonDark)
+                        .glass(CircleShape)
                         .clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -980,8 +964,8 @@ internal fun MediaGridCard(
     val hover = rememberCardHover()
     val active = hover.active() || armed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
-    val chipText by accentColor(active, accent, Ani.Muted)
-    val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.Chip)
+    val chipText by accentColor(active, accent, Color(0xFFE4E1EA))
+    val chipBg by accentColor(active, accent.copy(alpha = 0.28f), Color(0x2EFFFFFF))
     val titleColor by accentColor(active, accent, Color.White)
     BoxWithConstraints(modifier.hoverCard(hover, onClick, onArm = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
@@ -1101,9 +1085,10 @@ internal fun InfoBadge(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(7.dp))
+            .clip(RoundedCornerShape(50))
             .background(background)
-            .padding(horizontal = hPad, vertical = vPad),
+            .border(1.dp, Color(0x2BFFFFFF), RoundedCornerShape(50))
+            .padding(horizontal = hPad + 1.dp, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
@@ -1112,7 +1097,7 @@ internal fun InfoBadge(
         }
         Text(
             text = text,
-            style = inter(textSize, FontWeight.Medium),
+            style = inter(textSize, FontWeight.SemiBold),
             color = textColor,
             maxLines = 1,
             softWrap = false,
@@ -1204,8 +1189,8 @@ private fun RankRow(
     val hover = rememberCardHover()
     val active = hover.active() || armed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
-    val chipText by accentColor(active, accent, Ani.Muted)
-    val chipBg by accentColor(active, accent.copy(alpha = 0.22f), Ani.ChipOnItem)
+    val chipText by accentColor(active, accent, Color(0xFFE4E1EA))
+    val chipBg by accentColor(active, accent.copy(alpha = 0.28f), Color(0x2EFFFFFF))
     val titleColor by accentColor(active, accent, Color.White)
     val tint by accentColor(active, accent.copy(alpha = 0.30f), Ani.Item)
     val rowBorder by accentColor(active, accent.copy(alpha = 0.55f), Color.Transparent)
@@ -1271,10 +1256,9 @@ private fun RankRow(
                     if (active || isFav) {
                         Box(
                             Modifier
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(Color(0xFF1C1C1F))
+                                .glass(RoundedCornerShape(50))
                                 .clickable(onClick = toggleFav)
-                                .padding(horizontal = 7.dp, vertical = 4.dp),
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(

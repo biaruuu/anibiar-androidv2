@@ -253,3 +253,8 @@
 
 ## 58 | Glass buttons everywhere | 2026-11-07
 - Details, Watch, Watch together, Search, Login and Follow buttons, chips and round icon buttons now use the same glass style as the chat; every full page gets the glass < button
+
+## 59 | Glass chips, + buttons; header removed | 2026-11-07
+- Home card badges are lighter, bolder glass pills; the + / bookmark buttons are glass
+- Removed the Kiro header and search icon from Home and Details (search lives in the Search tab)
+- Details page icons (bookmark, site links, card badges) restyled as glass

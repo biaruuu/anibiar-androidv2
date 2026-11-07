@@ -36,6 +36,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 
 /** The anime's own cover colour (AniList `coverImage.color`), lifted so it stays readable on onyx. */
@@ -139,8 +140,7 @@ internal fun HoverOverlay(
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .size(28.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF1C1C1F))
+                    .glass(CircleShape)
                     .clickable(onClick = toggleFav),
                 contentAlignment = Alignment.Center,
             ) {

@@ -418,11 +418,9 @@ private fun Header(
                 onClick = onWatch,
                 modifier = Modifier.weight(1f),
             )
-            val favShape = RoundedCornerShape(14.dp)
             Box(
-                Modifier.size(40.dp).clip(favShape)
-                    .background(Color.White.copy(alpha = 0.10f))
-                    .border(1.dp, if (isFav) com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.20f), favShape)
+                Modifier.size(42.dp).glass(CircleShape)
+                    .then(if (isFav) Modifier.border(1.5.dp, com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.8f), CircleShape) else Modifier)
                     .clickable(onClick = onToggleFav),
                 contentAlignment = Alignment.Center,
             ) {
@@ -682,16 +680,14 @@ private data class LinkTile(val name: String, val icon: String?, val color: Stri
 
 @Composable
 private fun LinkTileView(tile: LinkTile, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(9.dp)
+    val shape = RoundedCornerShape(50)
     val brand = remember(tile.color) {
         tile.color?.let { c -> runCatching { Color(android.graphics.Color.parseColor(c)) }.getOrNull() }
     }
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(shape)
-            .background(brand ?: Ani.Item)
-            .then(if (brand == null) Modifier.border(1.dp, Ani.Border, shape) else Modifier)
+            .size(38.dp)
+            .then(if (brand == null) Modifier.glass(shape) else Modifier.clip(shape).background(brand).border(1.dp, Color(0x40FFFFFF), shape))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -705,7 +701,7 @@ private fun LinkTileView(tile: LinkTile, onClick: () -> Unit) {
                 contentDescription = tile.name,
                 filterQuality = FilterQuality.High,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(if (brand == null) 24.dp else 20.dp).clip(RoundedCornerShape(5.dp)),
+                modifier = Modifier.size(if (brand == null) 22.dp else 20.dp).clip(CircleShape),
             )
         } else {
             Icon(AniIcons.ExternalLink, contentDescription = tile.name, tint = Ani.Soft, modifier = Modifier.size(18.dp))
@@ -1298,8 +1294,7 @@ private fun MediaCard(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(8.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.62f))
+                        .glass(RoundedCornerShape(50))
                         .padding(horizontal = 10.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
