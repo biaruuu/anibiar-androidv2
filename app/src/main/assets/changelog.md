@@ -227,3 +227,6 @@
 ## 51 | Chat header, pin and smaller bubbles | 2026-11-07
 - Chat header: thin back chevron, star to pin the chat to the top of the Inbox, and a three-dot menu
 - Smaller bubbles, smaller + button and message bar
+
+## 52 | Flat iMessage bubbles | 2026-11-07
+- Chat bubbles are flat solid colours with a small curled tail, like iMessage; header buttons get a glossier glass look
