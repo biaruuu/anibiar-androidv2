@@ -317,6 +317,10 @@ private fun AppNavigation() {
                             onWatch = { aid, n -> watchEp = n; watchId = aid },
                         )
                     }
+                    com.anibiar.app.ui.theme.GlassBack(
+                        onClick = { if (stack.isNotEmpty()) stack.removeAt(stack.lastIndex) },
+                        modifier = Modifier.statusBarsPadding().padding(start = 12.dp, top = 8.dp),
+                    )
                 }
             }
         }

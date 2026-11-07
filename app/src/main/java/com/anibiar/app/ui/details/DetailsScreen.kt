@@ -113,6 +113,7 @@ import com.anibiar.app.ui.home.clearOnEmptyTap
 import androidx.lifecycle.repeatOnLifecycle
 import com.anibiar.app.ui.home.PosterImage
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import java.text.NumberFormat
@@ -461,14 +462,12 @@ private fun ActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(50)
     val content = if (filled) Color.Black else Color.White
     Row(
         modifier = modifier
-            .height(40.dp)
-            .clip(shape)
-            .background(if (filled) Color.White else Color.White.copy(alpha = 0.10f))
-            .then(if (filled) Modifier else Modifier.border(1.dp, Color.White.copy(alpha = 0.20f), shape))
+            .height(42.dp)
+            .then(if (filled) Modifier.clip(shape).background(Color.White) else Modifier.glass(shape))
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -931,9 +930,7 @@ private fun Trailer(
                             .align(Alignment.BottomEnd)
                             .padding(end = 10.dp, bottom = 10.dp)
                             .size(38.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
+                            .glass(CircleShape)
                             .clickable {
                                 fun open(start: Int) {
                                     webRef = null
@@ -972,9 +969,7 @@ private fun Trailer(
                 Box(
                     Modifier
                         .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape)
+                        .glass(CircleShape)
                         .clickable { playing = true },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1047,9 +1042,7 @@ private fun TrailerFullscreen(trailer: FsTrailer, onClose: () -> Unit) {
                 .align(Alignment.TopStart)
                 .padding(16.dp)
                 .size(40.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.55f))
-                .border(1.dp, Color.White.copy(alpha = 0.30f), CircleShape)
+                .glass(CircleShape)
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center,
         ) {

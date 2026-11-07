@@ -72,6 +72,7 @@ import com.anibiar.app.ui.home.LatestHeader
 import com.anibiar.app.ui.home.MediaGridCard
 import com.anibiar.app.ui.home.clearOnEmptyTap
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.delay
@@ -158,10 +159,7 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                     Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        AniIcons.ArrowBack, contentDescription = "Back", tint = Ani.Soft,
-                        modifier = Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable(onClick = onBack).padding(4.dp),
-                    )
+                    com.anibiar.app.ui.theme.GlassBack(onBack)
                     Spacer(Modifier.width(12.dp))
                     SearchField(
                         value = state.query,
@@ -430,11 +428,11 @@ private fun FilterBox(f: FilterDropdown) {
 
 @Composable
 private fun OutlineButton(label: String, enabled: Boolean, onClick: () -> Unit, leading: ImageVector? = null, trailing: ImageVector? = null) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(50)
     val tint = if (enabled) Color.White else Ani.Muted.copy(alpha = 0.6f)
     Row(
-        Modifier.height(42.dp).width(if (leading != null || trailing != null) 116.dp else 90.dp).clip(shape)
-            .border(1.dp, if (enabled) Color.White.copy(alpha = 0.75f) else Ani.Border, shape)
+        Modifier.height(42.dp).width(if (leading != null || trailing != null) 116.dp else 90.dp)
+            .then(if (enabled) Modifier.glass(shape) else Modifier.clip(shape).border(1.dp, Ani.Border, shape))
             .clickable(enabled = enabled, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

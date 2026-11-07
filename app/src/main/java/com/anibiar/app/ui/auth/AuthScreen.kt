@@ -126,10 +126,7 @@ fun AuthScreen(onClose: () -> Unit) {
 
 @Composable
 private fun BackArrow(onClick: () -> Unit) {
-    Icon(
-        AniIcons.ArrowBack, "Back", tint = Color.White,
-        modifier = Modifier.size(44.dp).clip(CircleShape).clickable(onClick = onClick).padding(10.dp),
-    )
+    com.anibiar.app.ui.theme.GlassBack(onClick)
 }
 
 private fun validEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s.trim()).matches()

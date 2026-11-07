@@ -119,10 +119,7 @@ internal fun UserSearchScreen(onBack: () -> Unit, onModeChange: (String) -> Unit
     ) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    AniIcons.ArrowBack, "Back", tint = Ani.Soft,
-                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(50)).clickable(onClick = onBack).padding(4.dp),
-                )
+                com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
                 Row(Modifier.weight(1f).height(40.dp).clip(shape).border(1.dp, Ani.Border, shape), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {

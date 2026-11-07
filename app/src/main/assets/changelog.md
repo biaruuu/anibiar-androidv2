@@ -250,3 +250,6 @@
 
 ## 57 | App-wide iOS glass restyle | 2026-11-07
 - Darker near-black pages, softer surfaces, rounder buttons and cards, glass card fill, tighter large text, rounder dialogs and menus across the whole app
+
+## 58 | Glass buttons everywhere | 2026-11-07
+- Details, Watch, Watch together, Search, Login and Follow buttons, chips and round icon buttons now use the same glass style as the chat; every full page gets the glass < button

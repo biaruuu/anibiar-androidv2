@@ -101,3 +101,10 @@ fun GlassPill(modifier: Modifier = Modifier, content: @Composable androidx.compo
 fun PillIcon(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.size(width = 40.dp, height = 36.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = content)
 }
+
+val GlassBtnBrush: Brush = Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036)))
+val GlassRimBrush: Brush = Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF)))
+
+/** iMessage glass: clip, translucent sheen fill and a bright rim. Use on any button, pill or chip. */
+fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier =
+    this.clip(shape).background(GlassBtnBrush).border(1.dp, GlassRimBrush, shape)

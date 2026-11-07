@@ -68,6 +68,7 @@ import com.anibiar.app.social.ImageProc
 import com.anibiar.app.social.UserProfile
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.GlassButton
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.Dispatchers
@@ -498,7 +499,7 @@ internal fun FollowButton(uid: String, myFollowing: Set<String>, myFollowers: Se
     val shape = RoundedCornerShape(50)
     Text(
         label, style = inter(13.5f, FontWeight.SemiBold), color = if (filled) Color(0xFF121214) else Color.White,
-        modifier = Modifier.clip(shape).then(if (filled) Modifier.background(Ani.Lavender) else Modifier.border(1.dp, Ani.Border, shape))
+        modifier = Modifier.then(if (filled) Modifier.clip(shape).background(Color(0xFFB7A9FF)) else Modifier.glass(shape))
             .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }

@@ -102,6 +102,7 @@ import com.anibiar.app.data.posterUrl
 import com.anibiar.app.data.timeAgo
 import com.anibiar.app.data.year
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.delay
@@ -718,9 +719,7 @@ private fun HeroSlide(
 internal fun HeroChip(label: String) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.10f))
-            .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(50))
+            .glass(RoundedCornerShape(50))
             .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
         Text(label, style = inter(11.5f, FontWeight.Medium), color = Color(0xFFE3E0E6), maxLines = 1, softWrap = false)
@@ -773,8 +772,7 @@ private fun ContinueWatching(
                                 .align(Alignment.TopEnd)
                                 .padding(10.dp)
                                 .size(32.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.40f))
+                                .glass(CircleShape)
                                 .clickable { onRemove(item) },
                             contentAlignment = Alignment.Center,
                         ) {

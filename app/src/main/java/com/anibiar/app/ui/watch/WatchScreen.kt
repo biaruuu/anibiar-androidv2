@@ -77,6 +77,7 @@ import com.anibiar.app.data.seasonLabel
 import com.anibiar.app.ui.home.FavYellow
 import com.anibiar.app.ui.home.rememberFav
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.VidIcons
 import com.anibiar.app.ui.theme.FeatherIcons
@@ -306,9 +307,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         if (!fullscreen) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x1FFFFFFF)).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
-                    Icon(AniIcons.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(22.dp))
-                }
+                com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
                 Text(name, style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -356,7 +355,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             Spacer(Modifier.height(10.dp))
                             val ctx = LocalContext.current
                             Text("Copy report", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
-                                modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x80FFFFFF), RoundedCornerShape(50)).clickable {
+                                modifier = Modifier.glass(RoundedCornerShape(50)).clickable {
                                     val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nplayer=${Streaming.lastPlayError ?: "-"}\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
                                     (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", report))
                                     android.widget.Toast.makeText(ctx, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
@@ -388,7 +387,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     }
                     Text("Dismiss", style = inter(13f), color = Ani.Muted, modifier = Modifier.clickable { requests = requests.drop(1) }.padding(8.dp))
                     Text("Accept", style = inter(13.5f, FontWeight.Bold), color = Color.Black,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.Lime).clickable {
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFB7A9FF)).clickable {
                             requests = requests.drop(1)
                             val r = room; val t = together
                             if (rq.animeId != null && r != null && t != null) {
@@ -515,7 +514,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     Text(
                         if (!micOk) "Mic off" else if (vMuted) "Muted" else "Mic on",
                         style = inter(12.5f, FontWeight.SemiBold), color = if (micOk && !vMuted) Color.Black else Color.White,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (micOk && !vMuted) Ani.Lime else Color(0x33FFFFFF))
+                        modifier = Modifier.then(if (micOk && !vMuted) Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFB7A9FF)) else Modifier.glass(RoundedCornerShape(50)))
                             .clickable { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) }
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
@@ -629,9 +628,9 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
 
 @Composable
 private fun PickerButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, open: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(11.dp)
+    val shape = RoundedCornerShape(50)
     Row(
-        Modifier.fillMaxWidth().height(38.dp).clip(shape).border(1.5.dp, Color(0x38FFFFFF), shape).background(Color(0x8C101014)).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().height(40.dp).glass(shape).clickable(onClick = onClick).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         Icon(icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
