@@ -1,0 +1,21 @@
+[package]
+name = "kiro_core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["jni-glue"]
+jni-glue = ["dep:jni"]
+
+[dependencies]
+jni = { version = "0.21", optional = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

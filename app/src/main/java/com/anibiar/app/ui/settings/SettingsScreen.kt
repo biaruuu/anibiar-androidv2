@@ -235,6 +235,8 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
     Divider()
     InfoRow("App version", version)
     Divider()
+    InfoRow("Rust core", com.anibiar.app.nativecore.Native.versionOrNull() ?: "Not loaded")
+    Divider()
     var found by remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
     var checking by remember { mutableStateOf(false) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()

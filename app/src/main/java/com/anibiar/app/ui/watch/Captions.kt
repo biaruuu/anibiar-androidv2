@@ -6,6 +6,19 @@ data class Cue(val start: Double, val end: Double, val text: String, val italic:
 /** Parses WebVTT, SRT and ASS/SSA subtitle files (the formats the AniBiar TV servers hand out). */
 object Captions {
     fun parse(raw: String): List<Cue> {
+        com.anibiar.app.nativecore.Native.captions(raw)?.let { packed ->
+            val out = ArrayList<Cue>()
+            if (packed.isNotEmpty()) for (rec in packed.split('\u001E')) {
+                val f = rec.split('\u001F', limit = 4)
+                if (f.size == 4) out += Cue(f[0].toDouble(), f[1].toDouble(), f[3], f[2] == "1")
+            }
+            return out
+        }
+        return parseKotlin(raw)
+    }
+
+    /** The original pure-Kotlin parser, kept as a fallback when the Rust library isn't available. */
+    internal fun parseKotlin(raw: String): List<Cue> {
         val text = raw.removePrefix("﻿").replace("\r\n", "\n").replace('\r', '\n')
         val cues = if (text.contains("[Events]", ignoreCase = true)) ass(text) else vttOrSrt(text)
         return cues.filter { it.text.isNotBlank() }.sortedBy { it.start }

@@ -69,7 +69,10 @@ internal fun FollowListScreen(
     val tabs = listOf("followers" to followers, "following" to following, "friends" to friends)
     val list = tabs.first { it.first == tab }.second.let { l ->
         val q = query.trim()
-        if (q.isEmpty()) l else l.filter { it.username.contains(q, ignoreCase = true) }
+        if (q.isEmpty()) l else {
+            val ranked = com.anibiar.app.nativecore.Native.rank(q, l.map { it.username + " " + (it.displayName ?: "") })
+            if (ranked != null) ranked.map { l[it] } else l.filter { it.username.contains(q, ignoreCase = true) }
+        }
     }
 
     Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding()) {

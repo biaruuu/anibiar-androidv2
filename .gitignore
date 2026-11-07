@@ -10,3 +10,7 @@ captures/
 *.jks
 *.keystore
 !app/debug.keystore
+
+# built by CI from rust/kiro_core
+app/src/main/jniLibs/
+rust/**/target/

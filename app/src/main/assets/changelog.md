@@ -292,3 +292,8 @@
 - New namecard effects (Sparkles, Sakura, Embers, Snowfall, Aura) that animate on your name card and profile banner
 - Pick both in Edit profile > Avatar decoration & effect, with a live preview
 - Top Airing and Upcoming now look the same
+
+## 67 | Rust core + profile save fix | 2026-11-08
+- Added a Rust library (kiro_core) to the app; the subtitle parser and ranked follower search now run in Rust, with the old Kotlin code as automatic backup
+- Settings > Rust core shows if it loaded on your phone
+- Fixed "permission denied for table profiles" when saving an avatar decoration or effect
