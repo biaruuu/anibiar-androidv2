@@ -278,3 +278,10 @@
 - Typing indicator: bouncing dots in a bubble when the other person is typing
 - Long-press menu is dark glass with real icons (Reply, Copy, Unsend) that press like liquid
 - Removed the empty header bar on Home
+
+## 65 | Real-time chat, stickers, photos, bubble styles | 2026-11-07
+- Messages and typing show up instantly (live channel with a polling backup)
+- Reply bar is now flat dark like TikTok: "You: hi" with a thin bar and a round X, no glass, no purple
+- Send photos, GIFs, your own stickers, or pick from the built-in sticker pack with the + button
+- New bubble styles with little decorations on top; choose and save yours from + > Bubble
+- Default bubble is blue; tap a photo to view it full screen

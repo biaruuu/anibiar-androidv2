@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.res.painterResource
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import com.anibiar.app.social.DmMessage
@@ -128,6 +131,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
         if (missing.isNotEmpty()) people = people + social.profiles(missing).associateBy { it.uid }
     }
     LaunchedEffect(following.size) { suggested = social.suggestions(ids.toSet(), 10) }
+    LaunchedEffect(Unit) { social.dmStream().collect { if (it.event == "msg") social.nudge() } }
 
     Column(Modifier.fillMaxSize().background(Bg).windowInsetsPadding(WindowInsets.statusBars)) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
@@ -240,13 +244,43 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     var theirTyping by remember { mutableStateOf(false) }
     val list = rememberLazyListState()
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-    LaunchedEffect(uid) { while (true) { theirTyping = social.isTyping(uid); kotlinx.coroutines.delay(1500) } }
+    var typingStamp by remember { mutableStateOf(0L) }
+    DisposableEffect(uid) { social.openChat(uid); onDispose { social.sendDm(uid, "typing", mapOf("on" to "false")); social.closeChat(uid) } }
+    LaunchedEffect(uid) {
+        social.dmStream().collect { b ->
+            when (b.event) {
+                "msg" -> social.nudge()
+                "typing" -> if (b.payload["from"]?.jsonPrimitive?.contentOrNull == uid) {
+                    theirTyping = b.payload["on"]?.jsonPrimitive?.contentOrNull == "true"; typingStamp = System.currentTimeMillis()
+                }
+            }
+        }
+    }
+    LaunchedEffect(typingStamp, theirTyping) { if (theirTyping) { kotlinx.coroutines.delay(4500); if (System.currentTimeMillis() - typingStamp >= 4400) theirTyping = false } }
     var typingSentAt by remember { mutableStateOf(0L) }
     LaunchedEffect(text) {
         val now = System.currentTimeMillis()
-        if (text.isNotBlank()) { if (now - typingSentAt > 2500) { typingSentAt = now; social.setTyping(uid, true) } }
-        else if (typingSentAt != 0L) { typingSentAt = 0L; social.setTyping(uid, false) }
+        if (text.isNotBlank()) { if (now - typingSentAt > 2000) { typingSentAt = now; social.sendDm(uid, "typing", mapOf("on" to "true")) } }
+        else if (typingSentAt != 0L) { typingSentAt = 0L; social.sendDm(uid, "typing", mapOf("on" to "false")) }
     }
+    var panel by remember { mutableStateOf(0) }          // 0 none, 1 attach menu, 2 stickers, 3 bubble styles
+    var viewer by remember { mutableStateOf<String?>(null) }
+    val myStyle by social.bubbleStyle.collectAsStateWithLifecycle()
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    fun sendPicked(uri: android.net.Uri, sticker: Boolean) {
+        if (sending) return
+        sending = true
+        scope.launch {
+            try {
+                val prepared = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { prepareImage(context, uri, sticker) }
+                    ?: throw IllegalStateException("Couldn't read that file.")
+                social.sendMedia(uid, prepared.first, prepared.second, sticker, replyTo?.id); replyTo = null; panel = 0
+            } catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
+            sending = false
+        }
+    }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u, false) }
+    val pickSticker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u, true) }
     LaunchedEffect(theirTyping) { if (theirTyping) list.animateScrollToItem(msgs.size) }
     LaunchedEffect(uid) { person = social.fetchProfile(uid) }
     LaunchedEffect(msgs.size) {
@@ -268,6 +302,13 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val glass = Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036)))
     val rim = Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF)))
+    viewer?.let { url ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = { viewer = null }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(Modifier.fillMaxSize().background(Color(0xF2000000)).clickable { viewer = null }, contentAlignment = Alignment.Center) {
+                coil.compose.AsyncImage(model = url, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = Modifier.fillMaxSize().padding(8.dp))
+            }
+        }
+    }
     Column(Modifier.fillMaxSize().background(Color.Black).imePadding()) {
         Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(76.dp).padding(horizontal = 14.dp)) {
             Box(Modifier.align(Alignment.CenterStart).size(36.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
@@ -364,24 +405,42 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                         Column(horizontalAlignment = if (m.mine) Alignment.End else Alignment.Start) {
                             var menuOpen by remember { mutableStateOf(false) }
                             Box {
-                                Column(
-                                    Modifier.widthIn(max = 276.dp).clip(shape)
-                                        .background(if (m.mine) Color(0xFF7F6BF5) else Color(0xFF2A2A2E))
-                                        .combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                                        .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
-                                ) {
-                                    m.replyTo?.let { rid ->
-                                        val t = msgs.firstOrNull { it.id == rid }
-                                        Row(
-                                            Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x33000000)).padding(horizontal = 8.dp, vertical = 5.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
+                                val st = BubbleStyles.of(m.style)
+                                val styled = m.kind == "text" && m.style != null && m.style != "default"
+                                val longPress = { menuOpen = true }
+                                when (m.kind) {
+                                    "sticker" -> StickerView(m.mediaUrl, Modifier.combinedClickable(onClick = {}, onLongClick = longPress))
+                                    "image" -> coil.compose.AsyncImage(
+                                        model = m.mediaUrl, contentDescription = "Photo", contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
+                                        modifier = Modifier.width(224.dp).heightIn(min = 100.dp, max = 340.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF1C1C1E))
+                                            .combinedClickable(onClick = { viewer = m.mediaUrl }, onLongClick = longPress),
+                                    )
+                                    else -> Box(Modifier.padding(top = if (styled && st.deco != null) (st.decoHeight * 0.55f).dp else 0.dp)) {
+                                        Column(
+                                            Modifier.widthIn(max = 276.dp).clip(shape)
+                                                .background(if (styled) st.brush else if (m.mine) BubbleStyles.all[0].brush else Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF2A2A2E))))
+                                                .combinedClickable(onClick = {}, onLongClick = longPress)
+                                                .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
                                         ) {
-                                            Icon(AniIcons.Reply, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(12.dp))
-                                            Spacer(Modifier.width(5.dp))
-                                            Text(t?.body ?: "Message unsent", style = inter(12f), color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            m.replyTo?.let { rid ->
+                                                val t = msgs.firstOrNull { it.id == rid }
+                                                Row(
+                                                    Modifier.padding(bottom = 5.dp).clip(RoundedCornerShape(10.dp)).background(Color(0x33000000)).padding(horizontal = 8.dp, vertical = 5.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                ) {
+                                                    Icon(AniIcons.Reply, null, tint = Color(0xCCFFFFFF), modifier = Modifier.size(12.dp))
+                                                    Spacer(Modifier.width(5.dp))
+                                                    Text(t?.body ?: "Message unsent", style = inter(12f), color = Color(0xCCFFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                }
+                                            }
+                                            Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = if (styled) st.text else Color.White)
                                         }
+                                        if (styled && st.deco != null) androidx.compose.foundation.Image(
+                                            painterResource(st.deco), null,
+                                            modifier = Modifier.align(st.alignment).offset(x = if (st.spot == DecoSpot.TopEnd) (-6).dp else if (st.spot == DecoSpot.TopStart) 8.dp else 0.dp, y = -(st.decoHeight * 0.55f).dp)
+                                                .size(st.decoWidth.dp, st.decoHeight.dp),
+                                        )
                                     }
-                                    Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White)
                                 }
                                 com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
                                     com.anibiar.app.ui.theme.GlassMenuItem("Reply", AniIcons.Reply) { menuOpen = false; replyTo = m }
@@ -410,22 +469,35 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             }
         }
         replyTo?.let { r ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(16.dp)).background(glass).border(1.dp, rim, RoundedCornerShape(16.dp)).padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(AniIcons.Reply, null, tint = Accent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Replying to " + (if (r.mine) "yourself" else person?.shownName ?: ""), style = inter(11.5f, FontWeight.SemiBold), color = Accent, maxLines = 1)
-                    Text(r.body, style = inter(12.5f), color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(3.dp).height(44.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3A3E)))
+                Spacer(Modifier.width(10.dp))
+                Row(
+                    Modifier.weight(1f).clip(RoundedCornerShape(24.dp)).background(Color(0xFF1C1C1E)).padding(start = 18.dp, end = 10.dp, top = 13.dp, bottom = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        (if (r.mine) "You" else person?.shownName ?: "") + ": " + r.body, style = inter(15f), color = Color(0xFF8E8E93),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    Box(Modifier.size(26.dp).clip(CircleShape).background(Color(0xFF6A6A70)).clickable { replyTo = null }, contentAlignment = Alignment.Center) {
+                        Text("✕", style = inter(12f, FontWeight.Bold), color = Color(0xFF1C1C1E))
+                    }
                 }
-                Box(Modifier.size(30.dp).clip(CircleShape).clickable { replyTo = null }, contentAlignment = Alignment.Center) { Text("✕", style = inter(13f, FontWeight.Bold), color = Muted) }
             }
         }
+        androidx.compose.animation.AnimatedVisibility(visible = panel != 0, enter = androidx.compose.animation.expandVertically(), exit = androidx.compose.animation.shrinkVertically()) {
+            ChatPanel(
+                panel = panel, onPanel = { panel = it },
+                onPhoto = { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onUploadSticker = { pickSticker.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onSticker = { name -> panel = 0; scope.launch { try { social.sendSticker(uid, name, replyTo?.id); replyTo = null } catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() } } },
+                styleId = myStyle, onSaveStyle = { social.setBubbleStyle(it); panel = 0; Toast.makeText(context, "Bubble style saved", Toast.LENGTH_SHORT).show() },
+            )
+        }
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
-            Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape), contentAlignment = Alignment.Center) {
-                androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
+            Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable { focus.clearFocus(); panel = if (panel == 0) 1 else 0 }, contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Canvas(Modifier.size(16.dp).graphicsLayer { rotationZ = if (panel != 0) 45f else 0f }) {
                     val st = 2.dp.toPx(); val c = size.width / 2f
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(0f, c), androidx.compose.ui.geometry.Offset(size.width, c), st, androidx.compose.ui.graphics.StrokeCap.Round)
                     drawLine(Color.White, androidx.compose.ui.geometry.Offset(c, 0f), androidx.compose.ui.geometry.Offset(c, size.height), st, androidx.compose.ui.graphics.StrokeCap.Round)
@@ -437,13 +509,13 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     if (text.isEmpty()) Text("Message…", style = inter(14f), color = Muted)
                     BasicTextField(
                         value = text, onValueChange = { if (it.length <= 2000) text = it },
-                        textStyle = inter(14f).copy(color = Color.White), cursorBrush = SolidColor(Accent), maxLines = 5,
+                        textStyle = inter(14f).copy(color = Color.White), cursorBrush = SolidColor(Color(0xFF3D7BFF)), maxLines = 5,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 val ready = text.isNotBlank() && !sending
                 if (ready) Box(
-                    Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFFA796FF), Color(0xFF7A63F0)))).clickable { send() },
+                    Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF3D7BFF), Color(0xFF2B58F0)))).clickable { send() },
                     contentAlignment = Alignment.Center,
                 ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f }) }
             }
@@ -514,5 +586,116 @@ private fun TypingBubble() {
             val v by t.animateFloat(0f, 1f, infiniteRepeatable(tween(520, delayMillis = i * 140), RepeatMode.Reverse), label = "dot$i")
             Box(Modifier.size(7.dp).offset(y = (-4f * v).dp).clip(CircleShape).background(Color(0xFFB4B1BA).copy(alpha = 0.55f + 0.45f * v)))
         }
+    }
+}
+
+@Composable
+private fun StickerView(url: String?, modifier: Modifier = Modifier) {
+    val res = url?.takeIf { it.startsWith("kiro:") }?.removePrefix("kiro:")?.let { n -> Stickers.all.firstOrNull { it.first == n }?.second }
+    if (res != null) androidx.compose.foundation.Image(painterResource(res), "Sticker", modifier.size(132.dp))
+    else coil.compose.AsyncImage(model = url, contentDescription = "Sticker", contentScale = androidx.compose.ui.layout.ContentScale.Fit, modifier = modifier.size(150.dp))
+}
+
+/** Reads a picked image and shrinks it. GIF and WebP are sent as they are so they keep moving. */
+private fun prepareImage(context: android.content.Context, uri: android.net.Uri, sticker: Boolean): Pair<ByteArray, String>? {
+    val cr = context.contentResolver
+    val mime = cr.getType(uri) ?: "image/jpeg"
+    val raw = cr.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    if (mime == "image/gif" || mime == "image/webp") return raw to mime
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
+    val limit = if (sticker) 640 else 1600
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > limit * 2) sample *= 2
+    var bmp = android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+    val big = maxOf(bmp.width, bmp.height)
+    if (big > limit) { val k = limit.toFloat() / big; bmp = android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true) }
+    val out = java.io.ByteArrayOutputStream()
+    return if (bmp.hasAlpha()) { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out); out.toByteArray() to "image/png" }
+    else { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 86, out); out.toByteArray() to "image/jpeg" }
+}
+
+/** The "+" panel: attach menu, sticker pack and bubble-style picker. */
+@Composable
+private fun ChatPanel(
+    panel: Int, onPanel: (Int) -> Unit, onPhoto: () -> Unit, onUploadSticker: () -> Unit,
+    onSticker: (String) -> Unit, styleId: String, onSaveStyle: (String) -> Unit,
+) {
+    var pending by remember(styleId) { mutableStateOf(styleId) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFF161618)).padding(14.dp)) {
+        when (panel) {
+            1 -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                PanelTile("Photo", AniIcons.Image, onPhoto)
+                PanelTile("My sticker", AniIcons.Upload, onUploadSticker)
+                PanelTile("Stickers", AniIcons.Sticker) { onPanel(2) }
+                PanelTile("Bubble", AniIcons.Palette) { onPanel(3) }
+            }
+            2 -> {
+                PanelHeader("Stickers") { onPanel(1) }
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(76.dp), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(Stickers.all.size) { i ->
+                        val (name, res) = Stickers.all[i]
+                        androidx.compose.foundation.Image(painterResource(res), name, Modifier.size(76.dp).clip(RoundedCornerShape(14.dp)).clickable { onSticker(name) }.padding(6.dp))
+                    }
+                }
+            }
+            3 -> {
+                PanelHeader("Bubble style") { onPanel(1) }
+                Text("Applies to messages you send after saving.", style = inter(12.5f), color = Muted, modifier = Modifier.padding(bottom = 8.dp))
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3), modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(BubbleStyles.all.size) { i ->
+                        val st = BubbleStyles.all[i]
+                        val sel = pending == st.id
+                        Column(
+                            Modifier.clip(RoundedCornerShape(16.dp)).background(if (sel) Color(0xFF2A2A2E) else Color.Transparent)
+                                .border(1.dp, if (sel) Color(0x66FFFFFF) else Color.Transparent, RoundedCornerShape(16.dp))
+                                .clickable { pending = st.id }.padding(vertical = 10.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Box(Modifier.height(54.dp).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+                                Box(Modifier.fillMaxWidth(0.82f).height(34.dp).clip(RoundedCornerShape(14.dp)).background(st.brush), contentAlignment = Alignment.Center) {
+                                    Text("Aa", style = inter(14f, FontWeight.SemiBold), color = st.text)
+                                }
+                                if (st.deco != null) androidx.compose.foundation.Image(
+                                    painterResource(st.deco), null,
+                                    Modifier.align(when (st.spot) { DecoSpot.TopEnd -> Alignment.TopEnd; DecoSpot.TopStart -> Alignment.TopStart; DecoSpot.TopCenter -> Alignment.TopCenter }).padding(horizontal = 8.dp).size((st.decoWidth * 0.72f).dp, (st.decoHeight * 0.72f).dp),
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(st.name, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "Save", style = inter(15f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSaveStyle(pending) }.padding(vertical = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PanelHeader(title: String, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(32.dp).glass(CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) { com.anibiar.app.ui.theme.ChevronIcon(Modifier.size(18.dp)) }
+        Spacer(Modifier.width(12.dp))
+        Text(title, style = inter(16f, FontWeight.Bold), color = Color.White)
+    }
+}
+
+@Composable
+private fun PanelTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Column(Modifier.clip(RoundedCornerShape(16.dp)).clickable(onClick = onClick).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(54.dp).glass(CircleShape), contentAlignment = Alignment.Center) { Icon(icon, label, tint = Color.White, modifier = Modifier.size(26.dp)) }
+        Spacer(Modifier.height(6.dp))
+        Text(label, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1)
     }
 }

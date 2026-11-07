@@ -47,7 +47,7 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
-data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null)
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null, val style: String? = null)
 
 data class UserProfile(
     val uid: String,
@@ -473,7 +473,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
-        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to&order=id.desc&limit=200"
+        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url,style&order=id.desc&limit=200"
         return getRows(q).map {
             val o = it.jsonObject
             DmMessage(
@@ -483,6 +483,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 at = isoMs(o["created_at"]?.jsonPrimitive?.contentOrNull),
                 read = o["read_at"]?.jsonPrimitive?.contentOrNull != null,
                 replyTo = o["reply_to"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
+                kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "text",
+                mediaUrl = o["media_url"]?.jsonPrimitive?.contentOrNull,
+                style = o["style"]?.jsonPrimitive?.contentOrNull,
             )
         }.reversed()
     }
@@ -495,26 +498,75 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             flow {
                 while (true) {
                     try { emit(fetchMessages(other)) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-                    delay(2500)
+                    delay(4000)
                 }
             }
         }.distinctUntilChanged()
 
-    suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
-        val text = body.trim()
-        if (text.isEmpty()) return@net
+    private val _style = MutableStateFlow(prefs.getString("bubble_style", "default") ?: "default")
+    /** My chosen chat bubble style; it is stored on each message I send so the other person sees it too. */
+    val bubbleStyle: StateFlow<String> = _style.asStateFlow()
+    fun setBubbleStyle(id: String) { _style.value = id; prefs.edit().putString("bubble_style", id).apply() }
+
+    private suspend fun insertDm(to: String, body: String, kind: String, mediaUrl: String?, replyTo: Long?) {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         val (code, resp) = raw(
             "POST", "/rest/v1/dm_messages",
-            buildJsonObject { put("sender_id", me); put("recipient_id", to); put("body", text); if (replyTo != null) put("reply_to", replyTo) }.toString().toByteArray(),
+            buildJsonObject {
+                put("sender_id", me); put("recipient_id", to); put("body", body); put("kind", kind)
+                if (mediaUrl != null) put("media_url", mediaUrl)
+                if (replyTo != null) put("reply_to", replyTo)
+                if (kind == "text" && _style.value != "default") put("style", _style.value)
+            }.toString().toByteArray(),
             extra = mapOf("Prefer" to "return=minimal"),
         )
         if (code !in 200..299) {
             val msg = runCatching { json.parseToJsonElement(resp).jsonObject["message"]?.jsonPrimitive?.contentOrNull }.getOrNull()
             throw IllegalStateException(msg?.takeIf { it.isNotBlank() } ?: "Couldn't send ($code)")
         }
-        chatTick.value++; refreshSoon()
+        chatTick.value++; refreshSoon(); sendDm(to, "msg")
     }
+
+    suspend fun sendSticker(to: String, name: String, replyTo: Long? = null) = net { insertDm(to, "Sticker", "sticker", "kiro:$name", replyTo) }
+
+    suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
+        val text = body.trim()
+        if (text.isEmpty()) return@net
+        insertDm(to, text, "text", null, replyTo)
+    }
+
+    /** Uploads [bytes] to the dm-media bucket and sends it as a photo or a sticker. */
+    suspend fun sendMedia(to: String, bytes: ByteArray, mime: String, sticker: Boolean, replyTo: Long? = null) = net {
+        val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
+        if (bytes.size > 8 * 1024 * 1024) throw IllegalStateException("That file is over 8 MB.")
+        val ext = when (mime) { "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> "jpg" }
+        val path = "$me/${java.util.UUID.randomUUID()}.$ext"
+        val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = mime)
+        if (code !in 200..299) fail(code, resp)
+        insertDm(to, if (sticker) "Sticker" else "Photo", if (sticker) "sticker" else "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
+    }
+
+    // ---- instant nudges over the shared realtime socket ("dmu-<uid>" is my own inbox channel)
+
+    /** Events pushed to me while the app is open: "msg" (something changed) and "typing". */
+    fun dmStream(): Flow<Broadcast> = _auth.map { it?.uid }.distinctUntilChanged().flatMapLatest { uid ->
+        if (uid == null) emptyFlow() else {
+            val name = "dmu-$uid"
+            realtime.join(name).onCompletion { realtime.leave(name) }
+        }
+    }
+
+    /** Join the other person's channel while a chat is open so I can ping them. */
+    fun openChat(peer: String) { realtime.join("dmu-$peer") }
+    fun closeChat(peer: String) { realtime.leave("dmu-$peer") }
+
+    fun sendDm(peer: String, event: String, extra: Map<String, String> = emptyMap()) {
+        val me = session?.uid ?: return
+        realtime.send("dmu-$peer", event, buildJsonObject { put("from", me); extra.forEach { (k, v) -> put(k, v) } })
+    }
+
+    /** Something changed (a ping arrived): refetch chats and messages now. */
+    fun nudge() { chatTick.value++; refreshSoon() }
 
     /** Tell [peer] I'm typing (or stopped). Fire and forget. */
     suspend fun setTyping(peer: String, on: Boolean) {
@@ -541,7 +593,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 buildJsonObject { put("read_at", java.time.Instant.now().toString()) }.toString().toByteArray(),
                 extra = mapOf("Prefer" to "return=minimal"),
             )
-            _dmUnread.value = 0; refreshSoon()
+            _dmUnread.value = 0; refreshSoon(); sendDm(other, "msg")
         }
     }
 
