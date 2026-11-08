@@ -47,7 +47,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Shrink-only R8 (no obfuscation/optimisation): drops unused library code for a smaller, faster-starting app.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
             // Signed with the debug key so the APK installs directly.
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -70,6 +72,8 @@ android {
 }
 
 dependencies {
+    // Installs the baseline profile (src/main/baseline-prof.txt) on sideloaded APKs too.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")

@@ -358,3 +358,7 @@
 ## 80 | Profile themes and more effects | 2026-11-08
 - Pick a profile theme colour (Ocean, Rose, Forest, Sunset, Gold, Crimson) for your banner and namecard
 - New namecard effects: Rain, Fireflies and Hearts
+
+## 81 | Share card and faster startup | 2026-11-09
+- Share your profile as a picture card (theme colour, avatar, name and link)
+- Smaller app and a startup profile so the app opens and scrolls faster

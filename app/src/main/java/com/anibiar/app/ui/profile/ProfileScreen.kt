@@ -325,15 +325,9 @@ fun ProfileScreen(
                         if (targetUid in myFollowing || targetUid in myFollowers) onMessage(targetUid) else toast("Follow ${profile?.shownName ?: "them"} to send a message")
                     }) { Icon(AniIcons.Mail, "Message", tint = Color.White, modifier = Modifier.size(18.dp)) }
                     com.anibiar.app.ui.theme.PillIcon({
-                        val slug = profile?.linkSlug
-                        if (slug.isNullOrBlank()) toast(if (isMe) "Set your profile link in Edit profile first" else "This profile has no share link")
-                        else context.startActivity(
-                            android.content.Intent.createChooser(
-                                android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
-                                    .putExtra(android.content.Intent.EXTRA_TEXT, "Add me on Kiro: kiro://u/$slug"),
-                                "Share profile",
-                            ),
-                        )
+                        val pr = profile
+                        if (pr == null) toast("Profile is still loading")
+                        else scope.launch { runCatching { ShareCard.share(context, pr) }.onFailure { toast("Couldn't create the share card") } }
                     }) { Icon(com.anibiar.app.ui.theme.FeatherIcons.Share, "Share profile", tint = Color.White, modifier = Modifier.size(17.dp)) }
                     if (isMe) onOpenSettings?.let { open -> com.anibiar.app.ui.theme.PillIcon(open) { Icon(AniIcons.Settings, "Settings", tint = Color.White, modifier = Modifier.size(18.dp)) } }
                 }
