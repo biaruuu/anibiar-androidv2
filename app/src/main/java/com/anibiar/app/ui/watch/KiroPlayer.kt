@@ -338,6 +338,7 @@ fun KiroPlayer(
                 val http = generateSequence<Throwable>(e) { it.cause }.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
                 val detail = (if (http != null) "HTTP ${http.responseCode} from ${http.dataSpec.uri.host}" else (e.cause?.message ?: e.message).orEmpty().take(140))
                 com.anibiar.app.data.Streaming.lastPlayError = "${e.errorCodeName}: $detail (src=${src?.take(120)})"
+                com.anibiar.app.data.Diag.log("player", "${e.errorCodeName} ${e.cause?.message ?: e.message} src=${src?.take(80)}")
                 error = "This server couldn't play the video (${e.errorCodeName})."; onFail()
             }
             override fun onVideoSizeChanged(v: VideoSize) { if (v.width > 0 && v.height > 0) videoRatio = v.width * v.pixelWidthHeightRatio / v.height }
@@ -431,7 +432,7 @@ fun KiroPlayer(
         captionState = "error"
         if (captionRetry[0] < 3) { captionRetry[0]++; delay(3000); captionTry++ }
     }
-    LaunchedEffect(captionState) { if (captionState == "error") say("Captions couldn't load. Open Settings, Captions to retry", true) }
+    LaunchedEffect(captionState) { if (captionState == "error") com.anibiar.app.data.Diag.log("captions", "failed to load or parse the selected track"); if (captionState == "error") say("Captions couldn't load. Open Settings, Captions to retry", true) }
 
     // Position, buffering, skip intro/outro, progress reporting.
     val onTimeNow by rememberUpdatedState(onTime)

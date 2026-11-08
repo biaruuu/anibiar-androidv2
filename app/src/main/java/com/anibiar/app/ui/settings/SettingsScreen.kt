@@ -117,6 +117,7 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
                     ) { Text("Log in", style = inter(14f, FontWeight.Medium), color = Color.Black) }
                 }
             }
+            Section("App") { AppToolRows(context, ::toast) }
             Section("About") { aboutRows(context, ::toast) }
             return@Column
         }
@@ -188,6 +189,8 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
         Section("Notifications") {
             InfoRow("Inbox", if (unread > 0) "$unread new" else "", onClick = onOpenInbox)
         }
+
+        Section("App") { AppToolRows(context, ::toast) }
 
         Section("About") { aboutRows(context, ::toast) }
 

@@ -60,6 +60,15 @@ class MainActivity : ComponentActivity() {
                 var splash by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
                 Box(Modifier.fillMaxSize()) {
                     AppNavigation()
+                    var locked by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.AppPrefs.hasPin(this@MainActivity)) }
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
+                            if (ev == androidx.lifecycle.Lifecycle.Event.ON_STOP) com.anibiar.app.data.AppPrefs.markBackgrounded(this@MainActivity)
+                            if (ev == androidx.lifecycle.Lifecycle.Event.ON_START && com.anibiar.app.data.AppPrefs.needsUnlock(this@MainActivity)) locked = true
+                        }
+                        lifecycle.addObserver(obs); onDispose { lifecycle.removeObserver(obs) }
+                    }
+                    if (locked) com.anibiar.app.ui.settings.PinLockScreen { locked = false }
                     var crash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(CrashLog.take(this@MainActivity)) }
                     crash?.let { report ->
                         androidx.compose.material3.AlertDialog(

@@ -32,6 +32,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
+        com.anibiar.app.data.Diag.init(this)
         Http.init(this)
         social.start()
         // "Continue watching" follows the account: push every change (at most one per anime every 20 s), pull when logging in.

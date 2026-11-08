@@ -362,3 +362,10 @@
 ## 81 | Share card and faster startup | 2026-11-09
 - Share your profile as a picture card (theme colour, avatar, name and link)
 - Smaller app and a startup profile so the app opens and scrolls faster
+
+## 82 | Backup, PIN lock, data saver, diagnostics | 2026-11-09
+- Back up and restore your history, watchlist and settings as one file (Settings, App)
+- Optional PIN lock that asks again after the app was in the background for 30 seconds
+- Data saver caps video at 480p on mobile data
+- Adult filter is hidden from Search until you turn it on in Settings
+- Diagnostics screen with a Share report button for playback and caption problems
