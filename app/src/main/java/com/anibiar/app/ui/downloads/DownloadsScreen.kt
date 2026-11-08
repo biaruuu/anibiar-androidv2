@@ -63,7 +63,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
         val p = playing
         if (p != null) {
             if (!fullscreen) Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                GlassBack { playing = null }
+                GlassBack(onClick = { playing = null })
                 Spacer(Modifier.width(12.dp))
                 Text("${p.item.title} · Episode ${p.item.episode}", style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

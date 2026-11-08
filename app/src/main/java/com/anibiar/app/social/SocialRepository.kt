@@ -47,7 +47,9 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
-data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null)
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null,
+    /** emoji to count, and the one I picked (one per person per message). */
+    val reactions: Map<String, Int> = emptyMap(), val myReaction: String? = null)
 
 data class UserProfile(
     val uid: String,
@@ -72,6 +74,7 @@ data class UserProfile(
     val favoritesVisibility: String = "everyone",
     val avatarDeco: String? = null,
     val profileEffect: String? = null,
+    val profileTheme: String? = null,
 ) {
     /** The name people see: the display name if set, otherwise the username. */
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
@@ -405,6 +408,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         favoritesVisibility = o["favorites_visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
         avatarDeco = o["avatar_deco"]?.jsonPrimitive?.contentOrNull,
         profileEffect = o["profile_effect"]?.jsonPrimitive?.contentOrNull,
+        profileTheme = o["profile_theme"]?.jsonPrimitive?.contentOrNull,
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -425,7 +429,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -478,9 +482,21 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
         val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url&order=id.desc&limit=200"
-        return getRows(q).map {
+        val rows = getRows(q)
+        // Reactions for these messages in one extra request.
+        val ids = rows.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
+        val reacts: Map<Long, List<Pair<String, String>>> = if (ids.isEmpty()) emptyMap() else try {
+            getRows("/rest/v1/dm_reactions?message_id=in.(${ids.joinToString(",")})&select=message_id,user_id,emoji").groupBy(
+                { it.jsonObject["message_id"]!!.jsonPrimitive.content.toLong() },
+                { it.jsonObject["user_id"]!!.jsonPrimitive.content to it.jsonObject["emoji"]!!.jsonPrimitive.content },
+            )
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyMap() }
+        return rows.map {
             val o = it.jsonObject
+            val rs = reacts[o["id"]!!.jsonPrimitive.content.toLong()].orEmpty()
             DmMessage(
+                reactions = rs.groupingBy { r -> r.second }.eachCount(),
+                myReaction = rs.firstOrNull { r -> r.first == me }?.second,
                 id = o["id"]!!.jsonPrimitive.content.toLong(),
                 mine = o["sender_id"]!!.jsonPrimitive.content == me,
                 body = o["body"]!!.jsonPrimitive.content,
@@ -573,6 +589,19 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val (code, text) = raw("POST", "/rest/v1/rpc/dm_is_typing", buildJsonObject { put("peer", peer) }.toString().toByteArray())
         code in 200..299 && text.trim() == "true"
     } catch (e: CancellationException) { throw e } catch (_: Exception) { false }
+
+    /** Tap the same emoji again to remove it; a different one replaces yours. */
+    suspend fun react(messageId: Long, emoji: String, peer: String, remove: Boolean) = net {
+        val me = session?.uid ?: throw IllegalStateException("Log in to react.")
+        val (code, text) = if (remove) raw("DELETE", "/rest/v1/dm_reactions?message_id=eq.$messageId&user_id=eq.$me", extra = mapOf("Prefer" to "return=minimal"))
+        else raw(
+            "POST", "/rest/v1/dm_reactions?on_conflict=message_id,user_id",
+            buildJsonObject { put("message_id", messageId); put("user_id", me); put("emoji", emoji) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal,resolution=merge-duplicates"),
+        )
+        if (code !in 200..299) fail(code, text)
+        chatTick.value++; refreshSoon(); sendDm(peer, "msg")
+    }
 
     suspend fun unsendMessage(id: Long) = net {
         val (code, text) = raw("DELETE", "/rest/v1/dm_messages?id=eq.$id", extra = mapOf("Prefer" to "return=minimal"))
@@ -766,10 +795,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             put("status_emoji", if (e.isEmpty()) JsonNull else JsonPrimitive(e))
         })
     }
-    suspend fun setLook(deco: String?, effect: String?) = net {
+    suspend fun setLook(deco: String?, effect: String?, theme: String? = null) = net {
         patchProfile(buildJsonObject {
             put("avatar_deco", if (deco == null) JsonNull else JsonPrimitive(deco))
             put("profile_effect", if (effect == null) JsonNull else JsonPrimitive(effect))
+            put("profile_theme", if (theme == null) JsonNull else JsonPrimitive(theme))
         })
     }
     suspend fun setFavoritesVisibility(v: String) = net { patchProfile(buildJsonObject { put("favorites_visibility", v) }) }

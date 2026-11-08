@@ -7,6 +7,8 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import kotlin.math.sin
 
 class Deco(val id: String, val name: String)
 class Fx(val id: String, val name: String)
+class Theme(val id: String, val name: String, val color: Color)
 
 /**
  * The avatar decorations and namecard effects people can pick. Decorations are the animated WebP files in
@@ -42,8 +45,13 @@ object Looks {
         Deco("butterfly", "Butterflies"), Deco("notes", "Study buddy"), Deco("rage", "Furious"),
     )
     val effects = listOf(
-        Fx("storm", "Storm"), Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"),
+        Fx("storm", "Storm"), Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"), Fx("rain", "Rain"), Fx("fireflies", "Fireflies"), Fx("hearts", "Hearts"),
     )
+    val themes = listOf(
+        Theme("ocean", "Ocean", Color(0xFF2B7FFF)), Theme("rose", "Rose", Color(0xFFFF4D8D)), Theme("forest", "Forest", Color(0xFF2FBF71)),
+        Theme("sunset", "Sunset", Color(0xFFFF8A3D)), Theme("gold", "Gold", Color(0xFFFFC83D)), Theme("crimson", "Crimson", Color(0xFFE5383B)),
+    )
+    fun theme(id: String?) = themes.firstOrNull { it.id == id }
     fun deco(id: String?) = decos.firstOrNull { it.id == id }
 }
 
@@ -113,6 +121,31 @@ fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
                 val c = Offset((q[0] + sin(f * 8f + q[2] * 6f) * 0.015f) * w, f * h)
                 drawCircle(Color.White.copy(alpha = 0.35f + 0.5f * q[2]), (0.006f + 0.011f * q[2]) * u, c)
             }
+            "rain" -> pts.forEach { q ->
+                val k = 2 + (q[3] * 2).toInt()
+                val f = (p * k * 2f + q[1]) % 1f
+                val x = q[0] * w + f * w * 0.06f
+                val y = f * h * 1.1f - h * 0.05f
+                drawLine(Color(0xFFBFD8FF).copy(alpha = 0.25f + 0.35f * q[2]), Offset(x, y), Offset(x - 0.012f * u, y + 0.045f * u), 0.004f * u, StrokeCap.Round)
+            }
+            "fireflies" -> pts.forEach { q ->
+                val a = (0.5f + 0.5f * sin((p * 4f + q[2]) * 2f * PI.toFloat())).let { it * it }
+                val c = Offset((q[0] + sin((p + q[1]) * 2f * PI.toFloat()) * 0.04f) * w, (q[1] + sin((p * 2f + q[0]) * 2f * PI.toFloat()) * 0.03f) * h)
+                val r = (0.008f + 0.012f * q[3]) * u
+                drawCircle(Color(0xFFFFF59D).copy(alpha = a * 0.25f), r * 3f, c)
+                drawCircle(Color(0xFFFFF59D).copy(alpha = a), r, c)
+            }
+            "hearts" -> pts.forEach { q ->
+                val k = 1 + (q[3] * 2).toInt()
+                val f = (p * k + q[1]) % 1f
+                val c = Offset((q[0] + sin(f * 6f + q[2] * 6f) * 0.02f) * w, h * (1f - f))
+                val r = (0.012f + 0.014f * q[2]) * u
+                val col = Color(0xFFFF6B9D).copy(alpha = (1f - f) * 0.9f)
+                drawCircle(col, r, Offset(c.x - r * 0.55f, c.y))
+                drawCircle(col, r, Offset(c.x + r * 0.55f, c.y))
+                val path = androidx.compose.ui.graphics.Path().apply { moveTo(c.x - r * 1.5f, c.y + r * 0.2f); lineTo(c.x, c.y + r * 2f); lineTo(c.x + r * 1.5f, c.y + r * 0.2f); close() }
+                drawPath(path, col)
+            }
             "aura" -> {
                 val a = 0.16f + 0.12f * (0.5f + 0.5f * sin(p * 2f * PI.toFloat() * 3f))
                 drawRect(Brush.radialGradient(listOf(Color(0xFF4BA3FF).copy(alpha = a), Color.Transparent), Offset(w * 0.8f, h), w * 0.9f))
@@ -120,4 +153,12 @@ fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+
+/** Soft colour wash from a profile theme, drawn over a banner or namecard. */
+@Composable
+fun ThemeTint(id: String?, modifier: Modifier = Modifier) {
+    val t = Looks.theme(id) ?: return
+    Box(modifier.background(Brush.verticalGradient(listOf(t.color.copy(alpha = 0.38f), t.color.copy(alpha = 0.10f), Color.Transparent))))
 }

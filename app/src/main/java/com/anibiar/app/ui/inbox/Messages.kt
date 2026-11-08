@@ -264,6 +264,8 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
         else if (typingSentAt != 0L) { typingSentAt = 0L; social.sendDm(uid, "typing", mapOf("on" to "false")) }
     }
     var viewer by remember { mutableStateOf<String?>(null) }
+    var searching by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     val focus = androidx.compose.ui.platform.LocalFocusManager.current
     fun sendPicked(uri: android.net.Uri) {
         if (sending) return
@@ -338,10 +340,39 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                         repeat(3) { Box(Modifier.size(4.dp).clip(CircleShape).background(Color.White)) }
                     }
                     com.anibiar.app.ui.theme.GlassMenu(expanded = menu, onDismiss = { menu = false }) {
+                        com.anibiar.app.ui.theme.GlassMenuItem("Search in chat", AniIcons.Search) { menu = false; searching = true }
                         com.anibiar.app.ui.theme.GlassMenuItem("View profile", AniIcons.Person) { menu = false; onOpenUser(uid) }
                         com.anibiar.app.ui.theme.GlassMenuItem(if (isPinned) "Unpin chat" else "Pin chat", AniIcons.Pin) { menu = false; social.togglePin(uid) }
                     }
                 }
+            }
+        }
+        if (searching) {
+            // Typo-tolerant search over this conversation (Rust), tap a result to jump to it.
+            val hits = remember(query, msgs) {
+                if (query.isBlank()) emptyList() else {
+                    val idx = msgs.indices.filter { msgs[it].kind != "image" }
+                    (com.anibiar.app.nativecore.Native.rank(query.trim(), idx.map { msgs[it].body })?.map { idx[it] }
+                        ?: idx.filter { msgs[it].body.contains(query.trim(), ignoreCase = true) }).take(30)
+                }
+            }
+            Column(Modifier.fillMaxWidth().background(Color(0xFF111114)).padding(horizontal = 14.dp, vertical = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = query, onValueChange = { query = it }, singleLine = true,
+                        textStyle = inter(15f).copy(color = Color.White), cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).background(Color(0xFF1C1C1E)).padding(horizontal = 14.dp, vertical = 10.dp),
+                        decorationBox = { inner -> if (query.isEmpty()) Text("Search messages", style = inter(15f), color = Muted); inner() },
+                    )
+                    Text("Close", style = inter(14f), color = Color.White, modifier = Modifier.clickable { searching = false; query = "" }.padding(10.dp))
+                }
+                hits.forEach { i ->
+                    Text(
+                        msgs[i].body, style = inter(14f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().clickable { scope.launch { list.animateScrollToItem(i) } }.padding(vertical = 8.dp),
+                    )
+                }
+                if (query.isNotBlank() && hits.isEmpty()) Text("No messages found", style = inter(13f), color = Muted, modifier = Modifier.padding(8.dp))
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 12.dp)) {
@@ -425,8 +456,21 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                                         }
                                     }
                                     Text(m.body, style = inter(14f, FontWeight.Normal, 19f), color = Color.White)
+                                    com.anibiar.app.social.LinkPreview.firstUrl(m.body)?.let { u -> LinkCard(u) }
                                 }
                                 com.anibiar.app.ui.theme.GlassMenu(expanded = menuOpen, onDismiss = { menuOpen = false }) {
+                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        listOf("❤️", "😂", "😮", "😢", "👍", "🔥").forEach { e ->
+                                            Text(
+                                                e, fontSize = 22.sp,
+                                                modifier = Modifier.clip(CircleShape).background(if (m.myReaction == e) Color(0x33FFFFFF) else Color.Transparent)
+                                                    .clickable {
+                                                        menuOpen = false
+                                                        scope.launch { runCatching { social.react(m.id, e, uid, m.myReaction == e) }.onFailure { Toast.makeText(context, "Couldn't react", Toast.LENGTH_SHORT).show() } }
+                                                    }.padding(6.dp),
+                                            )
+                                        }
+                                    }
                                     com.anibiar.app.ui.theme.GlassMenuItem("Reply", AniIcons.Reply) { menuOpen = false; replyTo = m }
                                     com.anibiar.app.ui.theme.GlassMenuItem("Copy text", AniIcons.Copy) {
                                         menuOpen = false
@@ -437,6 +481,15 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                                         menuOpen = false
                                         scope.launch { runCatching { social.unsendMessage(m.id) }.onFailure { Toast.makeText(context, it.message ?: "Couldn't unsend", Toast.LENGTH_SHORT).show() } }
                                     }
+                                }
+                            }
+                            if (m.reactions.isNotEmpty()) Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                m.reactions.forEach { (e, n) ->
+                                    Row(
+                                        Modifier.clip(RoundedCornerShape(12.dp)).background(if (m.myReaction == e) Color(0x553D7BFF) else Color(0xFF2A2A2E))
+                                            .clickable { scope.launch { runCatching { social.react(m.id, e, uid, m.myReaction == e) } } }.padding(horizontal = 7.dp, vertical = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) { Text(e, fontSize = 13.sp); if (n > 1) Text(" $n", style = inter(11.5f), color = Color.White) }
                                 }
                             }
                             if (m.mine && m.id == msgs.lastOrNull { it.mine }?.id) Text(if (m.read) "Seen" else "Sent", style = inter(11f), color = Muted, modifier = Modifier.padding(top = 3.dp, end = 4.dp))
@@ -581,4 +634,26 @@ private fun prepareImage(context: android.content.Context, uri: android.net.Uri)
     val out = java.io.ByteArrayOutputStream()
     return if (bmp.hasAlpha()) { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out); out.toByteArray() to "image/png" }
     else { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 86, out); out.toByteArray() to "image/jpeg" }
+}
+
+
+/** Small card under a message that contains a link: picture, title and site. */
+@Composable
+private fun LinkCard(url: String) {
+    var preview by remember(url) { mutableStateOf<com.anibiar.app.social.Preview?>(null) }
+    LaunchedEffect(url) { preview = com.anibiar.app.social.LinkPreview.load(url) }
+    val p = preview ?: return
+    val context = LocalContext.current
+    Column(
+        Modifier.padding(top = 6.dp).width(230.dp).clip(RoundedCornerShape(12.dp)).background(Color(0x33000000))
+            .clickable { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } },
+    ) {
+        p.image?.let {
+            coil.compose.AsyncImage(model = it, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(120.dp))
+        }
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(p.title, style = inter(13f, FontWeight.SemiBold, 17f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(p.host, style = inter(11.5f), color = Color(0xCCFFFFFF), maxLines = 1)
+        }
+    }
 }

@@ -160,6 +160,7 @@ fun ProfileScreen(
                 // Banner fills the top; name, handle and counts sit on it, avatar on the right.
                 Box(Modifier.fillMaxWidth().height(topInset + 232.dp)) {
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
+                    ThemeTint(profile?.profileTheme, Modifier.fillMaxSize())
                     EffectLayer(profile?.profileEffect, Modifier.fillMaxSize())
                     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
@@ -596,6 +597,7 @@ internal fun UserCard(
         // Banner shows through softly behind the content, fading into the card.
         if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
         Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+        ThemeTint(user.profileTheme, Modifier.matchParentSize())
         EffectLayer(user.profileEffect, Modifier.matchParentSize())
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.requiredSize(64.dp)) {

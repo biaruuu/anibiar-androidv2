@@ -113,7 +113,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
             ) { social.setLinkSlug(it); page = "main" }
             "look" -> LookPage(
                 profile, onBack = { page = "main" },
-                onSave = { d, e -> scope.launch { try { social.setLook(d, e) } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }; page = "main" },
+                onSave = { d, e, th -> scope.launch { try { social.setLook(d, e, th) } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }; page = "main" },
             )
             "bio" -> FieldPage(
                 "Bio", "You can edit your bio anytime.", profile?.bio.orEmpty(), 200,
@@ -292,7 +292,8 @@ private fun FieldPage(
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?, String?) -> Unit) {
+private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?, String?, String?) -> Unit) {
+    var theme by remember { mutableStateOf(profile?.profileTheme) }
     var deco by remember { mutableStateOf(profile?.avatarDeco) }
     var fx by remember { mutableStateOf(profile?.profileEffect) }
     BackHandler(onBack = onBack)
@@ -307,6 +308,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
             Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) {
                 if (profile?.bannerUrl != null) AsyncImage(profile.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
                 Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+                ThemeTint(theme, Modifier.matchParentSize())
                 EffectLayer(fx, Modifier.matchParentSize())
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Avatar(profile?.avatarUrl, profile?.shownName, 64.dp, deco = deco)
@@ -327,11 +329,16 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
                 LookTile("None", fx == null, { fx = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
                 Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize()) } } }
             }
+            Text("Profile theme", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LookTile("None", theme == null, { theme = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
+                Looks.themes.forEach { th -> LookTile(th.name, theme == th.id, { theme = th.id }) { Box(Modifier.size(44.dp).clip(CircleShape).background(th.color)) } }
+            }
             Spacer(Modifier.height(20.dp))
         }
         Text(
             "Save", style = inter(15f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSave(deco, fx) }.padding(vertical = 13.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSave(deco, fx, theme) }.padding(vertical = 13.dp),
         )
     }
 }

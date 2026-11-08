@@ -348,3 +348,13 @@
 - New Download button in the player: saves the episode with its subtitles so you can watch without internet
 - Downloads screen on Home: play offline, pause, resume or remove
 - Home shows an "offline" note and keeps showing what was saved on your device when there's no connection
+
+## 79 | Chat reactions, search and link previews | 2026-11-08
+- React to any message with an emoji (long-press), see who reacted, tap a reaction to remove it
+- Search inside a chat from the ⋯ menu, with typo tolerance
+- Links in messages show a preview card with title and picture
+- Watch Together: tap an emoji on the video and everyone in the room sees it float up
+
+## 80 | Profile themes and more effects | 2026-11-08
+- Pick a profile theme colour (Ocean, Rose, Forest, Sunset, Gold, Crimson) for your banner and namecard
+- New namecard effects: Rain, Fireflies and Hearts

@@ -52,6 +52,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -638,6 +640,8 @@ fun KiroPlayer(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = pad + pill + 14.dp).clip(RoundedCornerShape(50)).background(if (err) Color(0xFFDC2626) else Color(0xD9000000)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
 
+        togetherNow?.let { ReactionLayer(it, controlsVisible) }
+
         // ---------------- controls ----------------
         Box(Modifier.fillMaxSize().alpha(aCtl)) {
             val live = aCtl > 0.05f
@@ -893,4 +897,38 @@ private fun screenshot(context: Context, tv: TextureView?, done: (Pair<String, B
 /** The cast button's native counterpart: opens the system "Cast / screen mirroring" settings. */
 fun openCastSettings(context: Context) {
     runCatching { context.startActivity(Intent(Settings.ACTION_CAST_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+
+private class FloatingEmoji(val id: Long, val emoji: String, val x: Float)
+
+/** Room reactions: a row of emoji to tap (while controls show) and everyone's emoji drifting up over the picture. */
+@Composable
+private fun ReactionLayer(t: com.anibiar.app.social.WatchTogether, showPicker: Boolean) {
+    val floating = remember { mutableStateListOf<FloatingEmoji>() }
+    LaunchedEffect(t) {
+        var n = 0L
+        t.reactions.collect { e -> if (floating.size < 24) floating.add(FloatingEmoji(n++, e, 0.55f + (Math.random().toFloat() * 0.4f))) }
+    }
+    Box(Modifier.fillMaxSize()) {
+        floating.forEach { f ->
+            key(f.id) {
+                val rise = remember { androidx.compose.animation.core.Animatable(0f) }
+                LaunchedEffect(Unit) { rise.animateTo(1f, androidx.compose.animation.core.tween(2200, easing = androidx.compose.animation.core.LinearEasing)); floating.remove(f) }
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    Text(
+                        f.emoji, fontSize = 30.sp,
+                        modifier = Modifier.offset(x = maxWidth * f.x, y = maxHeight * (0.85f - 0.6f * rise.value)).alpha(1f - rise.value * rise.value),
+                    )
+                }
+            }
+        }
+        if (showPicker) Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 6.dp).clip(RoundedCornerShape(20.dp)).background(Color(0x66000000)).padding(vertical = 4.dp),
+        ) {
+            listOf("😂", "😮", "❤️", "👏", "🔥").forEach { e ->
+                Text(e, fontSize = 20.sp, modifier = Modifier.clickable { t.react(e) }.padding(horizontal = 8.dp, vertical = 4.dp))
+            }
+        }
+    }
 }
