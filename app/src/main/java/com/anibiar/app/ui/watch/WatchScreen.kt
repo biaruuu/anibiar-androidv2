@@ -199,6 +199,14 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         epsRaw = null; epsError = null
         runCatching { Streaming.episodesLive(id) { epsRaw = it } }.onSuccess { }.onFailure { if (epsRaw == null) epsError = it.message ?: "Couldn't load episodes" }
     }
+    // Airing shows get new episodes all the time: re-check every 3 minutes while the player is open.
+    LaunchedEffect(id, anime?.status) {
+        if (anime?.status != null && anime?.status != "RELEASING") return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(180_000)
+            runCatching { Streaming.episodesLive(id) { epsRaw = it } }
+        }
+    }
     val list: List<WatchEpisode> = eps?.let { if (audio == "dub" && it.dub.isNotEmpty()) it.dub else it.sub }.orEmpty()
     LaunchedEffect(eps, audio) {
         val e = eps ?: return@LaunchedEffect
@@ -214,6 +222,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     LaunchedEffect(id, audio, current?.number, watchTry, providerPref) {
         val c = current ?: return@LaunchedEffect
         watchError = null; watch = null
+        if (watchTry > 0) Streaming.forget(id, audio, c.number)
         val first = providerPref?.let { p -> c.providers.firstOrNull { it.equals(p, true) } }
         val servers = if (first != null) listOf(first) + c.providers.filter { it != first } else c.providers
         runCatching { Streaming.watch(id, audio, c.number, servers) }

@@ -321,6 +321,9 @@ object Streaming {
         return r
     }
 
+    /** Drops the saved stream list for one episode so the next [watch] asks the providers again (used by Retry). */
+    fun forget(id: Int, audio: String, ep: Int) { watchCache.keys.removeAll { it.startsWith("$id|$audio|$ep|") } }
+
     suspend fun prefetch(id: Int, audio: String, ep: Int, servers: List<String>) { runCatching { watch(id, audio, ep, servers) } }
 
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =

@@ -324,3 +324,7 @@
 ## 73 | Fix "AniList HTTP 429" on episodes | 2026-11-08
 - Provider title lookups now retry when AniList rate-limits, remember the result for 30 days, and fall back to ani.zip when AniList keeps refusing
 - If a fresh episode list can't be loaded but a saved one exists, the saved list stays on screen instead of an error
+
+## 74 | Fresher episodes and streams | 2026-11-08
+- Retry now really asks the providers again instead of reusing the saved stream
+- Airing shows re-check for new episodes every 3 minutes while you watch
