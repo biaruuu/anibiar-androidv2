@@ -142,6 +142,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     var synopsisEpisode by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
+    val inPip by com.anibiar.app.data.Pip.active.collectAsState()
 
     // ---- Watch together (the room lives in RoomSession, so leaving this page doesn't end it) ----
     val social = app.social
@@ -319,7 +320,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
-        if (!fullscreen) {
+        if (!(fullscreen || inPip)) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
@@ -330,7 +331,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             }
         }
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
-        Box(if (fullscreen) Modifier.fillMaxSize() else if (landscape && room != null) Modifier.fillMaxWidth().weight(1.6f, fill = false).aspectRatio(16f / 9f, matchHeightConstraintsFirst = true).align(Alignment.CenterHorizontally).background(Color.Black) else Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
+        Box(if (fullscreen || inPip) Modifier.fillMaxSize() else if (landscape && room != null) Modifier.fillMaxWidth().weight(1.6f, fill = false).aspectRatio(16f / 9f, matchHeightConstraintsFirst = true).align(Alignment.CenterHorizontally).background(Color.Black) else Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black)) {
             KiroPlayer(
                 src = if (ready) stream?.src else null, format = stream?.format ?: "hls",
                 title = current?.let { "$name · Episode ${it.number}" } ?: name, poster = poster,
@@ -342,7 +343,12 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onAutoSkip = { autoSkip = it; prefsStore.edit().putBoolean("autoSkip", it).apply() },
                 startAt = together?.resumeSeconds(current?.number),
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
-                onEnded = { if (autoNext && next != null && !locked) select(next.number) },
+                onEnded = {
+                    if (room == null && current != null) scope.launch {
+                        runCatching { com.anibiar.app.data.Offline.afterWatched(context, id, name, anime?.bannerImage ?: anime?.posterUrl, audio, current.number, list.drop(position + 1)) }
+                    }
+                    if (autoNext && next != null && !locked) select(next.number)
+                },
                 onFail = {
                     // Move to the best stream that hasn't failed yet and say so.
                     stream?.let { failedStreams += it.id }
@@ -396,7 +402,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }
 
         // In a room the page is the call: tiles fill the screen under the video, controls pinned below.
-        if (!fullscreen && !episodesOpen && room != null) Column(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!(fullscreen || inPip) && !episodesOpen && room != null) Column(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding().padding(horizontal = 12.dp).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             requests.firstOrNull()?.let { rq ->
                 val who = roomProfiles[rq.from]?.shownName ?: "Someone"
                 Row(
@@ -431,7 +437,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.weight(1f),
             )
         }
-        if (!fullscreen && episodesOpen) {
+        if (!(fullscreen || inPip) && episodesOpen) {
             com.anibiar.app.ui.watch.EpisodeSheet(
                 title = name, episodes = list, current = ep, watched = watchedNumbers,
                 fallbackImage = anime?.bannerImage ?: anime?.posterUrl, subNumbers = subNumbers, dubNumbers = dubNumbers,
@@ -439,7 +445,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(top = 2.dp),
             )
         }
-        if (!fullscreen && !episodesOpen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        if (!(fullscreen || inPip) && !episodesOpen && room == null) Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 14.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Episode heading
             val generic = current?.title.isNullOrBlank() || Regex("^episode\\s*\\d+$", RegexOption.IGNORE_CASE).matches(current?.title.orEmpty().trim())
             Column {

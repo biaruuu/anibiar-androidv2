@@ -123,6 +123,23 @@ object Offline {
         saveItems(app, items(app).filter { it.key != key })
     }
 
+    /**
+     * After an episode finishes: optionally delete its download, and (Wi-Fi only) save the next [count] episodes that
+     * aren't saved yet. Streams come from the same ranking the player uses.
+     */
+    suspend fun afterWatched(c: Context, mediaId: Int, title: String, image: String?, audio: String, finished: Int, upcoming: List<WatchEpisode>, count: Int = 3) {
+        val app = c.applicationContext
+        if (AppPrefs.deleteWatched(app)) items(app).firstOrNull { it.key == key(mediaId, finished, audio) }?.let { remove(app, it.key) }
+        if (!AppPrefs.autoDownload(app) || !AppPrefs.onWifi(app)) return
+        for (e in upcoming.take(count)) {
+            val k = key(mediaId, e.number, audio)
+            if (state(app, k) != null) continue
+            val s = runCatching { Streaming.watch(mediaId, audio, e.number, e.providers) }.getOrNull()?.streams
+                ?.let { l -> l.firstOrNull { it.kind == "soft" && (it.format == "hls" || it.format == "file") } ?: l.firstOrNull { it.format == "hls" || it.format == "file" } } ?: continue
+            runCatching { enqueue(app, k, mediaId, title, image, e.number, s.src, s.format, s.subtitles) }
+        }
+    }
+
     fun pause(c: Context, key: String, resume: Boolean) {
         DownloadService.sendSetStopReason(c.applicationContext, OfflineService::class.java, key, if (resume) Download.STOP_REASON_NONE else 1, false)
     }

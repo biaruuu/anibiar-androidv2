@@ -369,3 +369,10 @@
 - Data saver caps video at 480p on mobile data
 - Adult filter is hidden from Search until you turn it on in Settings
 - Diagnostics screen with a Share report button for playback and caption problems
+
+## 83 | Smarter playback | 2026-11-09
+- Playback starts on a quality that fits your connection, learned from your recent speeds (Rust)
+- Swipe up/down on the left of the video for brightness, on the right for volume; hold anywhere for 2x speed
+- Leave the app while watching and the video keeps playing in a floating picture-in-picture window
+- The next episode is warmed up while you watch, so it starts faster
+- Optional: auto-download the next 3 episodes on Wi-Fi and delete watched downloads (Settings, App)

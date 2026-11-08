@@ -66,4 +66,14 @@ object Native {
 
     /** See rust/kiro_core/src/stats.rs for the format. Null when Rust isn't usable. */
     fun stats(today: Long, rows: String): String? = if (available) runCatching { statsSummary(today, rows) }.getOrNull() else null
+
+    @JvmStatic private external fun netEstimate(samples: String): Double
+
+    /** Starting bandwidth (bits/s) from past samples, or null when there's too little data. */
+    fun bandwidth(samples: List<Double>): Double? {
+        if (samples.size < 3) return null
+        if (available) runCatching { netEstimate(samples.joinToString(",")) }.getOrNull()?.takeIf { it > 0 }?.let { return it }
+        val v = samples.sorted(); val lo = v.size / 10; val hi = maxOf(v.size - v.size / 5, lo + 1)
+        return v.subList(lo, hi).average() * 0.8
+    }
 }

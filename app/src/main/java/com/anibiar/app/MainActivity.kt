@@ -48,6 +48,18 @@ import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.AniBiarTheme
 
 class MainActivity : ComponentActivity() {
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (com.anibiar.app.data.Pip.canEnter && android.os.Build.VERSION.SDK_INT >= 26) {
+            runCatching { enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16, 9)).build()) }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        com.anibiar.app.data.Pip.active.value = isInPictureInPictureMode
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),

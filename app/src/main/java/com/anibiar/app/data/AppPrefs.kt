@@ -16,6 +16,12 @@ object AppPrefs {
     fun saveData(c: Context): Boolean = dataSaver(c) &&
         runCatching { (c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).isActiveNetworkMetered }.getOrDefault(true)
 
+    fun autoDownload(c: Context) = p(c).getBoolean("auto_dl", false)
+    fun setAutoDownload(c: Context, on: Boolean) = p(c).edit().putBoolean("auto_dl", on).apply()
+    fun deleteWatched(c: Context) = p(c).getBoolean("del_watched", false)
+    fun setDeleteWatched(c: Context, on: Boolean) = p(c).edit().putBoolean("del_watched", on).apply()
+    fun onWifi(c: Context): Boolean = runCatching { !(c.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).isActiveNetworkMetered }.getOrDefault(false)
+
     fun allowAdult(c: Context) = p(c).getBoolean("allow_adult", false)
     fun setAllowAdult(c: Context, on: Boolean) = p(c).edit().putBoolean("allow_adult", on).apply()
 

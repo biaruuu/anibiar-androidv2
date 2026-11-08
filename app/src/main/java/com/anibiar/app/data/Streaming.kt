@@ -324,7 +324,32 @@ object Streaming {
     /** Drops the saved stream list for one episode so the next [watch] asks the providers again (used by Retry). */
     fun forget(id: Int, audio: String, ep: Int) { watchCache.keys.removeAll { it.startsWith("$id|$audio|$ep|") } }
 
-    suspend fun prefetch(id: Int, audio: String, ep: Int, servers: List<String>) { runCatching { watch(id, audio, ep, servers) } }
+    suspend fun prefetch(id: Int, audio: String, ep: Int, servers: List<String>) {
+        val p = runCatching { watch(id, audio, ep, servers) }.getOrNull() ?: return
+        p.streams.firstOrNull()?.let { warm(it) }
+    }
+
+    /** Fetches the playlist and the first piece of video so DNS, TLS and the CDN are warm when the next episode starts. Never throws. */
+    private suspend fun warm(s: StreamSource) = withContext(Dispatchers.IO) {
+        if (s.format != "hls" || !s.src.startsWith("http")) return@withContext
+        runCatching {
+            suspend fun fetch(url: String, limit: Long): String? {
+                val b = Request.Builder().url(url)
+                LocalSources.referers[s.src]?.let { b.header("Referer", it) }
+                return client.newCall(b.build()).execute().use { r ->
+                    if (!r.isSuccessful) null else r.body?.source()?.let { src -> src.request(limit); src.buffer.clone().readUtf8(minOf(limit, src.buffer.size)) }
+                }
+            }
+            val master = fetch(s.src, 100_000) ?: return@runCatching
+            val variant = master.lines().firstOrNull { it.isNotBlank() && !it.startsWith("#") } ?: return@runCatching
+            val vUrl = java.net.URI(s.src).resolve(variant).toString()
+            val media = fetch(vUrl, 100_000) ?: return@runCatching
+            val seg = media.lines().firstOrNull { it.isNotBlank() && !it.startsWith("#") } ?: return@runCatching
+            val b = Request.Builder().url(java.net.URI(vUrl).resolve(seg).toString())
+            LocalSources.referers[s.src]?.let { b.header("Referer", it) }
+            client.newCall(b.build()).execute().use { r -> r.body?.source()?.skip(minOf(400_000L, r.body?.contentLength()?.takeIf { it > 0 } ?: 400_000L)) }
+        }
+    }
 
     suspend fun skip(mal: Int, ep: Int): SkipPayload? =
         runCatching { json.decodeFromString<SkipPayload>(get("/api/skip?mal=$mal&ep=$ep")) }.getOrNull()

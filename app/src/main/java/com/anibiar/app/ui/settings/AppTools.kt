@@ -75,6 +75,12 @@ fun AppToolRows(context: Context, toast: (String) -> Unit) {
 
     SwitchRow("Data saver", "Caps video at 480p on mobile data", saver) { saver = it; AppPrefs.setDataSaver(context, it) }
     SettingsDivider()
+    var autoDl by remember { mutableStateOf(AppPrefs.autoDownload(context)) }
+    var delWatched by remember { mutableStateOf(AppPrefs.deleteWatched(context)) }
+    SwitchRow("Auto-download next episodes", "After you finish an episode, save the next 3 (Wi-Fi only)", autoDl) { autoDl = it; AppPrefs.setAutoDownload(context, it) }
+    SettingsDivider()
+    SwitchRow("Delete watched downloads", "Removes a saved episode once you finish it", delWatched) { delWatched = it; AppPrefs.setDeleteWatched(context, it) }
+    SettingsDivider()
     SwitchRow("Adult content filter in search", "Off hides the adult option from Search filters", adult) {
         if (it && hasPin) toast("Adult filter can only be turned on while no PIN is set") else { adult = it; AppPrefs.setAllowAdult(context, it) }
     }

@@ -172,13 +172,23 @@ fun KiroPlayer(
             .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(http))
-            .setBandwidthMeter(androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context).setInitialBitrateEstimate(12_000_000L).build())
+            .setBandwidthMeter(
+                androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context).setInitialBitrateEstimate(com.anibiar.app.data.NetEstimate.initial(context)).build().also { m ->
+                    m.addEventListener(android.os.Handler(android.os.Looper.getMainLooper())) { _, _, est -> com.anibiar.app.data.NetEstimate.record(context, est) }
+                },
+            )
             .setLoadControl(androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(30_000, 70_000, 1_500, 3_000).build())
             .build()
     }
     var textureView by remember { mutableStateOf<TextureView?>(null) }
 
     var playing by remember { mutableStateOf(false) }
+    var hud by remember { mutableStateOf<String?>(null) }
+    var holdFast by remember { mutableStateOf(false) }
+    val activity = remember(context) { var c = context; while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext; c as? android.app.Activity }
+    val inPip by com.anibiar.app.data.Pip.active.collectAsState()
+    DisposableEffect(Unit) { onDispose { com.anibiar.app.data.Pip.canEnter = false } }
+    LaunchedEffect(playing) { com.anibiar.app.data.Pip.canEnter = playing }
     var buffering by remember { mutableStateOf(true) }
     var ended by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -410,6 +420,8 @@ fun KiroPlayer(
                 (0 until g.length).firstOrNull { g.getTrackFormat(it).height == quality }?.let { builder.setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, it)) }
             }
         }
+        // Data saver on a metered connection: never above 480p unless the viewer picked a quality themselves.
+        if (quality <= 0 && com.anibiar.app.data.AppPrefs.saveData(context)) builder.setMaxVideoSize(854, 480)
         player.trackSelectionParameters = builder.build()
     }
 
@@ -518,7 +530,34 @@ fun KiroPlayer(
         // Video + gestures
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
+                var side = 0
+                androidx.compose.foundation.gestures.detectVerticalDragGestures(
+                    onDragStart = { o -> side = if (o.x < size.width / 2) 0 else 1 },
+                    onDragEnd = { hud = null }, onDragCancel = { hud = null },
+                ) { _, dy ->
+                    val d = -dy / size.height * 1.4f
+                    if (side == 0) {
+                        activity?.window?.let { w ->
+                            val cur = w.attributes.screenBrightness.let { if (it < 0f) 0.5f else it }
+                            val nv = (cur + d).coerceIn(0.02f, 1f)
+                            w.attributes = w.attributes.also { a -> a.screenBrightness = nv }
+                            hud = "Brightness ${(nv * 100).toInt()}%"
+                        }
+                    } else {
+                        volume = (volume + d).coerceIn(0f, 1f); muted = false
+                        hud = "Volume ${(volume * 100).toInt()}%"
+                    }
+                }
+            }.pointerInput(Unit) {
                 detectTapGestures(
+                    onPress = {
+                        if (!readOnlyNow) {
+                            val job = scope.launch { delay(500); holdFast = true; hud = "2x speed"; player.setPlaybackSpeed(2f) }
+                            tryAwaitRelease()
+                            job.cancel()
+                            if (holdFast) { holdFast = false; hud = null; player.setPlaybackSpeed(speedNow) }
+                        }
+                    },
                     onTap = { if (readOnlyNow) Unit else if (menuOpen) menuOpen = false else showControls = !showControls },
                     onDoubleTap = { o ->
                         val f = o.x / size.width
@@ -641,7 +680,15 @@ fun KiroPlayer(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = pad + pill + 14.dp).clip(RoundedCornerShape(50)).background(if (err) Color(0xFFDC2626) else Color(0xD9000000)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
 
-        togetherNow?.let { ReactionLayer(it, controlsVisible) }
+        togetherNow?.let { ReactionLayer(it, controlsVisible && !inPip) }
+        hud?.let { text ->
+            Text(
+                text, style = inter(14f, FontWeight.SemiBold), color = Color.White,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp).clip(RoundedCornerShape(18.dp)).background(Color(0x99000000)).padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+        LaunchedEffect(hud) { if (hud != null && !holdFast) { delay(900); hud = null } }
+        LaunchedEffect(inPip) { if (inPip) { showControls = false; menuOpen = false } }
 
         // ---------------- controls ----------------
         Box(Modifier.fillMaxSize().alpha(aCtl)) {
