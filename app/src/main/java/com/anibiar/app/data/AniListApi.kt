@@ -240,6 +240,29 @@ object Queries {
 
     val TRENDING = POPULAR.replace("coverImage {", "bannerImage\n              coverImage {").replace("popular: Page", "trending: Page").replace("sort: POPULARITY_DESC", "sort: TRENDING_DESC, status_not: NOT_YET_RELEASED")
 
+    val SCHEDULE = """
+        query (${'$'}from: Int, ${'$'}to: Int, ${'$'}page: Int) {
+          latest: Page(page: ${'$'}page, perPage: 50) {
+            airingSchedules(airingAt_greater: ${'$'}from, airingAt_lesser: ${'$'}to, sort: TIME) {
+              episode
+              airingAt
+              media {
+                id
+                title { romaji english }
+                episodes
+                format
+                genres
+                averageScore
+                seasonYear
+                coverImage { extraLarge large color }
+                countryOfOrigin
+                isAdult
+              }
+            }
+          }
+        }
+    """.trimIndent()
+
     val LATEST = """
         query (${'$'}now: Int, ${'$'}page: Int) {
           latest: Page(page: ${'$'}page, perPage: 50) {

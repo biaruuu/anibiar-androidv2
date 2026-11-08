@@ -339,3 +339,7 @@
 - Search forgives typos ("naruot" finds Naruto) and shows matches saved on your device instantly, even offline, with a "Did you mean" note
 - Home has a "Because you watched ..." row picked from the genres you watch and save
 - Your profile shows watch stats: total time, this week, streak and top genres
+
+## 77 | Airing schedule and reminders | 2026-11-08
+- New Airing schedule on Home: the next 7 days in your own time zone with live countdowns
+- Tap the bell on an anime to get a notification when each new episode airs (reminders refresh whenever you open the app)

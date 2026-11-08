@@ -111,7 +111,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onSchedule: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -134,6 +134,7 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) 
         onOpen = onOpen,
         onSearch = onSearch,
         onWatch = onWatch,
+        onSchedule = onSchedule,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -147,6 +148,7 @@ private fun HomeContent(
     onOpen: (Int) -> Unit,
     onSearch: () -> Unit,
     onWatch: (Int) -> Unit,
+    onSchedule: () -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -284,6 +286,22 @@ private fun HomeContent(
                                 items = state.reco,
                                 onClick = onOpen,
                             )
+                        }
+                    }
+
+                    item(key = "schedule-entry") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 24.dp)
+                                .clip(RoundedCornerShape(14.dp)).background(Ani.Item).clickable { onSchedule() }.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(AniIcons.Calendar, null, tint = Ani.Lavender, modifier = Modifier.size(22.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Airing schedule", style = inter(16f, FontWeight.SemiBold))
+                                Text("This week in your time, with reminders", style = inter(13f), color = Ani.Muted)
+                            }
+                            Icon(AniIcons.ChevronRight, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
                         }
                     }
 

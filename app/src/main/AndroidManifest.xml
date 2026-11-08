@@ -20,6 +20,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.AniBiar">
+        <receiver android:name=".data.ReminderReceiver" android:exported="false" />
         <service android:name=".social.CallService" android:exported="false" android:foregroundServiceType="microphone" />
 
         <provider

@@ -24,6 +24,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
     val history: WatchHistory by lazy { WatchHistory(this) }
     val watchlist: Watchlist by lazy { Watchlist(this) }
     val stats: com.anibiar.app.data.WatchStats by lazy { com.anibiar.app.data.WatchStats(this, catalog) }
+    val reminders: com.anibiar.app.data.Reminders by lazy { com.anibiar.app.data.Reminders(this) }
     val catalog: com.anibiar.app.data.Catalog by lazy { com.anibiar.app.data.Catalog(this) }
     val roomSession: com.anibiar.app.social.RoomSession by lazy { com.anibiar.app.social.RoomSession(this, social, appScope) }
     val social: com.anibiar.app.social.SocialRepository by lazy { com.anibiar.app.social.SocialRepository(this, appScope) }
@@ -54,6 +55,8 @@ class AniBiarApp : Application(), ImageLoaderFactory {
                 history.load().filter { (known[it.mediaId]?.at ?: -1L) < it.at }.forEach { social.pushProgress(it) }
             }
         }
+        // Re-plan episode reminders from the fresh schedule.
+        appScope.launch { runCatching { if (reminders.ids.value.isNotEmpty()) reminders.plan(repository.fetchSchedule()) } }
         // Build the network stack and warm image caches off the main thread while the UI starts.
         appScope.launch {
             Http.client

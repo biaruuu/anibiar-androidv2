@@ -7,6 +7,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -139,6 +140,33 @@ class AnimeRepository(context: Context) {
         if (secondBody != null) cache.write(KEY_LATEST_2, secondBody)
         withContext(Dispatchers.Default) { buildLatest(listOfNotNull(firstBody, secondBody)) }
     }
+
+    // ---- Weekly airing schedule ----
+
+    /** Episodes airing from now to +7 days (Japanese, non-adult), soonest first. Falls back to the last saved copy offline. */
+    suspend fun fetchSchedule(): List<LatestEpisode> = coroutineScope {
+        val from = (System.currentTimeMillis() / 1000).toInt() - 3600
+        val to = from + 7 * 86400
+        val pages = (1..3).map { p -> async { runCatching { api.execute(Queries.SCHEDULE, mapOf("from" to from, "to" to to, "page" to p)) }.getOrNull() } }.awaitAll()
+        val bodies = pages.filterNotNull()
+        if (bodies.isEmpty()) return@coroutineScope cachedSchedule()
+        bodies.forEachIndexed { i, b -> cache.write("schedule_${i + 1}", b) }
+        withContext(Dispatchers.Default) { buildSchedule(bodies) }
+    }
+
+    suspend fun cachedSchedule(): List<LatestEpisode> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis() / 1000
+        buildSchedule((1..3).mapNotNull { cache.read("schedule_$it") }).filter { it.airingAt > now - 3600 }
+    }
+
+    private fun buildSchedule(bodies: List<String>): List<LatestEpisode> =
+        bodies.flatMap { body ->
+            runCatching { json.decodeFromString<GraphQlResponse<LatestData>>(body).data?.latest?.airingSchedules.orEmpty() }.getOrDefault(emptyList())
+        }.mapNotNull { sc ->
+            val m = sc.media ?: return@mapNotNull null
+            if (m.isAdult == true || (m.countryOfOrigin != null && m.countryOfOrigin != "JP")) return@mapNotNull null
+            LatestEpisode(m, sc.episode, sc.airingAt)
+        }.distinctBy { it.media.id to it.episode }.sortedBy { it.airingAt }
 
     private fun buildLatest(bodies: List<String>): List<LatestEpisode> {
         val schedules = bodies.flatMap { body ->
