@@ -337,6 +337,7 @@ object Streaming {
 
     /** Raw text of a (proxied) subtitle file. */
     suspend fun text(url: String): String = withContext(Dispatchers.IO) {
+        if (url.startsWith("file://")) return@withContext java.io.File(url.removePrefix("file://")).readText()
         client.newCall(Request.Builder().url(abs(url)).apply { LocalSources.referers[url]?.let { header("Referer", it).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36") } }.build()).execute().use { r ->
             if (!r.isSuccessful) throw IOException("Subtitle HTTP ${r.code}")
             r.body?.string().orEmpty()

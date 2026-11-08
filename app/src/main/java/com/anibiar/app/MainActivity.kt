@@ -118,6 +118,7 @@ private fun AppNavigation() {
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var scheduleOpen by rememberSaveable { mutableStateOf(false) }
+    var downloadsOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var inboxOpen by rememberSaveable { mutableStateOf(false) }
@@ -215,7 +216,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id }, onSchedule = { scheduleOpen = true })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id }, onSchedule = { scheduleOpen = true }, onDownloads = { downloadsOpen = true })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -262,6 +263,12 @@ private fun AppNavigation() {
                 } else {
                     com.anibiar.app.ui.auth.AuthScreen(onClose = { profileOpen = false })
                 }
+            }
+        }
+
+        if (downloadsOpen) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                com.anibiar.app.ui.downloads.DownloadsScreen(onBack = { downloadsOpen = false })
             }
         }
 
@@ -389,7 +396,7 @@ private fun AppNavigation() {
         val noticeUnread by social.unread.collectAsStateWithLifecycle()
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !scheduleOpen && !inboxOpen && !inboxTab && !profileOpen && !settingsOpen && userStack.isEmpty() && chatUid == null && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
+            visible = stack.isEmpty() && !scheduleOpen && !downloadsOpen && !inboxOpen && !inboxTab && !profileOpen && !settingsOpen && userStack.isEmpty() && chatUid == null && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),

@@ -154,7 +154,7 @@ fun KiroPlayer(
     val scope = rememberCoroutineScope()
     val player = remember {
         // In-app providers need a Referer on every request (playlist and segments); our own server's streams don't.
-        val http = androidx.media3.datasource.ResolvingDataSource.Factory(
+        val upstream = androidx.media3.datasource.ResolvingDataSource.Factory(
             androidx.media3.datasource.DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true).setConnectTimeoutMs(15_000).setReadTimeoutMs(30_000),
             androidx.media3.datasource.ResolvingDataSource.Resolver { spec ->
                 val ref = Streaming.activeReferer
@@ -162,6 +162,12 @@ fun KiroPlayer(
                 else spec.withAdditionalHeaders(mapOf("Referer" to ref, "Origin" to ref.trimEnd('/'), "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"))
             },
         )
+        // Read-only view of the offline cache: saved episodes play without a network, everything else streams as before.
+        val http = androidx.media3.datasource.cache.CacheDataSource.Factory()
+            .setCache(com.anibiar.app.data.Offline.cache(context))
+            .setUpstreamDataSourceFactory(upstream)
+            .setCacheWriteDataSinkFactory(null)
+            .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(http))
             .setBandwidthMeter(androidx.media3.exoplayer.upstream.DefaultBandwidthMeter.Builder(context).setInitialBitrateEstimate(12_000_000L).build())

@@ -323,7 +323,10 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             Row(Modifier.fillMaxWidth().statusBarsPadding().height(52.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
-                Text(name, style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name, style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (room == null && current != null && ready) {
+                    DownloadButton(id, name, anime?.bannerImage ?: anime?.posterUrl, current.number, audio, stream)
+                }
             }
         }
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }

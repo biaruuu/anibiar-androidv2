@@ -26,6 +26,8 @@ data class HomeUiState(
     val history: List<HistoryItem> = emptyList(),
     val reco: List<Media> = emptyList(),
     val recoBecause: String? = null,
+    val downloads: Int = 0,
+    val offline: Boolean = false,
     val art: Map<Int, TmdbArt> = emptyMap(),
     val loading: Boolean = true,
     val error: String? = null,
@@ -56,6 +58,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun load() {
         viewModelScope.launch {
+            _state.update { it.copy(downloads = com.anibiar.app.data.Offline.items(app).size) }
             _state.update { it.copy(loading = it.hero.isEmpty() && it.latest.isEmpty(), error = null, history = history.load()) }
 
             // 1) Show whatever we cached last time, instantly.
@@ -91,6 +94,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 repository.preloadImages(list.take(12).map { it.media.posterUrl })
             }
 
+            val offlineNow = discover.isFailure && latest.isFailure
+            _state.update { it.copy(offline = offlineNow) }
             _state.update { current ->
                 val nothingToShow = current.hero.isEmpty() && current.latest.isEmpty()
                 current.copy(

@@ -343,3 +343,8 @@
 ## 77 | Airing schedule and reminders | 2026-11-08
 - New Airing schedule on Home: the next 7 days in your own time zone with live countdowns
 - Tap the bell on an anime to get a notification when each new episode airs (reminders refresh whenever you open the app)
+
+## 78 | Offline downloads and offline Home | 2026-11-08
+- New Download button in the player: saves the episode with its subtitles so you can watch without internet
+- Downloads screen on Home: play offline, pause, resume or remove
+- Home shows an "offline" note and keeps showing what was saved on your device when there's no connection
