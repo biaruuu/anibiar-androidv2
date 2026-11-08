@@ -39,4 +39,31 @@ object Native {
     /** Indices of [items] matching [query], best first. Null when Rust isn't usable. */
     fun rank(query: String, items: List<String>): IntArray? =
         if (available) runCatching { fuzzyRank(query, items.joinToString("\n") { it.replace('\n', ' ') }) }.getOrNull() else null
+
+    @JvmStatic private external fun typoRank(query: String, items: String): IntArray?
+    @JvmStatic private external fun recoRank(taste: String, cands: String): IntArray?
+    @JvmStatic private external fun statsSummary(today: Long, rows: String): String?
+
+    /** Typo-tolerant title match (every query word must match). Kotlin fallback is a plain contains check. */
+    fun typo(query: String, items: List<String>): List<Int> {
+        if (available) runCatching { typoRank(query, items.joinToString("\n") { it.replace('\n', ' ') }) }.getOrNull()?.let { return it.toList() }
+        val q = query.trim().lowercase()
+        return items.indices.filter { items[it].lowercase().contains(q) }
+    }
+
+    /** taste: genre to weight. cands: score and genres. Indices of candidates, best first. */
+    fun reco(taste: Map<String, Double>, cands: List<Pair<Int, List<String>>>): List<Int> {
+        if (taste.isEmpty()) return emptyList()
+        if (available) runCatching {
+            recoRank(taste.entries.joinToString("\n") { "${it.key}\t${it.value}" }, cands.joinToString("\n") { "${it.first}\t${it.second.joinToString(",")}" })
+        }.getOrNull()?.let { return it.toList() }
+        val tn = Math.sqrt(taste.values.sumOf { it * it })
+        return cands.withIndex().mapNotNull { (i, c) ->
+            val dot = c.second.sumOf { taste[it] ?: 0.0 }
+            if (c.second.isEmpty() || dot == 0.0) null else i to (dot / (tn * Math.sqrt(c.second.size.toDouble())) + c.first / 400.0)
+        }.sortedByDescending { it.second }.map { it.first }
+    }
+
+    /** See rust/kiro_core/src/stats.rs for the format. Null when Rust isn't usable. */
+    fun stats(today: Long, rows: String): String? = if (available) runCatching { statsSummary(today, rows) }.getOrNull() else null
 }

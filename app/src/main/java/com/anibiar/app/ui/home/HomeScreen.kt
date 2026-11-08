@@ -277,6 +277,16 @@ private fun HomeContent(
                         }
                     }
 
+                    if (state.reco.size >= 4) {
+                        item(key = "reco") {
+                            RecoRow(
+                                title = state.recoBecause?.let { "Because you watched $it" } ?: "Recommended for you",
+                                items = state.reco,
+                                onClick = onOpen,
+                            )
+                        }
+                    }
+
                     item(key = "latest-header") {
                         Spacer(Modifier.height(28.dp))
                         LatestHeader(
@@ -705,6 +715,35 @@ internal fun HeroChip(label: String) {
 }
 
 // ---------------------------------------------------------------- continue watching
+
+@Composable
+private fun RecoRow(title: String, items: List<Media>, onClick: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
+        Text(
+            title,
+            style = inter(20f, FontWeight.SemiBold),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(14.dp))
+        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(items, key = { it.id }) { m ->
+                Column(Modifier.width(132.dp).clickable { onClick(m.id) }) {
+                    PosterImage(
+                        url = m.posterUrl,
+                        contentDescription = m.displayTitle,
+                        maxSide = 400,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(m.displayTitle, style = inter(14f, FontWeight.Medium, lineHeight = 18f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    m.genres?.firstOrNull()?.let { Text(it, style = inter(12f), color = Ani.Muted, maxLines = 1) }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ContinueWatching(

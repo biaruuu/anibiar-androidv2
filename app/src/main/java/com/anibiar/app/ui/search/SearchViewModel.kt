@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.data.Media
+import com.anibiar.app.data.displayTitle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,10 +49,14 @@ data class SearchUiState(
     val resultsPage: Int = 1,
     val loading: Boolean = true,
     val error: String? = null,
+    /** Set when the results are on-device matches: the best title, offered as "Did you mean". */
+    val suggest: String? = null,
+    val offline: Boolean = false,
 )
 
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as AniBiarApp).repository
+    private val catalog = (application as AniBiarApp).catalog
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
     private var job: Job? = null
@@ -88,7 +93,11 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             if (debounceMs > 0) delay(debounceMs)
             val s = _state.value
             // Never keep showing the previous page under the new page number while the next one loads.
-            _state.update { it.copy(loading = true, error = null, results = emptyList()) }
+            val qNow = s.query.trim()
+            val localNow = if (qNow.isNotEmpty() && s.filters.activeCount == 0 && s.page == 1)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { catalog.search(qNow, 30) } else emptyList()
+            // Instant on-device matches (typo tolerant) while AniList answers.
+            _state.update { it.copy(loading = true, error = null, results = localNow, resultsPage = 1, suggest = null, offline = false) }
             if (s.filters.language == "DUB") {
                 _state.update { it.copy(results = emptyList(), loading = false, hasNext = false, lastPage = 1) }
                 return@launch
@@ -113,11 +122,17 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             }
             try {
                 val page = repository.search(vars)
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { catalog.add(page.media) }
+                if (page.media.isEmpty() && localNow.isNotEmpty()) {
+                    _state.update { it.copy(results = localNow, resultsPage = 1, loading = false, hasNext = false, lastPage = 1, suggest = localNow.first().displayTitle) }
+                    return@launch
+                }
                 _state.update {
                     it.copy(
                         results = page.media,
                         resultsPage = s.page,
                         loading = false,
+                        suggest = null,
                         hasNext = page.pageInfo.hasNextPage == true,
                         lastPage = (page.pageInfo.lastPage ?: it.page).coerceAtLeast(1),
                     )
@@ -125,7 +140,8 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = "Couldn't load results. Check your connection.") }
+                if (localNow.isNotEmpty()) _state.update { it.copy(results = localNow, loading = false, offline = true, hasNext = false, lastPage = 1) }
+                else _state.update { it.copy(loading = false, error = "Couldn't load results. Check your connection.") }
             }
         }
     }

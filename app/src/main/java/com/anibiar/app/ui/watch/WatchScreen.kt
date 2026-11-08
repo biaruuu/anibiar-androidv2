@@ -314,6 +314,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         }; ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
     fun saveProgress(t: Double, d: Double, episode: Int) {
         if (d <= 0) return
+        app.stats.tick(id, episode, t)
         app.history.save(HistoryItem(id, name, anime?.bannerImage ?: anime?.posterUrl, episode, (t / d).toFloat().coerceIn(0f, 1f)))
     }
 

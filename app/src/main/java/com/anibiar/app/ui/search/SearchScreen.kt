@@ -232,6 +232,17 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                 Spacer(Modifier.height(14.dp))
             }
 
+            if (state.results.isNotEmpty() && (state.suggest != null || state.offline)) {
+                item(key = "notice") {
+                    Text(
+                        if (state.suggest != null) "No exact match. Did you mean \"${state.suggest}\"? Showing close matches."
+                        else "You're offline. Showing matches saved on this device.",
+                        style = inter(14f), color = Ani.Muted,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
             when {
                 state.loading && state.results.isEmpty() -> item(key = "loading") { Hint("Searching…") }
                 state.error != null && state.results.isEmpty() -> item(key = "error") {

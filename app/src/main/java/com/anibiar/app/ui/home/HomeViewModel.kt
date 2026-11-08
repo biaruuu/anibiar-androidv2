@@ -24,6 +24,8 @@ data class HomeUiState(
     val popular: List<Media> = emptyList(),
     val trending: List<Media> = emptyList(),
     val history: List<HistoryItem> = emptyList(),
+    val reco: List<Media> = emptyList(),
+    val recoBecause: String? = null,
     val art: Map<Int, TmdbArt> = emptyMap(),
     val loading: Boolean = true,
     val error: String? = null,
@@ -33,6 +35,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as AniBiarApp
     private val repository = app.repository
     private val history = app.history
+    private val catalog = app.catalog
 
     private val requestedArt = HashSet<Int>()
     private val _state = MutableStateFlow(HomeUiState())
@@ -40,7 +43,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         load()
-        viewModelScope.launch { history.version.collect { _state.update { it.copy(history = history.load()) } } }
+        viewModelScope.launch { history.version.collect { _state.update { it.copy(history = history.load()) }; recommend() } }
+        viewModelScope.launch { app.watchlist.ids.collect { recommend() } }
     }
 
     fun refresh() = load()
@@ -73,14 +77,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val latest = latestJob.await()
             trendingJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(trending = list) }
+                remember(list)
             }
             popularJob.await().getOrNull()?.takeIf { it.isNotEmpty() }?.let { list ->
                 _state.update { it.copy(popular = list) }
+                remember(list)
             }
 
             discover.getOrNull()?.let { applyDiscover(it.top.media, it.upcoming.media) }
             latest.getOrNull()?.let { list ->
                 _state.update { it.copy(latest = list) }
+                remember(list.map { it.media })
                 repository.preloadImages(list.take(12).map { it.media.posterUrl })
             }
 
@@ -94,7 +101,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** "Because you watched X": scored in Rust from the on-disk catalog. */
+    private fun recommend() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            val hist = history.load()
+            val picks = catalog.recommend(hist, app.watchlist.ids.value)
+            val because = hist.firstOrNull { catalog.get(it.mediaId) != null }?.title
+            _state.update { it.copy(reco = picks, recoBecause = because) }
+        }
+    }
+
+    private fun remember(list: List<Media>) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) { catalog.add(list); recommend() }
+    }
+
     private fun applyDiscover(top: List<Media>, upcoming: List<Media>) {
+        remember(top + upcoming)
         val hero = top.filter { it.bannerImage != null || it.posterUrlAvailable() }.take(HERO_COUNT)
         _state.update { it.copy(hero = hero, topAiring = top, upcoming = upcoming, loading = false) }
 

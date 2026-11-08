@@ -334,3 +334,8 @@
 - Caption size (4 sizes), 2 new caption styles (Yellow outline, Soft shadow) and a Caption timing fix (earlier/later) in the player menu; your caption look and last quality are remembered
 - Audio (sub/dub) and server are remembered per anime
 - Continue Watching now syncs with your account across devices
+
+## 76 | Smarter search, picks for you, watch stats | 2026-11-08
+- Search forgives typos ("naruot" finds Naruto) and shows matches saved on your device instantly, even offline, with a "Did you mean" note
+- Home has a "Because you watched ..." row picked from the genres you watch and save
+- Your profile shows watch stats: total time, this week, streak and top genres

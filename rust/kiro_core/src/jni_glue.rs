@@ -69,3 +69,36 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_hlsMaxHeight<'l>(m
     let Some(t) = read(&mut env, &text) else { return -1 };
     catch_unwind(|| hls::max_height(&t)).unwrap_or(-1)
 }
+
+/// `items` joined with '\n'. Typo-tolerant, every query word must match. Indices best first.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_typoRank<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, query: JString<'l>, items: JString<'l>) -> jintArray {
+    let (Some(q), Some(all)) = (read(&mut env, &query), read(&mut env, &items)) else { return null_mut() };
+    let Ok(ranked) = catch_unwind(AssertUnwindSafe(|| {
+        let list: Vec<&str> = all.split('\n').collect();
+        crate::typo::rank(&q, &list)
+    })) else { return null_mut() };
+    let Ok(arr) = env.new_int_array(ranked.len() as i32) else { return null_mut() };
+    if env.set_int_array_region(&arr, 0, &ranked).is_err() {
+        return null_mut();
+    }
+    arr.into_raw()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_recoRank<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, taste: JString<'l>, cands: JString<'l>) -> jintArray {
+    let (Some(t), Some(c)) = (read(&mut env, &taste), read(&mut env, &cands)) else { return null_mut() };
+    let Ok(ranked) = catch_unwind(AssertUnwindSafe(|| crate::reco::rank(&crate::reco::parse_taste(&t), &crate::reco::parse_cands(&c)))) else { return null_mut() };
+    let Ok(arr) = env.new_int_array(ranked.len() as i32) else { return null_mut() };
+    if env.set_int_array_region(&arr, 0, &ranked).is_err() {
+        return null_mut();
+    }
+    arr.into_raw()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_statsSummary<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, today: jni::sys::jlong, rows: JString<'l>) -> jstring {
+    let Some(r) = read(&mut env, &rows) else { return null_mut() };
+    let Ok(out) = catch_unwind(|| crate::stats::summarize(today, &r)) else { return null_mut() };
+    env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}

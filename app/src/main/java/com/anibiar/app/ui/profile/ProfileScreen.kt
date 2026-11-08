@@ -244,6 +244,7 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                 }
             }
+            if (isMe) item(key = "stats") { StatsCard() }
             item(key = "fav-tabs") {
                 Box(Modifier.fillMaxWidth().height(50.dp)) {
                     Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Ani.Border))
@@ -622,5 +623,46 @@ internal fun UserCard(
                 )
             }
         }
+    }
+}
+
+
+private fun fmtDuration(sec: Long): String {
+    val h = sec / 3600; val m = sec % 3600 / 60
+    return if (h > 0) "${h}h ${m}m" else "${m}m"
+}
+
+/** Watch time, streak and top genres, summed in Rust from the on-device log. */
+@Composable
+private fun StatsCard() {
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
+    val stats by produceState<com.anibiar.app.data.StatsSummary?>(null) {
+        value = withContext(kotlinx.coroutines.Dispatchers.Default) { app.stats.flush(); app.stats.summary() }
+    }
+    val s = stats ?: return
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF1B1B1F)).padding(16.dp)) {
+        Text("Watch stats", style = inter(16f, FontWeight.SemiBold), color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth()) {
+            listOf(fmtDuration(s.total) to "Total", fmtDuration(s.week) to "This week", "${s.streak}d" to "Streak", "${s.shows}" to "Anime").forEach { (v, l) ->
+                Column(Modifier.weight(1f)) {
+                    Text(v, style = inter(18f, FontWeight.SemiBold), color = Color.White)
+                    Text(l, style = inter(12f), color = Ani.Muted)
+                }
+            }
+        }
+        if (s.genres.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            val top = s.genres.first().second.coerceAtLeast(1L)
+            s.genres.take(4).forEach { (g, secs) ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(g, style = inter(13f), color = Color.White, modifier = Modifier.width(88.dp), maxLines = 1)
+                    Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(Color(0x22FFFFFF))) {
+                        Box(Modifier.fillMaxWidth(secs.toFloat() / top).fillMaxHeight().background(Ani.Lavender))
+                    }
+                }
+            }
+        }
+        if (s.bestStreak > 1) Text("Best streak: ${s.bestStreak} days", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 10.dp))
     }
 }

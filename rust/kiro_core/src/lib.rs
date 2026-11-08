@@ -5,7 +5,10 @@ pub mod captions;
 pub mod fuzzy;
 pub mod hls;
 pub mod streams;
+pub mod reco;
+pub mod stats;
 pub mod text;
+pub mod typo;
 
 #[cfg(feature = "jni-glue")]
 mod jni_glue;
