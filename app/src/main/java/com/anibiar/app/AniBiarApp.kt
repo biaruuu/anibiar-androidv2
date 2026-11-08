@@ -12,6 +12,8 @@ import com.anibiar.app.data.Watchlist
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class AniBiarApp : Application(), ImageLoaderFactory {
@@ -29,6 +31,27 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         CrashLog.install(this)
         Http.init(this)
         social.start()
+        // "Continue watching" follows the account: push every change (at most one per anime every 20 s), pull when logging in.
+        val lastPush = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+        history.listener = object : WatchHistory.Listener {
+            override fun saved(item: com.anibiar.app.data.HistoryItem) {
+                val now = System.currentTimeMillis()
+                if (now - (lastPush[item.mediaId] ?: 0L) < 20_000 && item.progress < 0.95f) return
+                lastPush[item.mediaId] = now
+                appScope.launch { social.pushProgress(item) }
+            }
+            override fun removed(mediaId: Int) { appScope.launch { social.removeProgress(mediaId) } }
+        }
+        appScope.launch {
+            social.authState.map { it?.uid }.distinctUntilChanged().collect { uid ->
+                if (uid == null) return@collect
+                val remote = social.pullProgress()
+                history.merge(remote)
+                // Anything only on this device goes up too.
+                val known = remote.associateBy { it.mediaId }
+                history.load().filter { (known[it.mediaId]?.at ?: -1L) < it.at }.forEach { social.pushProgress(it) }
+            }
+        }
         // Build the network stack and warm image caches off the main thread while the UI starts.
         appScope.launch {
             Http.client

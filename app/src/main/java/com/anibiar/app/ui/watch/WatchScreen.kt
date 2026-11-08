@@ -129,14 +129,16 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     }
     var epsError by remember { mutableStateOf<String?>(null) }
     var epsTry by remember { mutableIntStateOf(0) }
-    var audio by remember { mutableStateOf(joinRoom?.audio ?: "sub") }
+    // Audio and server you used last time for this anime (not when joining someone's room, where the host decides).
+    val savedPref = remember(id) { if (joinRoom == null) prefsStore.getString("pref_$id", null)?.split("|") else null }
+    var audio by remember { mutableStateOf(joinRoom?.audio ?: savedPref?.getOrNull(0)?.takeIf { it == "sub" || it == "dub" } ?: "sub") }
     var ep by remember { mutableIntStateOf(startEp.coerceAtLeast(0)) }
     var watch by remember { mutableStateOf<WatchPayload?>(null) }
     var watchError by remember { mutableStateOf<String?>(null) }
     var watchTry by remember { mutableIntStateOf(0) }
     var streamName by remember { mutableStateOf<String?>(null) }
     var episodesOpen by remember { mutableStateOf(false) }
-    var providerPref by remember { mutableStateOf<String?>(null) }
+    var providerPref by remember { mutableStateOf<String?>(savedPref?.getOrNull(1)?.takeIf { it.isNotBlank() }) }
     var synopsisEpisode by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     var fullscreen by remember { mutableStateOf(false) }
@@ -229,6 +231,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             .onSuccess { watch = it; if (streamName == null || it.streams.none { s -> s.name == streamName }) streamName = null }
             .onFailure { watchError = it.message ?: "Couldn't load this episode" }
     }
+    LaunchedEffect(id, audio, providerPref, room) { if (room == null) prefsStore.edit().putString("pref_$id", "$audio|${providerPref.orEmpty()}").apply() }
+    val failedStreams = remember(id, current?.number, audio) { mutableSetOf<String>() }
     val stream = watch?.streams?.let { all -> all.firstOrNull { it.name == streamName } ?: all.firstOrNull() }
     val ready = watch != null && watch?.episode == current?.number && watch?.audio == audio
     // Host shares its server; a guest switches to it once per episode so everyone sees the same captions.
@@ -336,8 +340,13 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
                 onEnded = { if (autoNext && next != null && !locked) select(next.number) },
                 onFail = {
-                    val all = watch?.streams.orEmpty(); val at = all.indexOfFirst { it.id == stream?.id }
-                    if (at in 0 until all.lastIndex) streamName = all[at + 1].name
+                    // Move to the best stream that hasn't failed yet and say so.
+                    stream?.let { failedStreams += it.id }
+                    val next = watch?.streams.orEmpty().firstOrNull { it.id !in failedStreams }
+                    if (next != null && next.id != stream?.id) {
+                        streamName = next.name
+                        android.widget.Toast.makeText(context, "Switched to ${next.name}", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 },
                 fullscreen = fullscreen,
                 onFullscreen = {

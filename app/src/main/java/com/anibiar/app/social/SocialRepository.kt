@@ -805,6 +805,39 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         }
     }
 
+    /** Mirrors one "continue watching" entry to my account so it shows on my other devices. Never throws. */
+    suspend fun pushProgress(item: com.anibiar.app.data.HistoryItem) {
+        if (session == null) return
+        runCatching {
+            val body = buildJsonObject {
+                put("media_id", item.mediaId); put("title", item.title.take(200)); put("image", if (item.image == null) JsonNull else JsonPrimitive(item.image.take(600)))
+                put("episode", item.episode.coerceIn(0, 5000)); put("progress", item.progress.toDouble().coerceIn(0.0, 1.0))
+                put("updated_at", java.time.Instant.ofEpochMilli(item.at.takeIf { it > 0 } ?: System.currentTimeMillis()).toString())
+            }
+            raw("POST", "/rest/v1/watch_progress?on_conflict=user_id,media_id", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal,resolution=merge-duplicates"))
+        }
+    }
+
+    suspend fun removeProgress(mediaId: Int) {
+        val me = session?.uid ?: return
+        runCatching { raw("DELETE", "/rest/v1/watch_progress?user_id=eq.$me&media_id=eq.$mediaId") }
+    }
+
+    /** My saved "continue watching" list from the account (newest first), empty when logged out or offline. */
+    suspend fun pullProgress(): List<com.anibiar.app.data.HistoryItem> {
+        val me = session?.uid ?: return emptyList()
+        return runCatching {
+            getRows("/rest/v1/watch_progress?user_id=eq.$me&select=media_id,title,image,episode,progress,updated_at&order=updated_at.desc&limit=20").mapNotNull { r ->
+                val o = r.jsonObject
+                com.anibiar.app.data.HistoryItem(
+                    o["media_id"]!!.jsonPrimitive.content.toInt(), o["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), o["image"]?.jsonPrimitive?.contentOrNull,
+                    o["episode"]!!.jsonPrimitive.content.toInt(), o["progress"]!!.jsonPrimitive.content.toFloat(),
+                    runCatching { java.time.Instant.parse(o["updated_at"]!!.jsonPrimitive.content).toEpochMilli() }.getOrDefault(0L),
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+
     suspend fun setFriendRequests(v: String) = net { patchProfile(buildJsonObject { put("friend_requests", v) }) }
     suspend fun setListsVisibility(v: String) = net { patchProfile(buildJsonObject { put("lists_visibility", v) }) }
 

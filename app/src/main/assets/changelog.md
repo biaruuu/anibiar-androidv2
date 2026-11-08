@@ -328,3 +328,9 @@
 ## 74 | Fresher episodes and streams | 2026-11-08
 - Retry now really asks the providers again instead of reusing the saved stream
 - Airing shows re-check for new episodes every 3 minutes while you watch
+
+## 75 | Watching upgrades | 2026-11-08
+- If a stream fails, Kiro switches to the next best one that hasn't failed and tells you
+- Caption size (4 sizes), 2 new caption styles (Yellow outline, Soft shadow) and a Caption timing fix (earlier/later) in the player menu; your caption look and last quality are remembered
+- Audio (sub/dub) and server are remembered per anime
+- Continue Watching now syncs with your account across devices

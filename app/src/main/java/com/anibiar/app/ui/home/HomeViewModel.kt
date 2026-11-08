@@ -40,6 +40,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         load()
+        viewModelScope.launch { history.version.collect { _state.update { it.copy(history = history.load()) } } }
     }
 
     fun refresh() = load()

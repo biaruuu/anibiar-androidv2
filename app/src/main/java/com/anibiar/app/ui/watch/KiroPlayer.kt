@@ -120,7 +120,10 @@ private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
 }
-private val CAPTION_STYLES = listOf("Outline", "Dark box")
+private val CAPTION_STYLES = listOf("Outline", "Dark box", "Yellow outline", "Soft shadow")
+private val CAPTION_SIZES = listOf("Normal", "Large", "Extra large", "Small")
+private val CAPTION_SCALE = listOf(1f, 1.2f, 1.45f, 0.85f)
+private fun offsetLabel(ms: Int) = if (ms == 0) "In sync" else (if (ms > 0) "+" else "-") + "%.1f s".format(kotlin.math.abs(ms) / 1000f)
 
 private fun fmt(sec: Double): String {
     if (!sec.isFinite() || sec < 0) return "0:00"
@@ -194,8 +197,12 @@ fun KiroPlayer(
     val resumeFracNow by rememberUpdatedState(resumeFraction)
     var captionTry by remember { mutableIntStateOf(0) }
     var captionState by remember { mutableStateOf("") }
-    var captionSize by remember { mutableIntStateOf(0) }
-    var captionStyle by remember { mutableIntStateOf(0) }
+    // Caption look and the quality you chose last time are remembered between videos.
+    val capPrefs = remember { context.getSharedPreferences("caption_prefs", Context.MODE_PRIVATE) }
+    var captionSize by remember { mutableIntStateOf(capPrefs.getInt("size", 0).coerceIn(0, CAPTION_SIZES.lastIndex)) }
+    var captionStyle by remember { mutableIntStateOf(capPrefs.getInt("style", 0).coerceIn(0, CAPTION_STYLES.lastIndex)) }
+    /** Caption timing fix in ms: positive = captions appear later, negative = earlier. Resets for each video. */
+    var capOffset by remember { mutableIntStateOf(0) }
     // Once you change captions yourself, the host's caption settings stop overriding yours.
     var capLocal by remember { mutableStateOf(false) }
     var cues by remember { mutableStateOf<List<Cue>>(emptyList()) }
@@ -256,8 +263,8 @@ fun KiroPlayer(
         }
         if (c.speed != speedNow) speed = c.speed
         if (c.boost != boost) boost = c.boost
-        if (!capLocal && c.capSize != captionSize) captionSize = c.capSize
-        if (!capLocal && c.capStyle != captionStyle) captionStyle = c.capStyle
+        if (!capLocal && c.capSize != captionSize) captionSize = c.capSize.coerceIn(0, CAPTION_SIZES.lastIndex)
+        if (!capLocal && c.capStyle != captionStyle) captionStyle = c.capStyle.coerceIn(0, CAPTION_STYLES.lastIndex)
         // Captions follow the host: off only when the host switched them off, otherwise on (matching track, else my English one).
         if (!capLocal) {
             if (c.capOn == false) { if (captionTrack != -1) captionTrack = -1 }
@@ -344,7 +351,7 @@ fun KiroPlayer(
     val autoplayNow by rememberUpdatedState(autoplay)
     LaunchedEffect(src) {
         resumeDecided[0] = false; resumePrompt = false; hostSub = null
-        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
+        error = null; ended = false; skipped.clear(); skipTarget = null; skipToast = null; quality = -1; userQuality = false; capOffset = 0; retries[0] = 0; playedOnce[0] = false; bufSent[0] = 0; timeMs = 0; durationMs = 0
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         Streaming.activeReferer = com.anibiar.app.data.LocalSources.referers[src]
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
@@ -381,6 +388,11 @@ fun KiroPlayer(
     }
 
     // HD without pinning: Auto, but starting from a high bandwidth estimate so it begins on the best quality.
+    // Start on the quality you picked last time, when this stream has it.
+    LaunchedEffect(heights, src) {
+        val q = capPrefs.getInt("quality", -1)
+        if (!userQuality && q > 0 && heights.isNotEmpty() && q in heights && quality != q) { userQuality = true; quality = q }
+    }
     // Quality: pin the chosen height, or let the player adapt.
     LaunchedEffect(quality, heights) {
         val builder = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO)
@@ -518,22 +530,26 @@ fun KiroPlayer(
         }
 
         // Captions
-        val active = Captions.activeLine(cues, timeMs / 1000.0)
+        val active = Captions.activeLine(cues, (timeMs - capOffset) / 1000.0)
         if (active != null) {
             val (line, italic) = active
-            val base = (h.value * 0.058f).coerceIn(14.5f, 30f)
+            val base = ((h.value * 0.058f).coerceIn(14.5f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
             val face = inter(base, FontWeight.Bold, lineHeight = base * 1.28f).copy(
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center, color = Color.White, letterSpacing = (base * 0.008f).sp,
+                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center,
+                color = if (captionStyle == 2) Color(0xFFFFE066) else Color.White, letterSpacing = (base * 0.008f).sp,
+                shadow = if (captionStyle == 3) androidx.compose.ui.graphics.Shadow(Color(0xE6000000), androidx.compose.ui.geometry.Offset(2f, 2f), base * 0.35f) else null,
             )
             // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
             val lifted = aCtl > 0.5f
             val bottomPad by animateDpAsState(if (lifted) (w * 0.032f).coerce(10.dp, 34.dp) + 22.dp else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
             val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
-                if (captionStyle == 0) {
+                if (captionStyle == 0 || captionStyle == 2) {
                     // Outline: bold Inter, white fill with a clean dark outline (no shadow), scaled to the player.
                     val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
                     Text(line, style = face.copy(color = Color(0xFF0A0A0C), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round, miter = 2f)))
+                    Text(line, style = face)
+                } else if (captionStyle == 3) {
                     Text(line, style = face)
                 } else {
                     Text(
@@ -708,7 +724,7 @@ fun KiroPlayer(
                     .verticalScroll(rememberScrollState()).padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Caption style"; else -> "Speed" }) { menuView = "main" }
+                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Caption style"; "size" -> "Caption size"; "sync" -> "Caption timing"; else -> "Speed" }) { menuView = "main" }
                 when (menuView) {
                     "main" -> {
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
@@ -716,12 +732,14 @@ fun KiroPlayer(
                         if (sortedSubs.isNotEmpty()) {
                             MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { if (captionState == "error") captionTry++ else menuView = "captions" }
                             MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_STYLES[captionStyle]) { menuView = "style" }
+                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption size", CAPTION_SIZES[captionSize]) { menuView = "size" }
+                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption timing", offsetLabel(capOffset)) { menuView = "sync" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                     }
                     "quality" -> {
-                        OptionRow("Auto", quality == -1) { userQuality = true; quality = -1; menuView = "main" }
-                        heights.forEach { h -> OptionRow("${h}p", quality == h) { userQuality = true; quality = h; menuView = "main" } }
+                        OptionRow("Auto", quality == -1) { userQuality = true; quality = -1; capPrefs.edit().putInt("quality", -1).apply(); menuView = "main" }
+                        heights.forEach { h -> OptionRow("${h}p", quality == h) { userQuality = true; quality = h; capPrefs.edit().putInt("quality", h).apply(); menuView = "main" } }
                     }
                     "boost" -> BOOST_MB.indices.forEach { i -> OptionRow(boostLabel(i), boost == i) { boost = i; menuView = "main" } }
                     "captions" -> {
@@ -729,7 +747,15 @@ fun KiroPlayer(
                         sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = false; captionTrack = i; menuView = "main" } }
                     }
                     "style" -> {
-                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = false; captionStyle = i } }
+                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = false; captionStyle = i; capPrefs.edit().putInt("style", i).apply() } }
+                    }
+                    "size" -> CAPTION_SIZES.forEachIndexed { i, s -> OptionRow(s, captionSize == i) { capLocal = false; captionSize = i; capPrefs.edit().putInt("size", i).apply() } }
+                    "sync" -> {
+                        OptionRow("Captions earlier  (-0.5 s)", false) { capOffset = (capOffset - 500).coerceAtLeast(-30_000) }
+                        OptionRow("Captions later  (+0.5 s)", false) { capOffset = (capOffset + 500).coerceAtMost(30_000) }
+                        OptionRow("Fine tune earlier  (-0.1 s)", false) { capOffset = (capOffset - 100).coerceAtLeast(-30_000) }
+                        OptionRow("Fine tune later  (+0.1 s)", false) { capOffset = (capOffset + 100).coerceAtMost(30_000) }
+                        OptionRow("Reset  ·  now ${offsetLabel(capOffset)}", capOffset == 0) { capOffset = 0 }
                     }
                     else -> SPEEDS.forEach { s -> OptionRow(if (s == 1f) "Normal" else "${s}x", speed == s) { speed = s; menuView = "main" } }
                 }
