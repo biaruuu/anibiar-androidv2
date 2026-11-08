@@ -29,7 +29,8 @@ fn tier(sub_audio: bool, r: &Row) -> i32 {
 
 fn bucket(h: i32) -> i32 {
     match h {
-        i32::MIN..=0 => 0,
+        // unknown quality (probe failed or not a master playlist) is assumed to be ordinary HD, not the worst
+        i32::MIN..=0 => 720,
         1..=299 => 240,
         300..=449 => 360,
         450..=699 => 480,
@@ -78,6 +79,12 @@ mod tests {
         // 1080 hard beats 720 soft; at equal quality soft English beats soft other beats hard.
         let rows = [r(false, false, false, true, 1080), r(true, true, true, true, 720), r(true, false, true, true, 1080), r(true, true, true, true, 1080)];
         assert_eq!(rank(true, &rows), vec![3, 2, 0, 1]);
+    }
+
+    #[test]
+    fn unknown_height_is_treated_as_hd_not_worst() {
+        let rows = [r(true, true, true, true, 480), r(true, true, true, true, 0), r(true, true, true, true, 1080)];
+        assert_eq!(rank(true, &rows), vec![2, 1, 0]);
     }
 
     #[test]

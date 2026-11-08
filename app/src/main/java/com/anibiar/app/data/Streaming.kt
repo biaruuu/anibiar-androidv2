@@ -134,7 +134,7 @@ object Streaming {
 
     /** Asks several providers at once and returns as soon as the first one answers (plus a short grace for the rest). */
     private suspend fun gatewayWatch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload? {
-        val order = servers.map { it.lowercase() }.filter { tokens.containsKey("$id|$audio|$ep|$it") }.take(4)
+        val order = servers.map { it.lowercase() }.filter { tokens.containsKey("$id|$audio|$ep|$it") }.take(10)
         if (order.isEmpty()) return null
         return kotlinx.coroutines.coroutineScope {
             val ch = kotlinx.coroutines.channels.Channel<List<StreamSource>>(kotlinx.coroutines.channels.Channel.UNLIMITED)
@@ -143,7 +143,7 @@ object Streaming {
             while (left > 0) {
                 val got = if (deadline == 0L) ch.receive() else kotlinx.coroutines.withTimeoutOrNull((deadline - System.currentTimeMillis()).coerceAtLeast(1)) { ch.receive() } ?: break
                 left--
-                if (got.isNotEmpty()) { all += got; if (deadline == 0L) deadline = System.currentTimeMillis() + 1500 }
+                if (got.isNotEmpty()) { all += got; if (deadline == 0L) deadline = System.currentTimeMillis() + PROVIDER_GRACE_MS }
             }
             jobs.forEach { it.cancel() }
             val sorted = all.sortedBy { s -> order.indexOfFirst { s.id.startsWith("$it-") } }
@@ -233,10 +233,10 @@ object Streaming {
 
     suspend fun watch(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload = withContext(Dispatchers.Default) { watchInner(id, audio, ep, servers) }
 
-    /** Reads an HLS master playlist and returns the stream with its best resolution filled in (never throws, 2.5 s limit). */
+    /** Reads an HLS master playlist and returns the stream with its best resolution filled in (never throws, 5 s limit). */
     private suspend fun probe(s: StreamSource): StreamSource {
         if (s.format != "hls" || !s.src.startsWith("http")) return s
-        val h = kotlinx.coroutines.withTimeoutOrNull(2_500) {
+        val h = kotlinx.coroutines.withTimeoutOrNull(5_000) {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val b = Request.Builder().url(s.src).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
@@ -251,6 +251,11 @@ object Streaming {
         return if (h > 0) s.copy(height = h) else s
     }
 
+    /** After the first provider answers, the others get this long to show up (slow ones like Nami take several seconds). */
+    private const val PROVIDER_GRACE_MS = 8_000L
+
+    private fun isIdeal(s: StreamSource, audio: String) = s.height >= 1080 && (audio != "sub" || (s.kind == "soft" && s.subtitles.any(::isEnglish)))
+
     private val resolutionRe = Regex("RESOLUTION=\\d+x(\\d+)")
     private fun isEnglish(t: StreamSubtitle) = t.srclang.startsWith("en", true) || t.label.contains("english", true)
 
@@ -263,7 +268,7 @@ object Streaming {
         val rows = list.map { intArrayOf(if (it.kind == "soft") 1 else 0, if (it.subtitles.any(::isEnglish)) 1 else 0, if (it.subtitles.isNotEmpty()) 1 else 0, if (it.format == "hls") 1 else 0, it.height) }
         com.anibiar.app.nativecore.Native.rank(sub, rows)?.let { order -> return order.map { list[it] } }
         fun tier(s: StreamSource) = if (!sub || s.kind != "soft") 0 else if (s.subtitles.any(::isEnglish)) 3 else if (s.subtitles.isNotEmpty()) 2 else 1
-        fun bucket(h: Int) = when { h <= 0 -> 0; h < 300 -> 240; h < 450 -> 360; h < 700 -> 480; h < 1000 -> 720; h < 2000 -> 1080; else -> 2160 }
+        fun bucket(h: Int) = when { h <= 0 -> 720; h < 300 -> 240; h < 450 -> 360; h < 700 -> 480; h < 1000 -> 720; h < 2000 -> 1080; else -> 2160 }
         return list.sortedWith(compareByDescending<StreamSource> { bucket(it.height) }.thenByDescending { tier(it) }.thenByDescending { it.height }.thenByDescending { it.format == "hls" })
     }
 
@@ -272,8 +277,9 @@ object Streaming {
     private class Res(val base: WatchPayload?, val streams: List<StreamSource>, val err: Throwable?, val local: String?)
 
     /**
-     * Starts every server at once and returns as soon as the first one has a stream (plus a short grace period for the
-     * others), instead of waiting for the slowest server. A server that never answers can no longer hold up playback.
+     * Starts every server at once. It returns when every server has answered, when a 1080p+ (soft-sub) stream has
+     * arrived, or [PROVIDER_GRACE_MS] after the first answer, so slow providers are no longer cut off but a server that
+     * never answers still cannot hold up playback.
      */
     private suspend fun watchInner(id: Int, audio: String, ep: Int, servers: List<String>): WatchPayload {
         val key = "$id|$audio|$ep|${servers.firstOrNull()}"
@@ -301,7 +307,9 @@ object Streaming {
                 left--
                 if (got.err != null) err = got.err
                 if (got.local == null) { if (got.base != null) base = got.base; remoteStreams += got.streams } else if (got.streams.isNotEmpty()) localStreams += got.local to got.streams
-                if (got.streams.isNotEmpty() && deadline == 0L) deadline = System.currentTimeMillis() + 1200
+                if (got.streams.isNotEmpty() && deadline == 0L) deadline = System.currentTimeMillis() + PROVIDER_GRACE_MS
+                // Stop early only when nothing better can turn up: 1080p+ (with soft English subs for sub audio).
+                if ((remoteStreams + localStreams.flatMap { it.second }).any { isIdeal(it, audio) }) break
             }
             jobs.forEach { it.cancel() }
             val all = rankStreams(audio, remoteStreams + localStreams.sortedBy { servers.indexOfFirst { s -> s.equals(it.first, true) } }.flatMap { it.second })

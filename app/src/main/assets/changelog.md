@@ -315,3 +315,8 @@
 ## 71 | Quality first stream picking | 2026-11-08
 - Best stream is now the highest picture quality first; among equal quality, soft subs (English first) come before hard subs
 - Stream quality is read from the playlist in Rust
+
+## 72 | Slow providers (Nami) no longer cut off | 2026-11-08
+- Stream search now waits for every provider (up to 8 s after the first answer) instead of 1.2 s, so Nami's 1080p soft-sub streams are included; it stops early once a 1080p+ soft-sub stream is found
+- Quality check waits up to 5 s per stream, and a stream whose quality can't be read is treated as HD instead of the worst
+- Up to 10 server providers are asked per episode
