@@ -320,3 +320,7 @@
 - Stream search now waits for every provider (up to 8 s after the first answer) instead of 1.2 s, so Nami's 1080p soft-sub streams are included; it stops early once a 1080p+ soft-sub stream is found
 - Quality check waits up to 5 s per stream, and a stream whose quality can't be read is treated as HD instead of the worst
 - Up to 10 server providers are asked per episode
+
+## 73 | Fix "AniList HTTP 429" on episodes | 2026-11-08
+- Provider title lookups now retry when AniList rate-limits, remember the result for 30 days, and fall back to ani.zip when AniList keeps refusing
+- If a fresh episode list can't be loaded but a saved one exists, the saved list stays on screen instead of an error

@@ -101,20 +101,76 @@ object LocalSources {
         return metaLock.withLock { metaCache[id] ?: fetchMeta(id) }
     }
 
+    private fun metaFile(id: Int): java.io.File? = Http.context?.let { java.io.File(it.cacheDir, "meta-$id.json") }
+
+    /** Titles and ids almost never change, so a saved copy (30 days) means AniList is only asked once per anime. */
+    private fun readMeta(id: Int): Meta? = runCatching {
+        val f = metaFile(id) ?: return null
+        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 30L * 24 * 3600_000) return null
+        val o = org.json.JSONObject(f.readText())
+        val t = o.getJSONArray("titles")
+        Meta(o.optInt("mal", 0).takeIf { it > 0 }, List(t.length()) { t.getString(it) }, o.optInt("eps", 0).takeIf { it > 0 }, o.optString("fmt").ifBlank { null })
+            .takeIf { it.titles.isNotEmpty() }
+    }.getOrNull()
+
+    private fun writeMeta(id: Int, m: Meta) {
+        runCatching {
+            metaFile(id)?.writeText(org.json.JSONObject().put("mal", m.idMal ?: 0).put("titles", org.json.JSONArray(m.titles)).put("eps", m.episodes ?: 0).put("fmt", m.format ?: "").toString())
+        }
+    }
+
+    /** AniList with up to 3 tries on 429 / 5xx (honouring Retry-After). */
+    private suspend fun aniListText(body: String): String {
+        var last: Exception? = null
+        for (attempt in 0..2) {
+            try {
+                val (code, text, wait) = withContext(Dispatchers.IO) {
+                    http.newCall(Request.Builder().url("https://graphql.anilist.co").post(body.toRequestBody("application/json".toMediaType())).header("Accept", "application/json").build())
+                        .execute().use { r -> Triple(r.code, r.body?.string().orEmpty(), r.header("Retry-After")?.toLongOrNull()) }
+                }
+                if (code in 200..299) return text
+                last = IOException("AniList HTTP $code")
+                if (code != 429 && code < 500) throw last
+                kotlinx.coroutines.delay(((wait ?: (attempt + 1).toLong() * 2).coerceIn(1L, 6L)) * 1000)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: IOException) {
+                last = e
+                if (attempt < 2) kotlinx.coroutines.delay(1500)
+            }
+        }
+        throw last ?: IOException("AniList unreachable")
+    }
+
+    /** AniList-free fallback (ani.zip knows the MAL id and titles), used when AniList keeps refusing. */
+    private suspend fun aniZipMeta(id: Int): Meta? = runCatching {
+        val text = withContext(Dispatchers.IO) {
+            http.newCall(Request.Builder().url("https://api.ani.zip/mappings?anilist_id=$id").header("Accept", "application/json").build())
+                .execute().use { r -> if (r.isSuccessful) r.body?.string().orEmpty() else "" }
+        }
+        val root = json.parseToJsonElement(text).jsonObject
+        val map = root["mappings"] as? JsonObject
+        val t = root["titles"] as? JsonObject
+        val titles = listOfNotNull(t?.get("en")?.jsonPrimitive?.contentOrNull, t?.get("x-jat")?.jsonPrimitive?.contentOrNull).filter { it.isNotBlank() && it != "null" }.distinct()
+        if (titles.isEmpty()) null
+        else Meta(map?.get("mal_id")?.jsonPrimitive?.intOrNull, titles, root["episodeCount"]?.jsonPrimitive?.intOrNull ?: map?.get("episodeCount")?.jsonPrimitive?.intOrNull, map?.get("type")?.jsonPrimitive?.contentOrNull)
+    }.getOrNull()
+
     private suspend fun fetchMeta(id: Int): Meta {
+        readMeta(id)?.let { metaCache[id] = it; return it }
         val body = buildJsonObject {
             put("query", "query(\$id:Int){Media(id:\$id,type:ANIME){idMal title{english romaji} synonyms episodes format}}")
             put("variables", buildJsonObject { put("id", id) })
         }.toString()
-        val text = withContext(Dispatchers.IO) {
-            http.newCall(Request.Builder().url("https://graphql.anilist.co").post(body.toRequestBody("application/json".toMediaType())).header("Accept", "application/json").build())
-                .execute().use { r -> if (!r.isSuccessful) throw IOException("AniList HTTP ${r.code}"); r.body?.string().orEmpty() }
+        val text = try { aniListText(body) } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) {
+            val fb = aniZipMeta(id) ?: throw e
+            metaCache[id] = fb
+            return fb
         }
         val m = json.parseToJsonElement(text).jsonObject["data"]?.jsonObject?.get("Media")?.jsonObject ?: throw IOException("AniList: no media")
         val t = m["title"]?.jsonObject
         val titles = listOfNotNull(t?.get("english")?.jsonPrimitive?.contentOrNull, t?.get("romaji")?.jsonPrimitive?.contentOrNull) +
             (m["synonyms"] as? JsonArray).orEmpty().mapNotNull { it.jsonPrimitive.contentOrNull }.filter { s -> s.all { it.code < 0x2E80 } }.take(3)
-        return Meta(m["idMal"]?.jsonPrimitive?.intOrNull, titles.distinct(), m["episodes"]?.jsonPrimitive?.intOrNull, m["format"]?.jsonPrimitive?.contentOrNull).also { metaCache[id] = it }
+        return Meta(m["idMal"]?.jsonPrimitive?.intOrNull, titles.distinct(), m["episodes"]?.jsonPrimitive?.intOrNull, m["format"]?.jsonPrimitive?.contentOrNull)
+            .also { metaCache[id] = it; writeMeta(id, it) }
     }
 
     // ---------------------------------------------------------------- AnimeDunya (by MAL id; sub, HLS, soft subtitles)

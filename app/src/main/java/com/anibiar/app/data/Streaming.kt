@@ -185,7 +185,7 @@ object Streaming {
     private suspend fun episodesLiveInner(id: Int, onUpdateRaw: (EpisodesPayload) -> Unit) {
         val onUpdate: (EpisodesPayload) -> Unit = { p -> runCatching { onUpdateRaw(p) } }
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { onUpdate(it.v); return }
-        readDisk(id)?.let { onUpdate(it) }
+        val saved = readDisk(id)?.also { onUpdate(it) }
         val lock = kotlinx.coroutines.sync.Mutex()
         var base: EpisodesPayload? = null
         val locals = LinkedHashMap<String, LocalSources.Local>()
@@ -208,7 +208,8 @@ object Streaming {
                 }
             }
         }
-        val done = last ?: throw serverErr ?: IOException("No episodes found")
+        // Nothing fresh (server and providers all failed, e.g. AniList rate limit): keep showing the saved list instead of an error.
+        val done = last ?: if (saved != null) return else throw serverErr ?: IOException("No episodes found")
         epsCache[id] = Cached(System.currentTimeMillis(), done)
         writeDisk(id, done)
     }

@@ -197,7 +197,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
 
     LaunchedEffect(id, epsTry) {
         epsRaw = null; epsError = null
-        runCatching { Streaming.episodesLive(id) { epsRaw = it } }.onSuccess { }.onFailure { epsError = it.message ?: "Couldn't load episodes" }
+        runCatching { Streaming.episodesLive(id) { epsRaw = it } }.onSuccess { }.onFailure { if (epsRaw == null) epsError = it.message ?: "Couldn't load episodes" }
     }
     val list: List<WatchEpisode> = eps?.let { if (audio == "dub" && it.dub.isNotEmpty()) it.dub else it.sub }.orEmpty()
     LaunchedEffect(eps, audio) {
