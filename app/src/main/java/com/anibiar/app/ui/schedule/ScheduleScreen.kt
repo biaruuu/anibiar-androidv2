@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,7 +106,7 @@ fun ScheduleScreen(onBack: () -> Unit, onOpen: (Int) -> Unit, backEnabled: Boole
         when {
             loading && items.isEmpty() -> Text("Loading…", style = inter(15f), color = Ani.Muted, modifier = Modifier.padding(24.dp))
             shown.isEmpty() -> Text(if (items.isEmpty()) "Couldn't load the schedule. Check your connection." else "Nothing airing this day.", style = inter(15f), color = Ani.Muted, modifier = Modifier.padding(24.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp, bottom = 40.dp)) {
+            else -> LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 40.dp)) {
                 items(shown, key = { "${it.media.id}-${it.episode}" }) { e ->
                     val m = e.media
                     val on = m.id in reminders
