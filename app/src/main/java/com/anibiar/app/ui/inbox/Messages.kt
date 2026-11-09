@@ -279,6 +279,24 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             sending = false
         }
     }
+    var recorder by remember { mutableStateOf<VoiceRecorder?>(null) }
+    DisposableEffect(Unit) { onDispose { recorder?.cancel(); VoicePlayer.stop() } }
+    fun startRecording() {
+        val r = VoiceRecorder(context)
+        if (r.start()) recorder = r else Toast.makeText(context, "Couldn't start the microphone", Toast.LENGTH_SHORT).show()
+    }
+    val askMic = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok -> if (ok) startRecording() else Toast.makeText(context, "Allow the microphone to send voice notes", Toast.LENGTH_SHORT).show() }
+    fun sendVoiceNote() {
+        val r = recorder ?: return
+        recorder = null
+        val res = r.finish() ?: run { Toast.makeText(context, "Recording too short", Toast.LENGTH_SHORT).show(); return }
+        sending = true
+        scope.launch {
+            try { social.sendVoice(uid, res.bytes, res.seconds, res.bars, replyTo?.id); replyTo = null }
+            catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
+            sending = false
+        }
+    }
     val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { u -> if (u != null) sendPicked(u) }
     LaunchedEffect(theirTyping) { if (theirTyping) list.animateScrollToItem(msgs.size) }
     LaunchedEffect(uid) { person = social.fetchProfile(uid) }
@@ -351,7 +369,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
             // Typo-tolerant search over this conversation (Rust), tap a result to jump to it.
             val hits = remember(query, msgs) {
                 if (query.isBlank()) emptyList() else {
-                    val idx = msgs.indices.filter { msgs[it].kind != "image" }
+                    val idx = msgs.indices.filter { msgs[it].kind == "text" }
                     (com.anibiar.app.nativecore.Native.rank(query.trim(), idx.map { msgs[it].body })?.map { idx[it] }
                         ?: idx.filter { msgs[it].body.contains(query.trim(), ignoreCase = true) }).take(30)
                 }
@@ -434,7 +452,8 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                             var menuOpen by remember { mutableStateOf(false) }
                             Box {
                                 val longPress = { menuOpen = true }
-                                if (m.kind == "image") coil.compose.AsyncImage(
+                                if (m.kind == "voice") VoiceBubble(m, longPress)
+                                else if (m.kind == "image") coil.compose.AsyncImage(
                                     model = m.mediaUrl, contentDescription = "Photo", contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
                                     modifier = Modifier.width(224.dp).heightIn(min = 100.dp, max = 340.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF1C1C1E))
                                         .combinedClickable(onClick = { viewer = m.mediaUrl }, onLongClick = longPress),
@@ -523,7 +542,9 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
+        val rec = recorder
+        if (rec != null) RecordingBar(rec, onCancel = { rec.cancel(); recorder = null }, onSend = { sendVoiceNote() })
+        else Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.size(38.dp).clip(CircleShape).background(glass).border(1.dp, rim, CircleShape).clickable { focus.clearFocus(); if (!sending) pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }, contentAlignment = Alignment.Center) {
                 androidx.compose.foundation.Canvas(Modifier.size(16.dp)) {
                     val st = 2.dp.toPx(); val c = size.width / 2f
@@ -546,6 +567,14 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                     Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF3D7BFF), Color(0xFF2B58F0)))).clickable { send() },
                     contentAlignment = Alignment.Center,
                 ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f }) }
+                else Box(
+                    Modifier.size(30.dp).clip(CircleShape).clickable {
+                        focus.clearFocus()
+                        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) startRecording()
+                        else askMic.launch(android.Manifest.permission.RECORD_AUDIO)
+                    },
+                    contentAlignment = Alignment.Center,
+                ) { Text("🎤", fontSize = 17.sp) }
             }
         }
     }

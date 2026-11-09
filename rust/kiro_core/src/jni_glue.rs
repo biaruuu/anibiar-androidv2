@@ -113,3 +113,14 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_netEstimate<'l>(mu
     })
     .unwrap_or(-1.0)
 }
+
+/// `samples` joined with ','. Returns `n` digit characters (0-9) describing loudness over time.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_waveBars<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, samples: JString<'l>, n: jni::sys::jint) -> jstring {
+    let Some(s) = read(&mut env, &samples) else { return null_mut() };
+    let Ok(out) = catch_unwind(|| {
+        let v: Vec<i32> = s.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+        crate::wave::bars(&v, n.max(0) as usize)
+    }) else { return null_mut() };
+    env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}

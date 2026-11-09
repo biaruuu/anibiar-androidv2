@@ -381,3 +381,6 @@
 - Explore: pick a mood (Hype, Chill, Funny, Emotional...) and how long you want to watch, or browse by genre
 - My shows: what you're behind on for airing anime, what to keep watching, what you haven't touched in 30+ days (drop it) and your plan-to-watch list
 - Home-screen widget showing your last three shows and the next episode to air from your reminders
+
+## 85 | Voice messages | 2026-11-09
+- Send voice notes in chat: tap the mic, talk, tap send. Messages show a waveform and play in place

@@ -47,7 +47,7 @@ data class Fav(val animeId: Int, val title: String, val cover: String?)
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
-data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null,
+data class DmMessage(val id: Long, val mine: Boolean, val body: String, val at: Long, val read: Boolean, val replyTo: Long? = null, val kind: String = "text", val mediaUrl: String? = null, val style: String? = null,
     /** emoji to count, and the one I picked (one per person per message). */
     val reactions: Map<String, Int> = emptyMap(), val myReaction: String? = null)
 
@@ -481,7 +481,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
-        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url&order=id.desc&limit=200"
+        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url,style&order=id.desc&limit=200"
         val rows = getRows(q)
         // Reactions for these messages in one extra request.
         val ids = rows.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
@@ -505,6 +505,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 replyTo = o["reply_to"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(),
                 kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "text",
                 mediaUrl = o["media_url"]?.jsonPrimitive?.contentOrNull,
+                style = o["style"]?.jsonPrimitive?.contentOrNull,
             )
         }.reversed()
     }
@@ -522,7 +523,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private suspend fun insertDm(to: String, body: String, kind: String, mediaUrl: String?, replyTo: Long?) {
+    private suspend fun insertDm(to: String, body: String, kind: String, mediaUrl: String?, replyTo: Long?, style: String? = null) {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         val (code, resp) = raw(
             "POST", "/rest/v1/dm_messages",
@@ -530,6 +531,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 put("sender_id", me); put("recipient_id", to); put("body", body); put("kind", kind)
                 if (mediaUrl != null) put("media_url", mediaUrl)
                 if (replyTo != null) put("reply_to", replyTo)
+                if (style != null) put("style", style)
             }.toString().toByteArray(),
             extra = mapOf("Prefer" to "return=minimal"),
         )
@@ -555,6 +557,16 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = mime)
         if (code !in 200..299) fail(code, resp)
         insertDm(to, "Photo", "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
+    }
+
+    /** Voice note: [bytes] is AAC in an MP4 container. [style] carries "<seconds:3 digits><20 loudness digits>". */
+    suspend fun sendVoice(to: String, bytes: ByteArray, seconds: Int, bars: String, replyTo: Long? = null) = net {
+        val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
+        if (bytes.size > 6 * 1024 * 1024) throw IllegalStateException("That recording is too long.")
+        val path = "$me/${java.util.UUID.randomUUID()}.m4a"
+        val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = "audio/mp4")
+        if (code !in 200..299) fail(code, resp)
+        insertDm(to, "Voice message", "voice", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo, "%03d".format(seconds.coerceIn(0, 999)) + bars.take(20).padEnd(20, '0'))
     }
 
     // ---- instant nudges over the shared realtime socket ("dmu-<uid>" is my own inbox channel)

@@ -10,6 +10,7 @@ pub mod reco;
 pub mod stats;
 pub mod text;
 pub mod typo;
+pub mod wave;
 
 #[cfg(feature = "jni-glue")]
 mod jni_glue;

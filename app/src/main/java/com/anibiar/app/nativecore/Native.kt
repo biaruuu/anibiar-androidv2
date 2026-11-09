@@ -76,4 +76,15 @@ object Native {
         val v = samples.sorted(); val lo = v.size / 10; val hi = maxOf(v.size - v.size / 5, lo + 1)
         return v.subList(lo, hi).average() * 0.8
     }
+
+    @JvmStatic private external fun waveBars(samples: String, n: Int): String?
+
+    /** Loudness over time as [n] digits 0-9, for drawing a voice-message waveform. */
+    fun wave(samples: List<Int>, n: Int): String {
+        if (samples.isEmpty()) return "0".repeat(n)
+        if (available) runCatching { waveBars(samples.joinToString(","), n) }.getOrNull()?.takeIf { it.length == n }?.let { return it }
+        val peaks = (0 until n).map { i -> val a = i * samples.size / n; samples.subList(a, maxOf(a + 1, (i + 1) * samples.size / n).coerceAtMost(samples.size)).maxOrNull() ?: 0 }
+        val top = maxOf(1, peaks.max())
+        return peaks.joinToString("") { Math.round(Math.sqrt(it.toDouble() / top) * 9).toString() }
+    }
 }
