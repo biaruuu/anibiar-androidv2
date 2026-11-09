@@ -133,6 +133,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     // Audio and server you used last time for this anime (not when joining someone's room, where the host decides).
     val savedPref = remember(id) { if (joinRoom == null) prefsStore.getString("pref_$id", null)?.split("|") else null }
     var audio by remember { mutableStateOf(joinRoom?.audio ?: savedPref?.getOrNull(0)?.takeIf { it == "sub" || it == "dub" } ?: "sub") }
+    androidx.compose.runtime.DisposableEffect(Unit) { com.anibiar.app.social.LiveStats.setWatching(true); onDispose { com.anibiar.app.social.LiveStats.setWatching(false) } }
     var ep by remember { mutableIntStateOf(startEp.coerceAtLeast(0)) }
     var watch by remember { mutableStateOf<WatchPayload?>(null) }
     var watchError by remember { mutableStateOf<String?>(null) }

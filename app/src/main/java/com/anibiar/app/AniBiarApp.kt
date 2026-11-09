@@ -34,6 +34,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         com.anibiar.app.data.Diag.init(this)
         Http.init(this)
         com.anibiar.app.data.AppState.init(this)
+        com.anibiar.app.social.LiveStats.start(this, appScope)
         social.start()
         // "Continue watching" follows the account: push every change (at most one per anime every 20 s), pull when logging in.
         val lastPush = java.util.concurrent.ConcurrentHashMap<Int, Long>()

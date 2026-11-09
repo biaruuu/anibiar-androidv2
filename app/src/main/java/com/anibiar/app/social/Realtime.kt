@@ -6,6 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -14,6 +16,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -46,13 +49,17 @@ class Realtime(private val scope: CoroutineScope) {
         @Volatile var joinRef = ""
         val queue = ArrayDeque<String>()
         var users = 0
+        @Volatile var presenceKey = ""
+        @Volatile var track: JsonObject? = null
+        /** Who is on the channel right now: presence key to the state that device is tracking. */
+        val presence = MutableStateFlow<Map<String, JsonObject>>(emptyMap())
     }
 
     /** Joins [name] (shared by everyone who uses the same name) and returns its message flow. */
-    fun join(name: String): SharedFlow<Broadcast> {
+    fun join(name: String, presenceKey: String = "", track: JsonObject? = null): SharedFlow<Broadcast> {
         val topic = "realtime:$name"
         val c = channels.getOrPut(topic) { Chan(topic) }
-        synchronized(c) { c.users++ }
+        synchronized(c) { c.users++; if (presenceKey.isNotEmpty()) c.presenceKey = presenceKey; if (track != null) c.track = track }
         ensureRunning()
         if (open) sendJoin(c)
         return c.incoming
@@ -66,6 +73,20 @@ class Realtime(private val scope: CoroutineScope) {
             channels.remove(topic)
             if (open) socket?.send(frame(topic, "phx_leave", JsonObject(emptyMap()), joinRef = c.joinRef))
         }
+    }
+
+    fun presence(name: String): StateFlow<Map<String, JsonObject>>? = channels["realtime:$name"]?.presence
+
+    /** Changes what this device announces on the channel (sent now if joined, else on join). */
+    fun track(name: String, payload: JsonObject) {
+        val c = channels["realtime:$name"] ?: return
+        c.track = payload
+        if (c.joined && open) sendTrack(c)
+    }
+
+    private fun sendTrack(c: Chan) {
+        val p = c.track ?: return
+        socket?.send(frame(c.topic, "presence", buildJsonObject { put("type", "presence"); put("event", "track"); put("payload", p) }, null))
     }
 
     /** Sends a broadcast; queued until the channel is joined. */
@@ -101,7 +122,7 @@ class Realtime(private val scope: CoroutineScope) {
         val payload = buildJsonObject {
             put("config", buildJsonObject {
                 put("broadcast", buildJsonObject { put("self", false); put("ack", false) })
-                put("presence", buildJsonObject { put("key", "") })
+                put("presence", buildJsonObject { put("key", c.presenceKey) })
                 put("private", false)
             })
         }
@@ -137,7 +158,7 @@ class Realtime(private val scope: CoroutineScope) {
                 }
                 closed.await()
                 hb.cancel(); open = false
-                channels.values.forEach { it.joined = false }
+                channels.values.forEach { it.joined = false; it.presence.value = emptyMap() }
                 if (kicked) { kicked = false; backoff = 500L } else { delay(backoff); backoff = (backoff * 2).coerceAtMost(5000) }
             }
         }
@@ -155,7 +176,20 @@ class Realtime(private val scope: CoroutineScope) {
                         c.joined = true
                         while (c.queue.isNotEmpty()) socket?.send(c.queue.removeFirst())
                     }
+                    sendTrack(c)
                 }
+            }
+            "presence_state" -> {
+                val p = o["payload"]?.jsonObject ?: return
+                c.presence.value = p.mapValues { (_, v) -> v.jsonObject["metas"]?.jsonArray?.lastOrNull()?.jsonObject ?: JsonObject(emptyMap()) }
+            }
+            "presence_diff" -> {
+                val p = o["payload"]?.jsonObject ?: return
+                val m = c.presence.value.toMutableMap()
+                // Leaves first: a changed state arrives as a leave plus a join in one diff.
+                p["leaves"]?.jsonObject?.keys?.forEach { m.remove(it) }
+                p["joins"]?.jsonObject?.forEach { (k, v) -> m[k] = v.jsonObject["metas"]?.jsonArray?.lastOrNull()?.jsonObject ?: JsonObject(emptyMap()) }
+                c.presence.value = m
             }
             "phx_error", "phx_close" -> if (open) sendJoin(c)
             "broadcast" -> {

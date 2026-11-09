@@ -16,16 +16,17 @@ import java.net.InetAddress
 
 /** Whether the app is on screen, and a counter that ticks every time the network comes back. */
 object AppState {
-    @Volatile var foreground = false
-        private set
+    private val _fg = MutableStateFlow(false)
+    val fg: StateFlow<Boolean> = _fg
+    val foreground: Boolean get() = _fg.value
     private val _netUp = MutableStateFlow(0)
     val netUp: StateFlow<Int> = _netUp
     private var started = 0
 
     fun init(app: Application) {
         app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
-            override fun onActivityStarted(a: Activity) { started++; foreground = true; FrameMonitor.start() }
-            override fun onActivityStopped(a: Activity) { started = (started - 1).coerceAtLeast(0); if (started == 0) { foreground = false; FrameMonitor.stop() } }
+            override fun onActivityStarted(a: Activity) { started++; _fg.value = true; FrameMonitor.start() }
+            override fun onActivityStopped(a: Activity) { started = (started - 1).coerceAtLeast(0); if (started == 0) { _fg.value = false; FrameMonitor.stop() } }
             override fun onActivityCreated(a: Activity, b: Bundle?) {}
             override fun onActivityResumed(a: Activity) {}
             override fun onActivityPaused(a: Activity) {}

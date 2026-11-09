@@ -432,3 +432,6 @@
 
 ## 94 | Profile cleanup | 2026-11-10
 - Removed the watch stats card from your profile
+
+## 95 | Live Online and Watching | 2026-11-10
+- Home now shows a live "Watching | Online" box: how many people have the app open and how many are watching a video right now, updating in real time
