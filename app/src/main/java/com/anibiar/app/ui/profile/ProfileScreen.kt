@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -657,6 +659,23 @@ private fun StatsCard() {
                         Box(Modifier.fillMaxWidth(secs.toFloat() / top).fillMaxHeight().background(Ani.Lavender))
                     }
                 }
+            }
+        }
+        val badges = listOfNotNull(
+            if (s.total > 0) "🎬 First episode" else null,
+            if (s.total >= 10 * 3600) "⏱ 10 hours" else null,
+            if (s.total >= 50 * 3600) "⏱ 50 hours" else null,
+            if (s.total >= 100 * 3600) "🏆 100 hours" else null,
+            if (s.bestStreak >= 7) "🔥 7-day streak" else null,
+            if (s.bestStreak >= 30) "🔥 30-day streak" else null,
+            if (s.shows >= 10) "📚 10 anime" else null,
+            if (s.shows >= 25) "📚 25 anime" else null,
+            s.genres.firstOrNull()?.takeIf { it.second >= 20 * 3600 }?.let { "⭐ ${it.first} fan" },
+        )
+        if (badges.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                badges.forEach { b -> Text(b, style = inter(12.5f, FontWeight.Medium), color = Color.White, modifier = Modifier.clip(RoundedCornerShape(14.dp)).background(Color(0x22FFFFFF)).padding(horizontal = 10.dp, vertical = 6.dp)) }
             }
         }
         if (s.bestStreak > 1) Text("Best streak: ${s.bestStreak} days", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 10.dp))

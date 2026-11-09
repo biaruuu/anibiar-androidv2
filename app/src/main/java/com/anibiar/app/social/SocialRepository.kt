@@ -23,6 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -75,6 +76,7 @@ data class UserProfile(
     val avatarDeco: String? = null,
     val profileEffect: String? = null,
     val profileTheme: String? = null,
+    val shareActivity: Boolean = true,
 ) {
     /** The name people see: the display name if set, otherwise the username. */
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
@@ -409,6 +411,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         avatarDeco = o["avatar_deco"]?.jsonPrimitive?.contentOrNull,
         profileEffect = o["profile_effect"]?.jsonPrimitive?.contentOrNull,
         profileTheme = o["profile_theme"]?.jsonPrimitive?.contentOrNull,
+        shareActivity = o["share_activity"]?.jsonPrimitive?.booleanOrNull ?: true,
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -429,7 +432,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme,share_activity"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -807,6 +810,99 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             put("status_emoji", if (e.isEmpty()) JsonNull else JsonPrimitive(e))
         })
     }
+
+    // ---- Friends hub: activity feed and shared lists ----
+
+    suspend fun setShareActivity(on: Boolean) = net { patchProfile(buildJsonObject { put("share_activity", on) }) }
+
+    /** What my friends watched recently. Friends who turned sharing off never appear (the database enforces it). */
+    suspend fun friendActivity(): List<FriendActivity> = net {
+        val me = session?.uid ?: return@net emptyList()
+        val friends = getRows("/rest/v1/friend_requests?status=eq.accepted&or=(requester_id.eq.$me,addressee_id.eq.$me)&select=requester_id,addressee_id").map {
+            val o = it.jsonObject; val a = o["requester_id"]!!.jsonPrimitive.content; val b = o["addressee_id"]!!.jsonPrimitive.content
+            if (a == me) b else a
+        }
+        if (friends.isEmpty()) return@net emptyList()
+        val rows = getRows("/rest/v1/watch_progress?user_id=in.(${friends.joinToString(",")})&select=user_id,media_id,title,image,episode,progress,updated_at&order=updated_at.desc&limit=50")
+        val people = profiles(friends).associateBy { it.uid }
+        rows.mapNotNull { r ->
+            val o = r.jsonObject
+            val u = people[o["user_id"]!!.jsonPrimitive.content] ?: return@mapNotNull null
+            FriendActivity(
+                u, o["media_id"]!!.jsonPrimitive.content.toInt(), o["title"]?.jsonPrimitive?.contentOrNull.orEmpty(), o["image"]?.jsonPrimitive?.contentOrNull,
+                o["episode"]!!.jsonPrimitive.content.toInt(), o["progress"]!!.jsonPrimitive.content.toFloat(), isoMs(o["updated_at"]?.jsonPrimitive?.contentOrNull),
+            )
+        }
+    }
+
+    suspend fun myLists(): List<SharedList> = net {
+        val me = session?.uid ?: return@net emptyList()
+        getRows("/rest/v1/shared_lists?select=id,name,owner&order=created_at.desc").map {
+            val o = it.jsonObject; val owner = o["owner"]!!.jsonPrimitive.content
+            SharedList(o["id"]!!.jsonPrimitive.content, o["name"]!!.jsonPrimitive.content, owner, owner == me)
+        }
+    }
+
+    suspend fun createList(name: String) = net {
+        val (code, text) = raw("POST", "/rest/v1/shared_lists", buildJsonObject { put("name", name.trim().take(60)) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (code !in 200..299) fail(code, text)
+    }
+
+    suspend fun deleteList(id: String) = net { raw("DELETE", "/rest/v1/shared_lists?id=eq.$id"); Unit }
+    suspend fun leaveList(id: String) = net { val me = session?.uid ?: return@net; raw("DELETE", "/rest/v1/shared_list_members?list_id=eq.$id&user_id=eq.$me"); Unit }
+
+    suspend fun listItems(listId: String): List<ListItem> = net {
+        val me = session?.uid
+        val votes = getRows("/rest/v1/shared_list_votes?list_id=eq.$listId&select=media_id,user_id").groupBy({ it.jsonObject["media_id"]!!.jsonPrimitive.content.toInt() }, { it.jsonObject["user_id"]!!.jsonPrimitive.content })
+        getRows("/rest/v1/shared_list_items?list_id=eq.$listId&select=media_id,title,image,added_by&order=created_at.asc").map {
+            val o = it.jsonObject; val id = o["media_id"]!!.jsonPrimitive.content.toInt()
+            ListItem(id, o["title"]!!.jsonPrimitive.content, o["image"]?.jsonPrimitive?.contentOrNull, o["added_by"]!!.jsonPrimitive.content, votes[id]?.size ?: 0, me != null && votes[id]?.contains(me) == true)
+        }.sortedByDescending { it.votes }
+    }
+
+    suspend fun addToList(listId: String, mediaId: Int, title: String, image: String?) = net {
+        val (code, text) = raw(
+            "POST", "/rest/v1/shared_list_items?on_conflict=list_id,media_id",
+            buildJsonObject { put("list_id", listId); put("media_id", mediaId); put("title", title.take(200)); put("image", if (image == null) JsonNull else JsonPrimitive(image.take(600))) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"),
+        )
+        if (code !in 200..299) fail(code, text)
+    }
+
+    suspend fun removeFromList(listId: String, mediaId: Int) = net { raw("DELETE", "/rest/v1/shared_list_items?list_id=eq.$listId&media_id=eq.$mediaId"); Unit }
+
+    suspend fun vote(listId: String, mediaId: Int, on: Boolean) = net {
+        val me = session?.uid ?: throw IllegalStateException("Log in to vote.")
+        val (code, text) = if (on) raw(
+            "POST", "/rest/v1/shared_list_votes?on_conflict=list_id,media_id,user_id",
+            buildJsonObject { put("list_id", listId); put("media_id", mediaId); put("user_id", me) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"),
+        ) else raw("DELETE", "/rest/v1/shared_list_votes?list_id=eq.$listId&media_id=eq.$mediaId&user_id=eq.$me")
+        if (code !in 200..299) fail(code, text)
+    }
+
+    suspend fun listMembers(listId: String): Set<String> = net {
+        getRows("/rest/v1/shared_list_members?list_id=eq.$listId&select=user_id").map { it.jsonObject["user_id"]!!.jsonPrimitive.content }.toSet()
+    }
+
+    suspend fun inviteToList(listId: String, userId: String) = net {
+        val (code, text) = raw(
+            "POST", "/rest/v1/shared_list_members?on_conflict=list_id,user_id",
+            buildJsonObject { put("list_id", listId); put("user_id", userId) }.toString().toByteArray(),
+            extra = mapOf("Prefer" to "return=minimal,resolution=ignore-duplicates"),
+        )
+        if (code !in 200..299) fail(code, text)
+        runCatching { nudge() }
+    }
+
+    suspend fun myFriendIds(): List<String> = net {
+        val me = session?.uid ?: return@net emptyList()
+        getRows("/rest/v1/friend_requests?status=eq.accepted&or=(requester_id.eq.$me,addressee_id.eq.$me)&select=requester_id,addressee_id").map {
+            val o = it.jsonObject; val a = o["requester_id"]!!.jsonPrimitive.content; val b = o["addressee_id"]!!.jsonPrimitive.content
+            if (a == me) b else a
+        }
+    }
+
     suspend fun setLook(deco: String?, effect: String?, theme: String? = null) = net {
         patchProfile(buildJsonObject {
             put("avatar_deco", if (deco == null) JsonNull else JsonPrimitive(deco))

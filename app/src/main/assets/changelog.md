@@ -384,3 +384,8 @@
 
 ## 85 | Voice messages | 2026-11-09
 - Send voice notes in chat: tap the mic, talk, tap send. Messages show a waveform and play in place
+
+## 86 | Friends hub and badges | 2026-11-09
+- New Friends screen on Home: see what your friends are watching (turn sharing off any time)
+- Shared lists: make a list with friends, add anime and vote on what to watch next
+- Profile badges for watch time, streaks and how many anime you've watched
