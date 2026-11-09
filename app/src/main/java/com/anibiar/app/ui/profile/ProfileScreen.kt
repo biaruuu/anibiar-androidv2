@@ -247,7 +247,6 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                 }
             }
-            if (isMe) item(key = "stats") { StatsCard() }
             item(key = "fav-tabs") {
                 Box(Modifier.fillMaxWidth().height(50.dp)) {
                     Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Ani.Border))
