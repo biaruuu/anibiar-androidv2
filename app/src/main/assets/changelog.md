@@ -403,3 +403,8 @@
 - New episode alerts (Settings, off by default), Clear image cache, anonymous daily health report (can be turned off)
 - Slow frames are logged to Diagnostics; search index is cached
 
+
+## 89 | Netflix-style captions | 2026-11-09
+- New "Netflix" caption style, now the default: white medium-weight text, soft drop shadow, no outline or box
+- Long lines are split into two balanced lines
+- Removed the unused comment and shared-list tables from the server

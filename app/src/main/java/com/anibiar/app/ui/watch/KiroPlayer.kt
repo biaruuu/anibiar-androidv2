@@ -124,7 +124,7 @@ private fun isEnglishTrack(lang: String, label: String): Boolean {
     val l = lang.trim().lowercase(); val n = label.trim().lowercase()
     return l == "en" || l == "eng" || l.startsWith("en-") || l.startsWith("en_") || n.startsWith("english") || n == "eng" || n.startsWith("en ")
 }
-private val CAPTION_STYLES = listOf("Outline", "Dark box", "Yellow outline", "Soft shadow")
+private val CAPTION_STYLES = listOf("Outline", "Dark box", "Yellow outline", "Netflix")
 private val CAPTION_SIZES = listOf("Normal", "Large", "Extra large", "Small")
 private val CAPTION_SCALE = listOf(1f, 1.2f, 1.45f, 0.85f)
 private fun offsetLabel(ms: Int) = if (ms == 0) "In sync" else (if (ms > 0) "+" else "-") + "%.1f s".format(kotlin.math.abs(ms) / 1000f)
@@ -215,7 +215,7 @@ fun KiroPlayer(
     // Caption look and the quality you chose last time are remembered between videos.
     val capPrefs = remember { context.getSharedPreferences("caption_prefs", Context.MODE_PRIVATE) }
     var captionSize by remember { mutableIntStateOf(capPrefs.getInt("size", 0).coerceIn(0, CAPTION_SIZES.lastIndex)) }
-    var captionStyle by remember { mutableIntStateOf(capPrefs.getInt("style", 0).coerceIn(0, CAPTION_STYLES.lastIndex)) }
+    var captionStyle by remember { mutableIntStateOf(capPrefs.getInt("style", 3).coerceIn(0, CAPTION_STYLES.lastIndex)) }
     /** Caption timing fix in ms: positive = captions appear later, negative = earlier. Resets for each video. */
     var capOffset by remember { mutableIntStateOf(0) }
     // Once you change captions yourself, the host's caption settings stop overriding yours.
@@ -577,12 +577,20 @@ fun KiroPlayer(
         // Captions
         val active = Captions.activeLine(cues, (timeMs - capOffset) / 1000.0)
         if (active != null) {
-            val (line, italic) = active
-            val base = ((h.value * 0.058f).coerceIn(14.5f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
-            val face = inter(base, FontWeight.Bold, lineHeight = base * 1.28f).copy(
+            val (rawLine, italic) = active
+            // Netflix breaks long lines into two balanced ones (about 42 characters at most per line).
+            val line = if ('\n' in rawLine || rawLine.length <= 36) rawLine else {
+                val mid = rawLine.length / 2
+                val cut = (0 until rawLine.length).filter { rawLine[it] == ' ' }.minByOrNull { kotlin.math.abs(it - mid) }
+                if (cut == null) rawLine else rawLine.substring(0, cut) + "\n" + rawLine.substring(cut + 1)
+            }
+            val netflix = captionStyle == 3
+            val base = ((h.value * (if (netflix) 0.052f else 0.058f)).coerceIn(14f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
+            val face = inter(base, if (netflix) FontWeight.Medium else FontWeight.Bold, lineHeight = base * (if (netflix) 1.22f else 1.28f)).copy(
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center,
                 color = if (captionStyle == 2) Color(0xFFFFE066) else Color.White, letterSpacing = (base * 0.008f).sp,
-                shadow = if (captionStyle == 3) androidx.compose.ui.graphics.Shadow(Color(0xE6000000), androidx.compose.ui.geometry.Offset(2f, 2f), base * 0.35f) else null,
+                // Netflix look: plain white text with a soft dark drop shadow, no outline and no box.
+                shadow = if (netflix) androidx.compose.ui.graphics.Shadow(Color(0xF2000000), androidx.compose.ui.geometry.Offset(base * 0.05f, base * 0.08f), base * 0.22f) else null,
             )
             // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
             val lifted = aCtl > 0.5f
@@ -594,7 +602,9 @@ fun KiroPlayer(
                     val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
                     Text(line, style = face.copy(color = Color(0xFF0A0A0C), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round, miter = 2f)))
                     Text(line, style = face)
-                } else if (captionStyle == 3) {
+                } else if (netflix) {
+                    // Two passes of the shadowed text give the shadow the depth Netflix has on bright scenes.
+                    Text(line, style = face)
                     Text(line, style = face)
                 } else {
                     Text(
