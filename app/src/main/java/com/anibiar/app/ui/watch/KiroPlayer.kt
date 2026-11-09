@@ -53,6 +53,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -531,7 +533,7 @@ fun KiroPlayer(
         Box(
             Modifier.fillMaxSize().pointerInput(Unit) {
                 var side = 0
-                androidx.compose.foundation.gestures.detectVerticalDragGestures(
+                detectVerticalDragGestures(
                     onDragStart = { o -> side = if (o.x < size.width / 2) 0 else 1 },
                     onDragEnd = { hud = null }, onDragCancel = { hud = null },
                 ) { _, dy ->

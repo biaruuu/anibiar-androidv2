@@ -111,7 +111,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onSchedule: () -> Unit = {}, onDownloads: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onSchedule: () -> Unit = {}, onDownloads: () -> Unit = {}, onExplore: () -> Unit = {}, onTracker: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -136,6 +136,8 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) 
         onWatch = onWatch,
         onSchedule = onSchedule,
         onDownloads = onDownloads,
+        onExplore = onExplore,
+        onTracker = onTracker,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -151,6 +153,8 @@ private fun HomeContent(
     onWatch: (Int) -> Unit,
     onSchedule: () -> Unit,
     onDownloads: () -> Unit,
+    onExplore: () -> Unit,
+    onTracker: () -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -312,6 +316,19 @@ private fun HomeContent(
                                 Text("This week in your time, with reminders", style = inter(13f), color = Ani.Muted)
                             }
                             Icon(AniIcons.ChevronRight, null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
+                        }
+                    }
+
+                    item(key = "explore-entry") {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            listOf("Explore" to "By mood or genre", "My shows" to "What to catch up on").forEachIndexed { i, (t, sub) ->
+                                Column(
+                                    Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).background(Ani.Item).clickable { if (i == 0) onExplore() else onTracker() }.padding(14.dp),
+                                ) {
+                                    Text(t, style = inter(16f, FontWeight.SemiBold))
+                                    Text(sub, style = inter(12.5f), color = Ani.Muted, maxLines = 1)
+                                }
+                            }
                         }
                     }
 

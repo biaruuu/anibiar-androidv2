@@ -376,3 +376,8 @@
 - Leave the app while watching and the video keeps playing in a floating picture-in-picture window
 - The next episode is warmed up while you watch, so it starts faster
 - Optional: auto-download the next 3 episodes on Wi-Fi and delete watched downloads (Settings, App)
+
+## 84 | Explore, My shows and widget | 2026-11-09
+- Explore: pick a mood (Hype, Chill, Funny, Emotional...) and how long you want to watch, or browse by genre
+- My shows: what you're behind on for airing anime, what to keep watching, what you haven't touched in 30+ days (drop it) and your plan-to-watch list
+- Home-screen widget showing your last three shows and the next episode to air from your reminders

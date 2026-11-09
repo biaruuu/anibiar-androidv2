@@ -56,6 +56,8 @@ class AniBiarApp : Application(), ImageLoaderFactory {
                 history.load().filter { (known[it.mediaId]?.at ?: -1L) < it.at }.forEach { social.pushProgress(it) }
             }
         }
+        // Keep the home-screen widget in step with what you watch (at most every 10 s).
+        appScope.launch { history.version.collect { ContinueWidget.refresh(this@AniBiarApp); kotlinx.coroutines.delay(10_000) } }
         // Re-plan episode reminders from the fresh schedule.
         appScope.launch { runCatching { if (reminders.ids.value.isNotEmpty()) reminders.plan(repository.fetchSchedule()) } }
         // Build the network stack and warm image caches off the main thread while the UI starts.

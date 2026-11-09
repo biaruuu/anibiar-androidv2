@@ -22,6 +22,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AniBiar">
         <service android:name=".data.OfflineService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <receiver android:name=".ContinueWidget" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/continue_widget_info" />
+        </receiver>
         <receiver android:name=".data.ReminderReceiver" android:exported="false" />
         <service android:name=".social.CallService" android:exported="false" android:foregroundServiceType="microphone" />
 
