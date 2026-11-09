@@ -226,7 +226,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -344,7 +344,7 @@ private fun AppNavigation() {
                         id = watchId, startEp = watchEp, onBack = { watchId = 0 }, joinRoom = joinRoom,
                         onRoomMoved = { r -> joinRoom = r; watchEp = r.episode; watchId = r.animeId },
                         onOpenDetails = { aid -> watchId = 0; if (stack.lastOrNull() != aid) stack.add(aid) },
-                        onWatch = { aid -> joinRoom = null; watchEp = 1; watchId = aid },
+                        onWatch = { aid -> joinRoom = null; watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(aid); watchId = aid },
                     )
                 }
             }

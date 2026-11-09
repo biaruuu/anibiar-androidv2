@@ -26,6 +26,12 @@ class WatchHistory(context: Context) {
     var listener: Listener? = null
     interface Listener { fun saved(item: HistoryItem); fun removed(mediaId: Int) }
 
+    /** Where to pick up this show: the saved episode, or the next one if that was nearly finished; 1 when never watched. */
+    fun resumeEpisode(mediaId: Int): Int {
+        val h = load().firstOrNull { it.mediaId == mediaId } ?: return 1
+        return if (h.progress >= 0.92f) h.episode + 1 else h.episode.coerceAtLeast(1)
+    }
+
     fun load(): List<HistoryItem> {
         val raw = prefs.getString(KEY, null) ?: return emptyList()
         return try {

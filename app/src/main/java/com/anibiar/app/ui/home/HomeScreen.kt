@@ -111,7 +111,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onContinue: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -132,6 +132,7 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) 
         onOpen = onOpen,
         onSearch = onSearch,
         onWatch = onWatch,
+        onContinue = onContinue,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -145,6 +146,7 @@ private fun HomeContent(
     onOpen: (Int) -> Unit,
     onSearch: () -> Unit,
     onWatch: (Int) -> Unit,
+    onContinue: (Int) -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -277,18 +279,8 @@ private fun HomeContent(
                         item(key = "continue") {
                             ContinueWatching(
                                 entries = state.history,
-                                onClick = { onOpen(it.mediaId) },
+                                onClick = { onContinue(it.mediaId) },
                                 onRemove = onRemoveHistory,
-                            )
-                        }
-                    }
-
-                    if (state.reco.size >= 4) {
-                        item(key = "reco") {
-                            RecoRow(
-                                title = state.recoBecause?.let { "Because you watched $it" } ?: "Recommended for you",
-                                items = state.reco,
-                                onClick = onOpen,
                             )
                         }
                     }

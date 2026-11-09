@@ -216,7 +216,7 @@ fun DetailsScreen(
                         posterWidth = posterW,
                         titleSize = titleSp,
                         inList = media.id in saved,
-                        onWatch = { onWatch(media.id, 1) },
+                        onWatch = { onWatch(media.id, app.history.resumeEpisode(media.id)) },
                         onToggleList = { app.watchlist.toggle(media.id) },
                         isFav = media.id in favIds,
                         onToggleFav = {

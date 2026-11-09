@@ -424,3 +424,8 @@
 - Photos are shrunk by the Rust core (smaller on mobile data, small files sent untouched) and keep the right way up
 - Text messages clear the box instantly and come back only if sending fails
 - Realtime (chat and Watch Together) reconnects the moment your network returns
+
+## 93 | Continue where you left off | 2026-11-10
+- Continue watching, the Watch button on Details and on Home, and switching seasons now open at the episode you were on (or the next one if you had nearly finished it) instead of episode 1
+- If the saved episode is past the last one listed, it opens the last episode instead of jumping back to the first
+- Removed the "Because you watched" row from Home

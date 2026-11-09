@@ -217,7 +217,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         if (audio == "dub" && e.dub.isEmpty()) audio = "sub"
         if (audio == "sub" && e.sub.isEmpty() && e.dub.isNotEmpty()) audio = "dub"
     }
-    LaunchedEffect(list, ep) { if (list.isNotEmpty() && list.none { it.number == ep }) ep = (list.firstOrNull { it.number >= startEp } ?: list.first()).number }
+    LaunchedEffect(list, ep) { if (list.isNotEmpty() && list.none { it.number == ep }) ep = (list.firstOrNull { it.number >= startEp } ?: list.last()).number }
     val current = list.firstOrNull { it.number == ep }
     val position = list.indexOfFirst { it.number == ep }
     val prev = list.getOrNull(position - 1)
