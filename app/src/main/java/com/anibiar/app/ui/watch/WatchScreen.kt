@@ -326,9 +326,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 com.anibiar.app.ui.theme.GlassBack(onBack)
                 Spacer(Modifier.width(12.dp))
                 Text(name, style = inter(16f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (room == null && current != null && ready) {
-                    DownloadButton(id, name, anime?.bannerImage ?: anime?.posterUrl, current.number, audio, stream)
-                }
             }
         }
         val landscape = androidx.compose.ui.platform.LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
@@ -345,9 +342,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 startAt = together?.resumeSeconds(current?.number),
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
                 onEnded = {
-                    if (room == null && current != null) scope.launch {
-                        runCatching { com.anibiar.app.data.Offline.afterWatched(context, id, name, anime?.bannerImage ?: anime?.posterUrl, audio, current.number, list.drop(position + 1)) }
-                    }
                     if (autoNext && next != null && !locked) select(next.number)
                 },
                 onFail = {

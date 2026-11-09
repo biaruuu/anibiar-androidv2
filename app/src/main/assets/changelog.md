@@ -389,3 +389,8 @@
 - New Friends screen on Home: see what your friends are watching (turn sharing off any time)
 - Shared lists: make a list with friends, add anime and vote on what to watch next
 - Profile badges for watch time, streaks and how many anime you've watched
+
+## 87 | Cleanup | 2026-11-09
+- Removed Airing schedule, Explore, My shows, Friends, Downloads, auto-download, delete watched downloads, the adult filter switch and App PIN lock
+- The adult option is back in Search filters as before
+- Back up and restore are still in Settings

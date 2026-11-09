@@ -72,15 +72,6 @@ class MainActivity : ComponentActivity() {
                 var splash by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
                 Box(Modifier.fillMaxSize()) {
                     AppNavigation()
-                    var locked by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.AppPrefs.hasPin(this@MainActivity)) }
-                    androidx.compose.runtime.DisposableEffect(Unit) {
-                        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
-                            if (ev == androidx.lifecycle.Lifecycle.Event.ON_STOP) com.anibiar.app.data.AppPrefs.markBackgrounded(this@MainActivity)
-                            if (ev == androidx.lifecycle.Lifecycle.Event.ON_START && com.anibiar.app.data.AppPrefs.needsUnlock(this@MainActivity)) locked = true
-                        }
-                        lifecycle.addObserver(obs); onDispose { lifecycle.removeObserver(obs) }
-                    }
-                    if (locked) com.anibiar.app.ui.settings.PinLockScreen { locked = false }
                     var crash by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(CrashLog.take(this@MainActivity)) }
                     crash?.let { report ->
                         androidx.compose.material3.AlertDialog(
@@ -138,11 +129,6 @@ private fun AppNavigation() {
     ) { mutableStateListOf() }
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
-    var scheduleOpen by rememberSaveable { mutableStateOf(false) }
-    var downloadsOpen by rememberSaveable { mutableStateOf(false) }
-    var exploreOpen by rememberSaveable { mutableStateOf(false) }
-    var hubOpen by rememberSaveable { mutableStateOf(false) }
-    var trackerOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var inboxOpen by rememberSaveable { mutableStateOf(false) }
@@ -240,7 +226,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id }, onSchedule = { scheduleOpen = true }, onDownloads = { downloadsOpen = true }, onExplore = { exploreOpen = true }, onTracker = { trackerOpen = true }, onFriends = { hubOpen = true })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = 1; watchId = id })
 
         if (searchOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
@@ -287,36 +273,6 @@ private fun AppNavigation() {
                 } else {
                     com.anibiar.app.ui.auth.AuthScreen(onClose = { profileOpen = false })
                 }
-            }
-        }
-
-        if (hubOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.hub.FriendsHubScreen(onBack = { hubOpen = false }, onOpenAnime = { id -> stack.add(id) }, onOpenUser = { u -> userStack.add(u) }, backEnabled = stack.isEmpty())
-            }
-        }
-
-        if (exploreOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.explore.ExploreScreen(onBack = { exploreOpen = false }, onOpen = { id -> stack.add(id) }, backEnabled = stack.isEmpty())
-            }
-        }
-
-        if (trackerOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.tracker.TrackerScreen(onBack = { trackerOpen = false }, onOpen = { id -> stack.add(id) }, backEnabled = stack.isEmpty())
-            }
-        }
-
-        if (downloadsOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.downloads.DownloadsScreen(onBack = { downloadsOpen = false })
-            }
-        }
-
-        if (scheduleOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
-                com.anibiar.app.ui.schedule.ScheduleScreen(onBack = { scheduleOpen = false }, onOpen = { id -> stack.add(id) }, backEnabled = stack.isEmpty())
             }
         }
 
@@ -438,7 +394,7 @@ private fun AppNavigation() {
         val noticeUnread by social.unread.collectAsStateWithLifecycle()
         // Floating glass tab bar, only on the Home level (a details page slides over it).
         androidx.compose.animation.AnimatedVisibility(
-            visible = stack.isEmpty() && !scheduleOpen && !downloadsOpen && !exploreOpen && !trackerOpen && !hubOpen && !inboxOpen && !inboxTab && !profileOpen && !settingsOpen && userStack.isEmpty() && chatUid == null && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
+            visible = stack.isEmpty() && !inboxOpen && !inboxTab && !profileOpen && !settingsOpen && userStack.isEmpty() && chatUid == null && watchId == 0 && !com.anibiar.app.ui.theme.NavState.hidden,
             modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             enter = androidx.compose.animation.slideInVertically { it } + fadeIn(),
             exit = androidx.compose.animation.slideOutVertically { it } + fadeOut(),

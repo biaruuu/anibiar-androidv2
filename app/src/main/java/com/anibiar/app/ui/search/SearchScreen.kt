@@ -206,10 +206,10 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                             FilterDropdown("Source", null, SOURCES, setOfNotNull(filters.source), false) { viewModel.setFilters(filters.copy(source = it.firstOrNull())) },
                             FilterDropdown("Country", null, COUNTRIES, setOfNotNull(filters.country), false) { viewModel.setFilters(filters.copy(country = it.firstOrNull())) },
                         )
-                        val adultOn = com.anibiar.app.data.AppPrefs.allowAdult(androidx.compose.ui.platform.LocalContext.current)
-                        val adultDd = FilterDropdown("Non-adult", null, ADULT, setOf(filters.adult), false, sortStyle = true, clearable = false) { viewModel.setFilters(filters.copy(adult = it.firstOrNull() ?: "NON")) }
-                        val scoreDd = FilterDropdown("Score", AniIcons.Star, SCORES, setOfNotNull(filters.score?.toString()), false) { viewModel.setFilters(filters.copy(score = it.firstOrNull()?.toInt())) }
-                        FilterRow(if (adultOn) adultDd else scoreDd, if (adultOn) scoreDd else null)
+                        FilterRow(
+                            FilterDropdown("Non-adult", null, ADULT, setOf(filters.adult), false, sortStyle = true, clearable = false) { viewModel.setFilters(filters.copy(adult = it.firstOrNull() ?: "NON")) },
+                            FilterDropdown("Score", AniIcons.Star, SCORES, setOfNotNull(filters.score?.toString()), false) { viewModel.setFilters(filters.copy(score = it.firstOrNull()?.toInt())) },
+                        )
                         FilterRow(
                             FilterDropdown("Season", null, SEASONS, setOfNotNull(filters.season), false) { viewModel.setFilters(filters.copy(season = it.firstOrNull())) },
                             null,

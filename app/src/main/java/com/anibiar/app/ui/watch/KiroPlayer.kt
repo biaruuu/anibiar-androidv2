@@ -166,12 +166,7 @@ fun KiroPlayer(
                 else spec.withAdditionalHeaders(mapOf("Referer" to ref, "Origin" to ref.trimEnd('/'), "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"))
             },
         )
-        // Read-only view of the offline cache: saved episodes play without a network, everything else streams as before.
-        val http = androidx.media3.datasource.cache.CacheDataSource.Factory()
-            .setCache(com.anibiar.app.data.Offline.cache(context))
-            .setUpstreamDataSourceFactory(upstream)
-            .setCacheWriteDataSinkFactory(null)
-            .setFlags(androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+        val http = upstream
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(androidx.media3.exoplayer.source.DefaultMediaSourceFactory(http))
             .setBandwidthMeter(

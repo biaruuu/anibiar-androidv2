@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.widget.RemoteViews
-import com.anibiar.app.data.displayTitle
 
 /** Home-screen widget: the last three things you were watching, plus the next episode of a followed show to air. */
 class ContinueWidget : AppWidgetProvider() {
@@ -30,17 +29,6 @@ class ContinueWidget : AppWidgetProvider() {
                 val h = items.getOrNull(i)
                 v.setTextViewText(id, if (h != null) "${h.title}  ·  Ep ${h.episode}" else if (i == 0) "Nothing yet. Start watching in Kiro." else "")
             }
-            val now = System.currentTimeMillis() / 1000
-            val soon = runCatching {
-                val ids = app.reminders.ids.value
-                app.catalog.all().filter { it.id in ids }
-                    .mapNotNull { m -> m.nextAiringEpisode?.let { n -> if (n.airingAt != null && n.episode != null && n.airingAt > now) Triple(m, n.episode, n.airingAt) else null } }
-                    .minByOrNull { it.third }
-            }.getOrNull()
-            v.setTextViewText(R.id.w_air, soon?.let { (m, ep, at) ->
-                val mins = ((at - now) / 60).coerceAtLeast(0)
-                "Next: ${m.displayTitle} ep $ep in ${if (mins >= 1440) "${mins / 1440}d" else if (mins >= 60) "${mins / 60}h" else "${mins}m"}"
-            } ?: "")
             val open = PendingIntent.getActivity(
                 context, 0, context.packageManager.getLaunchIntentForPackage(context.packageName),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

@@ -117,7 +117,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 f.season?.let { put("season", it) }
                 f.country?.let { put("country", it) }
                 f.source?.let { put("source", it) }
-                when (if (com.anibiar.app.data.AppPrefs.allowAdult(getApplication())) f.adult else "NON") { "NON" -> put("adult", false); "ADULT" -> put("adult", true) }
+                when (f.adult) { "NON" -> put("adult", false); "ADULT" -> put("adult", true) }
                 f.score?.let { put("score", it) }
             }
             try {

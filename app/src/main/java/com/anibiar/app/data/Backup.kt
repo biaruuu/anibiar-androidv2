@@ -3,9 +3,9 @@ package com.anibiar.app.data
 import android.content.Context
 import kotlinx.serialization.json.*
 
-/** One file with everything that lives only on this phone: history, watchlist, preferences, reminders. Never includes login or PIN. */
+/** One file with everything that lives only on this phone: history, watchlist, preferences. Never includes login or PIN. */
 object Backup {
-    private val files = listOf("watch_history", "watchlist", "watch_prefs", "caption_prefs", "reminders")
+    private val files = listOf("watch_history", "watchlist", "watch_prefs", "caption_prefs")
 
     fun export(c: Context): String {
         val root = buildJsonObject {

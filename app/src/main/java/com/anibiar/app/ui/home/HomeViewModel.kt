@@ -26,7 +26,6 @@ data class HomeUiState(
     val history: List<HistoryItem> = emptyList(),
     val reco: List<Media> = emptyList(),
     val recoBecause: String? = null,
-    val downloads: Int = 0,
     val offline: Boolean = false,
     val art: Map<Int, TmdbArt> = emptyMap(),
     val loading: Boolean = true,
@@ -58,7 +57,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun load() {
         viewModelScope.launch {
-            _state.update { it.copy(downloads = com.anibiar.app.data.Offline.items(app).size) }
             _state.update { it.copy(loading = it.hero.isEmpty() && it.latest.isEmpty(), error = null, history = history.load()) }
 
             // 1) Show whatever we cached last time, instantly.
