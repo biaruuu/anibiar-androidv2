@@ -70,7 +70,35 @@ fun AppToolRows(context: Context, toast: (String) -> Unit) {
         }.onSuccess { restoreNote = "Restored $it items." }.onFailure { toast(it.message ?: "Couldn't read that file") }
     }
 
+    var alerts by remember { mutableStateOf(com.anibiar.app.data.NewEpisodeWorker.enabled(context)) }
+    var health by remember { mutableStateOf(com.anibiar.app.data.Health.enabled(context)) }
+    var cacheSize by remember { mutableStateOf("…") }
+    var cacheTick by remember { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(cacheTick) {
+        cacheSize = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val bytes = context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            if (bytes >= 1_048_576) "${bytes / 1_048_576} MB" else "${bytes / 1024} KB"
+        }
+    }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        if (ok) { alerts = true; com.anibiar.app.data.NewEpisodeWorker.set(context, true) } else toast("Allow notifications to get alerts")
+    }
+
+    SwitchRow("New episode alerts", "Tells you when a show you watch or saved has a new episode", alerts) { on ->
+        if (!on) { alerts = false; com.anibiar.app.data.NewEpisodeWorker.set(context, false) }
+        else if (android.os.Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) ask.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        else { alerts = true; com.anibiar.app.data.NewEpisodeWorker.set(context, true) }
+    }
+    SettingsDivider()
     SwitchRow("Data saver", "Caps video at 480p on mobile data", saver) { saver = it; AppPrefs.setDataSaver(context, it) }
+    SettingsDivider()
+    SwitchRow("Anonymous health report", "Once a day: app version, device model and error counts. No account info", health) { health = it; com.anibiar.app.data.Health.setEnabled(context, it) }
+    SettingsDivider()
+    ToolRow("Clear image cache", cacheSize) {
+        runCatching { coil.Coil.imageLoader(context).let { it.memoryCache?.clear(); it.diskCache?.clear() } }
+        cacheTick++
+        toast("Cache cleared")
+    }
     SettingsDivider()
     ToolRow("Back up my data") { save.launch("kiro-backup.json") }
     SettingsDivider()

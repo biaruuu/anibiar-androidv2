@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
@@ -46,9 +47,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         load()
         viewModelScope.launch { history.version.collect { _state.update { it.copy(history = history.load()) }; recommend() } }
         viewModelScope.launch { app.watchlist.ids.collect { recommend() } }
+        // Connection came back: reload straight away instead of waiting for the next tick.
+        viewModelScope.launch { com.anibiar.app.data.AppState.netUp.drop(1).collect { load() } }
     }
 
     fun refresh() = load()
+
+    private var loadedAt = 0L
+    /** Refreshes only when the data is older than [maxAgeMs]: called every time Home comes back on screen. */
+    fun refreshIfStale(maxAgeMs: Long) { if (System.currentTimeMillis() - loadedAt > maxAgeMs) load() }
 
     fun removeFromHistory(item: HistoryItem) {
         history.remove(item.mediaId)
@@ -56,6 +63,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun load() {
+        loadedAt = System.currentTimeMillis()
         viewModelScope.launch {
             _state.update { it.copy(loading = it.hero.isEmpty() && it.latest.isEmpty(), error = null, history = history.load()) }
 

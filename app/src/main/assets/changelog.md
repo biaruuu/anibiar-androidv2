@@ -394,3 +394,12 @@
 - Removed Airing schedule, Explore, My shows, Friends, Downloads, auto-download, delete watched downloads, the adult filter switch and App PIN lock
 - The adult option is back in Search filters as before
 - Back up and restore are still in Settings
+
+## 88 | Speed and live data | 2026-11-09
+- Faster, steadier network: connection reuse, quick retry on flaky connections, hosts looked up at startup
+- Video buffer adapts to Wi-Fi vs mobile data; providers that keep failing are skipped for a few minutes
+- Home refreshes when you return to it or the connection comes back; live updates pause while the app is in the background
+- Progress saved offline goes up automatically when you are back online
+- New episode alerts (Settings, off by default), Clear image cache, anonymous daily health report (can be turned off)
+- Slow frames are logged to Diagnostics; search index is cached
+

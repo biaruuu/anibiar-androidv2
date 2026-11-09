@@ -119,10 +119,8 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
-            var first = true
             while (true) {
-                if (!first) viewModel.refresh()
-                first = false
+                viewModel.refreshIfStale(55_000)
                 delay(60_000)
             }
         }

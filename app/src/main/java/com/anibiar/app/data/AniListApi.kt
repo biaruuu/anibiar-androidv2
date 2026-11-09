@@ -77,9 +77,11 @@ object Http {
         val plain = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
+            .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))
+            .dispatcher(okhttp3.Dispatcher().apply { maxRequests = 96; maxRequestsPerHost = 24 })
             .build()
 
-        val builder = plain.newBuilder().addInterceptor(RateLimitInterceptor())
+        val builder = plain.newBuilder().addInterceptor(RetryInterceptor()).addInterceptor(RateLimitInterceptor())
         cronetInterceptor()?.let { builder.addInterceptor(CronetWithFallback(it, plain)) }
         return builder.build()
     }

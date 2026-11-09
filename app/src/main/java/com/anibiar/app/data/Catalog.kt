@@ -31,7 +31,7 @@ class Catalog(context: Context) {
         for (m in list) {
             if (m.isAdult == true) continue
             val slim = m.copy(description = null, trailer = null, studios = null)
-            if (items[m.id] != slim) { items.remove(m.id); items[m.id] = slim; changed = true }
+            if (items[m.id] != slim) { items.remove(m.id); items[m.id] = slim; changed = true; stamp++ }
         }
         while (items.size > MAX) items.remove(items.keys.first())
         if (changed) runCatching {
@@ -44,13 +44,26 @@ class Catalog(context: Context) {
     @Synchronized fun all(): List<Media> { ensure(); return items.values.toList() }
     @Synchronized fun get(id: Int): Media? { ensure(); return items[id] }
 
+    private var idxList: List<Media> = emptyList()
+    private var idxNames: List<String> = emptyList()
+    private var idxSize = -1
+    private var idxStamp = 0
+
+    /** The joined-name list the Rust search runs over, rebuilt only when the catalog changed. */
+    @Synchronized private fun index(): Pair<List<Media>, List<String>> {
+        ensure()
+        if (idxSize != items.size || idxStamp != stamp) { idxList = items.values.toList(); idxNames = idxList.map(::names); idxSize = items.size; idxStamp = stamp }
+        return idxList to idxNames
+    }
+    private var stamp = 0
+
     private fun names(m: Media) = listOfNotNull(m.title.english, m.title.romaji, m.title.native).plus(m.synonyms.orEmpty()).joinToString(" ")
 
     /** Typo-tolerant local search, best first. */
     fun search(query: String, limit: Int = 24): List<Media> {
-        val list = all()
         if (query.isBlank()) return emptyList()
-        return Native.typo(query, list.map(::names)).take(limit).map { list[it] }
+        val (list, joined) = index()
+        return Native.typo(query, joined).take(limit).map { list[it] }
     }
 
     /** Genre taste from what the user watched and saved, newest weighted most. */

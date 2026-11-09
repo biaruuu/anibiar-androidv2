@@ -426,8 +426,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         tick.flatMapLatest {
             flow {
                 while (true) {
-                    try { emit(fetch()) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-                    delay(5000)
+                    // Nothing is fetched while the app is in the background; it catches up within seconds of coming back.
+                    if (com.anibiar.app.data.AppState.foreground) {
+                        try { emit(fetch()) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                        delay(5000)
+                    } else delay(2000)
                 }
             }
         }.distinctUntilChanged()
@@ -944,6 +947,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Mirrors one "continue watching" entry to my account so it shows on my other devices. Never throws. */
+    private val pendingProgress = java.util.concurrent.ConcurrentHashMap<Int, com.anibiar.app.data.HistoryItem>()
+
+    /** Progress that couldn't be sent (offline) goes up when the connection returns. */
+    suspend fun flushPending() { pendingProgress.values.toList().forEach { pendingProgress.remove(it.mediaId); pushProgress(it) } }
+
     suspend fun pushProgress(item: com.anibiar.app.data.HistoryItem) {
         if (session == null) return
         runCatching {
@@ -953,7 +961,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 put("updated_at", java.time.Instant.ofEpochMilli(item.at.takeIf { it > 0 } ?: System.currentTimeMillis()).toString())
             }
             raw("POST", "/rest/v1/watch_progress?on_conflict=user_id,media_id", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal,resolution=merge-duplicates"))
-        }
+        }.onFailure { if (it !is CancellationException) pendingProgress[item.mediaId] = item }
     }
 
     suspend fun removeProgress(mediaId: Int) {

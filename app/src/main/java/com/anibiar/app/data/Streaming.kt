@@ -296,8 +296,9 @@ object Streaming {
                 }
                 ch.send(Res(res?.getOrNull(), probeAll(res?.getOrNull()?.streams.orEmpty()), res?.exceptionOrNull(), null))
             }
-            for (a in local) jobs += launch {
+            for (a in local.filter { !StreamHealth.benched(it.lowercase()) }.ifEmpty { local }) jobs += launch {
                 val res = kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) } }
+                if (res?.getOrNull().isNullOrEmpty()) StreamHealth.fail(a.lowercase()) else StreamHealth.ok(a.lowercase())
                 ch.send(Res(null, probeAll(res?.getOrNull().orEmpty()), res?.exceptionOrNull(), a.lowercase()))
             }
             var left = jobs.size; var deadline = 0L

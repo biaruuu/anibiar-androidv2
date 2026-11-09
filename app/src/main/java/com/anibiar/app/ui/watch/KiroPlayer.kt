@@ -174,7 +174,7 @@ fun KiroPlayer(
                     m.addEventListener(android.os.Handler(android.os.Looper.getMainLooper())) { _, _, est -> com.anibiar.app.data.NetEstimate.record(context, est) }
                 },
             )
-            .setLoadControl(androidx.media3.exoplayer.DefaultLoadControl.Builder().setBufferDurationsMs(30_000, 70_000, 1_500, 3_000).build())
+            .setLoadControl(androidx.media3.exoplayer.DefaultLoadControl.Builder().let { b -> if (com.anibiar.app.data.AppState.metered(context)) b.setBufferDurationsMs(20_000, 45_000, 1_200, 2_500) else b.setBufferDurationsMs(45_000, 110_000, 1_500, 3_000) }.build())
             .build()
     }
     var textureView by remember { mutableStateOf<TextureView?>(null) }

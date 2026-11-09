@@ -33,6 +33,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         CrashLog.install(this)
         com.anibiar.app.data.Diag.init(this)
         Http.init(this)
+        com.anibiar.app.data.AppState.init(this)
         social.start()
         // "Continue watching" follows the account: push every change (at most one per anime every 20 s), pull when logging in.
         val lastPush = java.util.concurrent.ConcurrentHashMap<Int, Long>()
@@ -57,9 +58,14 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         }
         // Keep the home-screen widget in step with what you watch (at most every 10 s).
         appScope.launch { history.version.collect { ContinueWidget.refresh(this@AniBiarApp); kotlinx.coroutines.delay(10_000) } }
+        // Connection back: send whatever progress couldn't go up while offline.
+        appScope.launch { com.anibiar.app.data.AppState.netUp.collect { if (it > 0) social.flushPending() } }
+        com.anibiar.app.data.NewEpisodeWorker.apply(this)
+        appScope.launch { kotlinx.coroutines.delay(20_000); com.anibiar.app.data.Health.send(this@AniBiarApp, crashed = java.io.File(filesDir, "last-crash.txt").exists()) }
         // Build the network stack and warm image caches off the main thread while the UI starts.
         appScope.launch {
             Http.client
+            com.anibiar.app.data.DnsWarm.run(listOf("graphql.anilist.co", "s4.anilist.co", "image.tmdb.org", "rfelzigknsclbiepzivl.supabase.co", "anibiartv.vercel.app"))
             repository.prewarm()
         }
     }
