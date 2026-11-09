@@ -131,7 +131,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
         if (missing.isNotEmpty()) people = people + social.profiles(missing).associateBy { it.uid }
     }
     LaunchedEffect(following.size) { suggested = social.suggestions(ids.toSet(), 10) }
-    LaunchedEffect(Unit) { social.dmStream().collect { if (it.event == "msg") social.nudge() } }
+    LaunchedEffect(Unit) { social.dmStream().collect { if (it.event == "msg") social.onDm(it) } }
 
     Column(Modifier.fillMaxSize().background(Bg).windowInsetsPadding(WindowInsets.statusBars)) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
@@ -249,7 +249,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     LaunchedEffect(uid) {
         social.dmStream().collect { b ->
             when (b.event) {
-                "msg" -> social.nudge()
+                "msg" -> social.onDm(b)
                 "typing" -> if (b.payload["from"]?.jsonPrimitive?.contentOrNull == uid) {
                     theirTyping = b.payload["on"]?.jsonPrimitive?.contentOrNull == "true"; typingStamp = System.currentTimeMillis()
                 }
@@ -307,12 +307,13 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
 
     fun send() {
         val t = text.trim()
-        if (t.isEmpty() || sending) return
-        sending = true
+        if (t.isEmpty()) return
+        // The box clears and the message appears at once; if sending fails, the text comes back.
+        val reply = replyTo
+        text = ""; replyTo = null
         scope.launch {
-            try { social.sendMessage(uid, t, replyTo?.id); text = ""; replyTo = null }
-            catch (e: Exception) { Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
-            sending = false
+            try { social.sendMessage(uid, t, reply?.id) }
+            catch (e: Exception) { if (text.isEmpty()) { text = t; replyTo = reply }; Toast.makeText(context, e.message ?: "Couldn't send", Toast.LENGTH_LONG).show() }
         }
     }
 
@@ -654,15 +655,24 @@ private fun prepareImage(context: android.content.Context, uri: android.net.Uri)
     if (mime == "image/gif" || mime == "image/webp") return raw to mime
     val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
     android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, bounds)
-    val limit = 1600
-    var sample = 1
-    while (maxOf(bounds.outWidth, bounds.outHeight) / sample > limit * 2) sample *= 2
-    var bmp = android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
-    val big = maxOf(bmp.width, bmp.height)
-    if (big > limit) { val k = limit.toFloat() / big; bmp = android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true) }
+    // The Rust core decides how far to shrink (smaller on mobile data) and whether the file can go untouched.
+    val plan = com.anibiar.app.nativecore.Native.planImage(bounds.outWidth, bounds.outHeight, raw.size.toLong(), com.anibiar.app.data.AppState.metered(context))
+    if (plan.passthrough && mime == "image/jpeg") return raw to mime
+    var bmp = android.graphics.BitmapFactory.decodeByteArray(raw, 0, raw.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = plan.sample }) ?: return null
+    if (bmp.width != plan.width && bmp.height != plan.height && maxOf(bmp.width, bmp.height) > maxOf(plan.width, plan.height)) {
+        val k = maxOf(plan.width, plan.height).toFloat() / maxOf(bmp.width, bmp.height)
+        bmp = android.graphics.Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt().coerceAtLeast(1), (bmp.height * k).toInt().coerceAtLeast(1), true)
+    }
+    // Re-encoding drops the EXIF tag, so turn the pixels the right way up first.
+    val deg = runCatching {
+        when (android.media.ExifInterface(java.io.ByteArrayInputStream(raw)).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, 1)) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f; android.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f; android.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f; else -> 0f
+        }
+    }.getOrDefault(0f)
+    if (deg != 0f) bmp = android.graphics.Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, android.graphics.Matrix().apply { postRotate(deg) }, true)
     val out = java.io.ByteArrayOutputStream()
     return if (bmp.hasAlpha()) { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out); out.toByteArray() to "image/png" }
-    else { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 86, out); out.toByteArray() to "image/jpeg" }
+    else { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, plan.quality, out); out.toByteArray() to "image/jpeg" }
 }
 
 

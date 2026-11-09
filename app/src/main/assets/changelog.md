@@ -417,3 +417,10 @@
 - Chat and inbox open instantly with the last copy, your message shows the moment you send it, and reactions load in the same request
 - Captions are now a single menu: language, then Style, Size and Timing inside it
 - Captions follow the video every frame, so lines appear and leave on time; long lines are broken Netflix-style by the Rust core
+
+## 92 | Real-time chat | 2026-11-09
+- Photos and voice notes appear in the chat the moment you send them, while they upload
+- New messages are pushed straight to the other phone over the realtime connection instead of waiting for a refresh
+- Photos are shrunk by the Rust core (smaller on mobile data, small files sent untouched) and keep the right way up
+- Text messages clear the box instantly and come back only if sending fails
+- Realtime (chat and Watch Together) reconnects the moment your network returns

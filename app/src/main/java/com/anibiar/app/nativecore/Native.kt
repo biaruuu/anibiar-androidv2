@@ -97,4 +97,20 @@ object Native {
         val cut = text.indices.filter { text[it] == ' ' }.minByOrNull { kotlin.math.abs(it - text.length / 2) } ?: return text
         return text.substring(0, cut) + "\n" + text.substring(cut + 1)
     }
+
+    @JvmStatic private external fun planImageNative(w: Int, h: Int, bytes: Long, metered: Boolean): String?
+
+    /** How to shrink a photo before sending: sample, out width, out height, JPEG quality, send-untouched. */
+    class ImagePlan(val sample: Int, val width: Int, val height: Int, val quality: Int, val passthrough: Boolean)
+
+    fun planImage(w: Int, h: Int, bytes: Long, metered: Boolean): ImagePlan {
+        if (available) runCatching { planImageNative(w, h, bytes, metered) }.getOrNull()?.split(',')?.map { it.toInt() }?.takeIf { it.size == 5 }?.let { return ImagePlan(it[0], it[1], it[2], it[3], it[4] == 1) }
+        val maxSide = if (metered) 1024 else 1280
+        val big = maxOf(w, h, 1)
+        if (big <= maxSide && bytes <= 300_000) return ImagePlan(1, w, h, if (metered) 74 else 82, true)
+        val k = minOf(1.0, maxSide.toDouble() / big)
+        var sample = 1
+        while (big / (sample * 2) >= maxSide) sample *= 2
+        return ImagePlan(sample, maxOf(1, Math.round(w * k).toInt()), maxOf(1, Math.round(h * k).toInt()), if (metered) 74 else 82, false)
+    }
 }

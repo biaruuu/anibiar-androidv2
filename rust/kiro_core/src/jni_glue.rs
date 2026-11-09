@@ -132,3 +132,14 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_balanceLines<'l>(m
     let Ok(out) = catch_unwind(|| crate::linebreak::balance(&s, cap.max(0) as usize)) else { return null_mut() };
     env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
 }
+
+/// Returns "sample,out_w,out_h,quality,passthrough(0|1)" for sending a photo.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_planImageNative<'l>(env: JNIEnv<'l>, _c: JClass<'l>, w: jni::sys::jint, h: jni::sys::jint, bytes: jni::sys::jlong, metered: jni::sys::jboolean) -> jstring {
+    let mut env = env;
+    let Ok(out) = catch_unwind(|| {
+        let (s, ow, oh, q, pass) = crate::media::plan(w.max(0) as u32, h.max(0) as u32, bytes.max(0) as u64, metered != 0);
+        format!("{s},{ow},{oh},{q},{}", if pass { 1 } else { 0 })
+    }) else { return null_mut() };
+    env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}

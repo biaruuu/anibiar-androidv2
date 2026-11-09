@@ -545,10 +545,48 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 }
             }
         }.onStart { msgCache[other]?.let { emit(it) } }
-        return combine(server, outbox.map { it[other].orEmpty() }) { base, pending ->
-            if (pending.isEmpty()) base else base + pending.filter { p -> base.none { it.mine && it.body == p.body && it.kind == p.kind && it.at >= p.at - 60_000 } }
+        return combine(server, outbox.map { it[other].orEmpty() }, incoming.map { it[other].orEmpty() }) { base, pending, pushed ->
+            if (pending.isEmpty() && pushed.isEmpty()) base else {
+                val known = base.mapTo(HashSet()) { it.id }
+                // Each pending message hides behind at most one server copy, so two identical sends both stay visible until echoed.
+                val free = base.filter { it.mine }.toMutableList()
+                val still = pending.filter { p ->
+                    val hit = free.indexOfFirst { it.body == p.body && it.kind == p.kind && it.at >= p.at - 60_000 }
+                    if (hit >= 0) { free.removeAt(hit); false } else true
+                }
+                base + pushed.filter { it.id !in known } + still
+            }
         }.distinctUntilChanged()
     }
+
+    /** Messages the other side pushed over the realtime socket before the next fetch. */
+    private val incoming = MutableStateFlow<Map<String, List<DmMessage>>>(emptyMap())
+
+    /** A "msg" ping arrived. It carries the message itself, so it shows at once; a fetch then confirms it. */
+    fun onDm(b: Broadcast) {
+        if (b.event != "msg") return
+        val p = b.payload
+        val from = p["from"]?.jsonPrimitive?.contentOrNull
+        val id = p["id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        if (from != null && id != null) {
+            val m = DmMessage(
+                id = id, mine = false, body = p["body"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                at = p["at"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: System.currentTimeMillis(), read = false,
+                replyTo = p["rt"]?.jsonPrimitive?.contentOrNull?.toLongOrNull(), kind = p["kind"]?.jsonPrimitive?.contentOrNull ?: "text",
+                mediaUrl = p["media"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null }, style = p["style"]?.jsonPrimitive?.contentOrNull?.ifEmpty { null },
+            )
+            val cur = incoming.value[from].orEmpty()
+            if (cur.none { it.id == id }) incoming.value = incoming.value + (from to (cur + m).takeLast(30))
+        }
+        nudge()
+    }
+
+    /** A cache copy of what is being sent, so the bubble can show/play it before the upload finishes. */
+    private fun localCopy(bytes: ByteArray, ext: String): String? = runCatching {
+        val dir = java.io.File(com.anibiar.app.data.Http.context!!.cacheDir, "outgoing").apply { mkdirs() }
+        dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 3600_000 }?.forEach { it.delete() }
+        java.io.File(dir, "${System.nanoTime()}.$ext").also { it.writeBytes(bytes) }.toURI().toString()
+    }.getOrNull()
 
     private fun addPending(to: String, m: DmMessage) { outbox.value = outbox.value + (to to (outbox.value[to].orEmpty() + m)) }
     private fun dropPending(to: String, id: Long) { outbox.value = outbox.value + (to to outbox.value[to].orEmpty().filter { it.id != id }) }
@@ -563,13 +601,20 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 if (replyTo != null) put("reply_to", replyTo)
                 if (style != null) put("style", style)
             }.toString().toByteArray(),
-            extra = mapOf("Prefer" to "return=minimal"),
+            extra = mapOf("Prefer" to "return=representation"),
         )
         if (code !in 200..299) {
             val msg = runCatching { json.parseToJsonElement(resp).jsonObject["message"]?.jsonPrimitive?.contentOrNull }.getOrNull()
             throw IllegalStateException(msg?.takeIf { it.isNotBlank() } ?: "Couldn't send ($code)")
         }
-        chatTick.value++; refreshSoon(); sendDm(to, "msg")
+        val row = runCatching { json.parseToJsonElement(resp).jsonArray.first().jsonObject }.getOrNull()
+        val id = row?.get("id")?.jsonPrimitive?.contentOrNull
+        chatTick.value++; refreshSoon()
+        // The ping carries the message so the other phone can show it without waiting for a fetch.
+        sendDm(to, "msg", if (id == null) emptyMap() else buildMap {
+            put("id", id); put("body", body.take(1500)); put("kind", kind); put("media", mediaUrl.orEmpty()); put("style", style.orEmpty())
+            put("at", isoMs(row["created_at"]?.jsonPrimitive?.contentOrNull).toString()); if (replyTo != null) put("rt", replyTo.toString())
+        })
     }
 
     suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
@@ -588,9 +633,16 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         if (bytes.size > 8 * 1024 * 1024) throw IllegalStateException("That file is over 8 MB.")
         val ext = when (mime) { "image/png" -> "png"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> "jpg" }
         val path = "$me/${java.util.UUID.randomUUID()}.$ext"
-        val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = mime)
-        if (code !in 200..299) fail(code, resp)
-        insertDm(to, "Photo", "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
+        // The photo shows in the chat from the local copy right away, while it uploads.
+        val pid = -System.nanoTime()
+        val local = localCopy(bytes, ext)
+        if (local != null) addPending(to, DmMessage(id = pid, mine = true, body = "Photo", at = System.currentTimeMillis(), read = false, replyTo = replyTo, kind = "image", mediaUrl = local))
+        try {
+            val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = mime)
+            if (code !in 200..299) fail(code, resp)
+            insertDm(to, "Photo", "image", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo)
+        } catch (e: Throwable) { dropPending(to, pid); throw e }
+        scope.launch { delay(12_000); dropPending(to, pid) }
     }
 
     /** Voice note: [bytes] is AAC in an MP4 container. [style] carries "<seconds:3 digits><20 loudness digits>". */
@@ -598,9 +650,16 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
         if (bytes.size > 6 * 1024 * 1024) throw IllegalStateException("That recording is too long.")
         val path = "$me/${java.util.UUID.randomUUID()}.m4a"
-        val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = "audio/mp4")
-        if (code !in 200..299) fail(code, resp)
-        insertDm(to, "Voice message", "voice", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo, "%03d".format(seconds.coerceIn(0, 999)) + bars.take(20).padEnd(20, '0'))
+        val style = "%03d".format(seconds.coerceIn(0, 999)) + bars.take(20).padEnd(20, '0')
+        val pid = -System.nanoTime()
+        val local = localCopy(bytes, "m4a")
+        if (local != null) addPending(to, DmMessage(id = pid, mine = true, body = "Voice message", at = System.currentTimeMillis(), read = false, replyTo = replyTo, kind = "voice", mediaUrl = local, style = style))
+        try {
+            val (code, resp) = raw("POST", "/storage/v1/object/dm-media/$path", bytes, contentType = "audio/mp4")
+            if (code !in 200..299) fail(code, resp)
+            insertDm(to, "Voice message", "voice", "${SupabaseConfig.URL}/storage/v1/object/public/dm-media/$path", replyTo, style)
+        } catch (e: Throwable) { dropPending(to, pid); throw e }
+        scope.launch { delay(12_000); dropPending(to, pid) }
     }
 
     // ---- instant nudges over the shared realtime socket ("dmu-<uid>" is my own inbox channel)

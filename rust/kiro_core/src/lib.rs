@@ -5,6 +5,7 @@ pub mod captions;
 pub mod fuzzy;
 pub mod hls;
 pub mod linebreak;
+pub mod media;
 pub mod streams;
 pub mod net;
 pub mod reco;

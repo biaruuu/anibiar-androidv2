@@ -82,6 +82,11 @@ class Realtime(private val scope: CoroutineScope) {
         }
     }
 
+    @Volatile private var kicked = false
+
+    /** The network came back: drop the old socket now and reconnect without waiting out the back-off. */
+    fun reconnect() { kicked = true; socket?.cancel() }
+
     val connected: Boolean get() = open && channels.values.all { it.joined }
 
     private fun frame(topic: String, event: String, payload: JsonElement, joinRef: String?): String = buildJsonObject {
@@ -133,7 +138,7 @@ class Realtime(private val scope: CoroutineScope) {
                 closed.await()
                 hb.cancel(); open = false
                 channels.values.forEach { it.joined = false }
-                delay(backoff); backoff = (backoff * 2).coerceAtMost(5000)
+                if (kicked) { kicked = false; backoff = 500L } else { delay(backoff); backoff = (backoff * 2).coerceAtMost(5000) }
             }
         }
     }
