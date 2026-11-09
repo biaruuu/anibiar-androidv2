@@ -411,3 +411,9 @@
 
 ## 90 | Netflix Sans | 2026-11-09
 - The whole app now uses Netflix Sans, including dialogs, buttons, the profile share card and video captions
+
+## 91 | Faster chat, one caption menu | 2026-11-09
+- The app is back on its original font; Netflix Sans is used only inside the video player
+- Chat and inbox open instantly with the last copy, your message shows the moment you send it, and reactions load in the same request
+- Captions are now a single menu: language, then Style, Size and Timing inside it
+- Captions follow the video every frame, so lines appear and leave on time; long lines are broken Netflix-style by the Rust core

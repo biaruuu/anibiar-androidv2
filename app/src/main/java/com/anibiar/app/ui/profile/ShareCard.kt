@@ -33,8 +33,8 @@ object ShareCard {
         context.startActivity(Intent.createChooser(send, "Share profile"))
     }
 
-    private fun nsBold(c: Context): Typeface = androidx.core.content.res.ResourcesCompat.getFont(c, com.anibiar.app.R.font.netflix_sans_bold) ?: Typeface.DEFAULT_BOLD
-    private fun nsRegular(c: Context): Typeface = androidx.core.content.res.ResourcesCompat.getFont(c, com.anibiar.app.R.font.netflix_sans_regular) ?: Typeface.DEFAULT
+    private fun interBold(c: Context): Typeface = androidx.core.content.res.ResourcesCompat.getFont(c, com.anibiar.app.R.font.inter_bold) ?: Typeface.DEFAULT_BOLD
+    private fun interRegular(c: Context): Typeface = androidx.core.content.res.ResourcesCompat.getFont(c, com.anibiar.app.R.font.inter_regular) ?: Typeface.DEFAULT
 
     private suspend fun render(context: Context, p: UserProfile): File? = runCatching {
         val w = 1080; val h = 1350
@@ -61,22 +61,22 @@ object ShareCard {
             c.restoreToCount(save)
         } else {
             paint.color = 0xFF2A2A2E.toInt(); c.drawCircle(cx, cy, r, paint)
-            paint.color = Color.WHITE; paint.textSize = 190f; paint.textAlign = Paint.Align.CENTER; paint.typeface = nsBold(context)
+            paint.color = Color.WHITE; paint.textSize = 190f; paint.textAlign = Paint.Align.CENTER; paint.typeface = interBold(context)
             c.drawText(p.shownName.take(1).uppercase(), cx, cy + 66f, paint)
         }
 
         paint.textAlign = Paint.Align.CENTER
-        paint.color = Color.WHITE; paint.typeface = nsBold(context); paint.textSize = 84f
+        paint.color = Color.WHITE; paint.typeface = interBold(context); paint.textSize = 84f
         c.drawText(p.shownName.take(22), cx, 800f, paint)
-        paint.color = 0xFFB4B1BA.toInt(); paint.typeface = nsRegular(context); paint.textSize = 48f
+        paint.color = 0xFFB4B1BA.toInt(); paint.typeface = interRegular(context); paint.textSize = 48f
         c.drawText("@${p.username}", cx, 872f, paint)
         p.bio?.takeIf { it.isNotBlank() }?.let { bio ->
             paint.color = 0xFFD8D6DC.toInt(); paint.textSize = 40f
             bio.take(90).chunked(34).take(3).forEachIndexed { i, line -> c.drawText(line, cx, 960f + i * 54f, paint) }
         }
-        paint.color = Color.WHITE; paint.typeface = nsBold(context); paint.textSize = 52f
+        paint.color = Color.WHITE; paint.typeface = interBold(context); paint.textSize = 52f
         c.drawText("Kiro · AniBiar TV", cx, 1240f, paint)
-        paint.color = 0xFFB4B1BA.toInt(); paint.typeface = nsRegular(context); paint.textSize = 38f
+        paint.color = 0xFFB4B1BA.toInt(); paint.typeface = interRegular(context); paint.textSize = 38f
         p.linkSlug?.takeIf { it.isNotBlank() }?.let { c.drawText("kiro://u/$it", cx, 1296f, paint) }
 
         val dir = File(context.cacheDir, "share").apply { mkdirs() }

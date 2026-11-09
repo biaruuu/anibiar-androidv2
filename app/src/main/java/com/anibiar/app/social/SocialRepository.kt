@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -230,6 +232,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     private fun store(s: Session?) {
+        if (session?.uid != s?.uid) runCatching { msgCache.clear(); convCache = null; noticeCache = null; outbox.value = emptyMap() }
         session = s
         prefs.edit().apply {
             if (s == null) remove("session") else putString(
@@ -483,23 +486,29 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     /** My chats, newest first, refreshed every few seconds. */
-    fun conversations(): Flow<List<DmConversation>> = live { fetchConversations() }
+    fun conversations(): Flow<List<DmConversation>> = live { fetchConversations().also { convCache = it } }.onStart { convCache?.let { emit(it) } }
 
     private suspend fun fetchMessages(other: String): List<DmMessage> {
         val me = session?.uid ?: return emptyList()
-        val q = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&select=id,sender_id,body,created_at,read_at,reply_to,kind,media_url,style&order=id.desc&limit=200"
-        val rows = getRows(q)
-        // Reactions for these messages in one extra request.
-        val ids = rows.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
-        val reacts: Map<Long, List<Pair<String, String>>> = if (ids.isEmpty()) emptyMap() else try {
-            getRows("/rest/v1/dm_reactions?message_id=in.(${ids.joinToString(",")})&select=message_id,user_id,emoji").groupBy(
-                { it.jsonObject["message_id"]!!.jsonPrimitive.content.toLong() },
-                { it.jsonObject["user_id"]!!.jsonPrimitive.content to it.jsonObject["emoji"]!!.jsonPrimitive.content },
-            )
-        } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyMap() }
+        val base = "/rest/v1/dm_messages?or=(and(sender_id.eq.$me,recipient_id.eq.$other),and(sender_id.eq.$other,recipient_id.eq.$me))&order=id.desc&limit=150"
+        val cols = "id,sender_id,body,created_at,read_at,reply_to,kind,media_url,style"
+        // One request: reactions come embedded with the messages. Falls back to a second request if the server can't embed.
+        val embedded = try { getRows("$base&select=$cols,dm_reactions(user_id,emoji)") } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+        val rows = embedded ?: getRows("$base&select=$cols")
+        val reacts: Map<Long, List<Pair<String, String>>> = if (embedded != null) emptyMap() else {
+            val ids = rows.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.content }
+            if (ids.isEmpty()) emptyMap() else try {
+                getRows("/rest/v1/dm_reactions?message_id=in.(${ids.joinToString(",")})&select=message_id,user_id,emoji").groupBy(
+                    { it.jsonObject["message_id"]!!.jsonPrimitive.content.toLong() },
+                    { it.jsonObject["user_id"]!!.jsonPrimitive.content to it.jsonObject["emoji"]!!.jsonPrimitive.content },
+                )
+            } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyMap() }
+        }
         return rows.map {
             val o = it.jsonObject
-            val rs = reacts[o["id"]!!.jsonPrimitive.content.toLong()].orEmpty()
+            val rs: List<Pair<String, String>> = if (embedded != null) {
+                (o["dm_reactions"] as? kotlinx.serialization.json.JsonArray).orEmpty().map { r -> r.jsonObject["user_id"]!!.jsonPrimitive.content to r.jsonObject["emoji"]!!.jsonPrimitive.content }
+            } else reacts[o["id"]!!.jsonPrimitive.content.toLong()].orEmpty()
             DmMessage(
                 reactions = rs.groupingBy { r -> r.second }.eachCount(),
                 myReaction = rs.firstOrNull { r -> r.first == me }?.second,
@@ -516,18 +525,33 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         }.reversed()
     }
 
+    private val msgCache = java.util.concurrent.ConcurrentHashMap<String, List<DmMessage>>()
+    private var convCache: List<DmConversation>? = null
+    private var noticeCache: List<Notice>? = null
+    /** Messages I just sent that the server hasn't echoed back yet (shown at once, negative ids). */
+    private val outbox = MutableStateFlow<Map<String, List<DmMessage>>>(emptyMap())
+
     private val chatTick = MutableStateFlow(0)
 
-    /** Messages with one person, oldest first; polls every ~2.5 s while collected. */
-    fun messages(other: String): Flow<List<DmMessage>> =
-        chatTick.flatMapLatest {
+    /** Messages with one person, oldest first. The last copy shows instantly; a fresh one follows, then a poll every ~4 s while the app is open. */
+    fun messages(other: String): Flow<List<DmMessage>> {
+        val server = chatTick.flatMapLatest {
             flow {
                 while (true) {
-                    try { emit(fetchMessages(other)) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
-                    delay(4000)
+                    if (com.anibiar.app.data.AppState.foreground) {
+                        try { emit(fetchMessages(other).also { msgCache[other] = it }) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                        delay(4000)
+                    } else delay(2000)
                 }
             }
+        }.onStart { msgCache[other]?.let { emit(it) } }
+        return combine(server, outbox.map { it[other].orEmpty() }) { base, pending ->
+            if (pending.isEmpty()) base else base + pending.filter { p -> base.none { it.mine && it.body == p.body && it.kind == p.kind && it.at >= p.at - 60_000 } }
         }.distinctUntilChanged()
+    }
+
+    private fun addPending(to: String, m: DmMessage) { outbox.value = outbox.value + (to to (outbox.value[to].orEmpty() + m)) }
+    private fun dropPending(to: String, id: Long) { outbox.value = outbox.value + (to to outbox.value[to].orEmpty().filter { it.id != id }) }
 
     private suspend fun insertDm(to: String, body: String, kind: String, mediaUrl: String?, replyTo: Long?, style: String? = null) {
         val me = session?.uid ?: throw IllegalStateException("Log in to send messages.")
@@ -551,7 +575,11 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
         val text = body.trim()
         if (text.isEmpty()) return@net
-        insertDm(to, text, "text", null, replyTo)
+        // Shows in the chat immediately; the server copy replaces it when it comes back.
+        val pid = -System.nanoTime()
+        addPending(to, DmMessage(id = pid, mine = true, body = text, at = System.currentTimeMillis(), read = false, replyTo = replyTo))
+        try { insertDm(to, text, "text", null, replyTo) } catch (e: Throwable) { dropPending(to, pid); throw e }
+        scope.launch { delay(10_000); dropPending(to, pid) }
     }
 
     /** Uploads [bytes] to the dm-media bucket and sends it as a photo. */
@@ -751,7 +779,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     // ---------------------------------------------------------------- inbox
 
-    fun notices(): Flow<List<Notice>> = live {
+    fun notices(): Flow<List<Notice>> = live<List<Notice>> {
         val me = session?.uid ?: return@live emptyList()
         val rows = getRows("/rest/v1/notifications?user_id=eq.$me&select=id,type,read,created_at,actor_id,ref&order=created_at.desc&limit=100")
         val actors = profiles(rows.map { it.jsonObject["actor_id"]!!.jsonPrimitive.content }.toSet()).associateBy { it.uid }
@@ -763,8 +791,8 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
                 read = o["read"]?.jsonPrimitive?.contentOrNull == "true", createdAt = parseDate(o["created_at"]?.jsonPrimitive?.contentOrNull),
                 ref = o["ref"]?.jsonPrimitive?.contentOrNull,
             )
-        }
-    }
+        }.also { noticeCache = it }
+    }.onStart { noticeCache?.let { emit(it) } }
 
     suspend fun markAllRead() {
         val me = session?.uid ?: return

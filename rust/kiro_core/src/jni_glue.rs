@@ -124,3 +124,11 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_waveBars<'l>(mut e
     }) else { return null_mut() };
     env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
 }
+
+/// Breaks a subtitle into balanced lines that each fit `cap` characters.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_balanceLines<'l>(mut env: JNIEnv<'l>, _c: JClass<'l>, text: JString<'l>, cap: jni::sys::jint) -> jstring {
+    let Some(s) = read(&mut env, &text) else { return null_mut() };
+    let Ok(out) = catch_unwind(|| crate::linebreak::balance(&s, cap.max(0) as usize)) else { return null_mut() };
+    env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}

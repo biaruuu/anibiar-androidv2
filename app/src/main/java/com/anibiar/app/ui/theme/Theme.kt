@@ -37,14 +37,25 @@ val TrebuchetFamily = FontFamily(
     Font(R.font.trebuchet_ms_italic, FontWeight.Normal, androidx.compose.ui.text.font.FontStyle.Italic),
 )
 
-/** Netflix Sans for the whole app (name kept so every `inter(...)` call picks it up). Netflix has no SemiBold, so it uses Bold. */
 val InterFamily = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+)
+
+/** Netflix Sans: used only inside the video player. Netflix has no SemiBold, so it uses Bold. */
+val NetflixFamily = FontFamily(
     Font(R.font.netflix_sans_light, FontWeight.Light),
     Font(R.font.netflix_sans_regular, FontWeight.Normal),
     Font(R.font.netflix_sans_medium, FontWeight.Medium),
     Font(R.font.netflix_sans_bold, FontWeight.SemiBold),
     Font(R.font.netflix_sans_bold, FontWeight.Bold),
 )
+
+/** Same as [inter] but in Netflix Sans (video player only). */
+fun nflx(size: Float, weight: FontWeight = FontWeight.Normal, lineHeight: Float = 0f, letterSpacing: Float = 0f): TextStyle =
+    inter(size, weight, lineHeight, letterSpacing).copy(fontFamily = NetflixFamily)
 
 /** Text style helper: every text in the app uses Inter. */
 fun inter(
@@ -62,16 +73,7 @@ fun inter(
 
 @Composable
 fun AniBiarTheme(content: @Composable () -> Unit) {
-    val base = androidx.compose.material3.Typography()
-    val type = androidx.compose.material3.Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = InterFamily), displayMedium = base.displayMedium.copy(fontFamily = InterFamily), displaySmall = base.displaySmall.copy(fontFamily = InterFamily),
-        headlineLarge = base.headlineLarge.copy(fontFamily = InterFamily), headlineMedium = base.headlineMedium.copy(fontFamily = InterFamily), headlineSmall = base.headlineSmall.copy(fontFamily = InterFamily),
-        titleLarge = base.titleLarge.copy(fontFamily = InterFamily), titleMedium = base.titleMedium.copy(fontFamily = InterFamily), titleSmall = base.titleSmall.copy(fontFamily = InterFamily),
-        bodyLarge = base.bodyLarge.copy(fontFamily = InterFamily), bodyMedium = base.bodyMedium.copy(fontFamily = InterFamily), bodySmall = base.bodySmall.copy(fontFamily = InterFamily),
-        labelLarge = base.labelLarge.copy(fontFamily = InterFamily), labelMedium = base.labelMedium.copy(fontFamily = InterFamily), labelSmall = base.labelSmall.copy(fontFamily = InterFamily),
-    )
     MaterialTheme(
-        typography = type,
         colorScheme = darkColorScheme(
             primary = Ani.Lavender,
             background = Ani.Onyx,

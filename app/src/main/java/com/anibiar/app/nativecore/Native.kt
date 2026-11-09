@@ -87,4 +87,14 @@ object Native {
         val top = maxOf(1, peaks.max())
         return peaks.joinToString("") { Math.round(Math.sqrt(it.toDouble() / top) * 9).toString() }
     }
+
+    @JvmStatic private external fun balanceLines(text: String, cap: Int): String?
+
+    /** Breaks a subtitle into the fewest balanced lines that each fit [cap] characters (Netflix-style). */
+    fun balance(text: String, cap: Int): String {
+        if ('\n' in text || text.length <= cap) return text
+        if (available) runCatching { balanceLines(text, cap) }.getOrNull()?.let { return it }
+        val cut = text.indices.filter { text[it] == ' ' }.minByOrNull { kotlin.math.abs(it - text.length / 2) } ?: return text
+        return text.substring(0, cut) + "\n" + text.substring(cut + 1)
+    }
 }

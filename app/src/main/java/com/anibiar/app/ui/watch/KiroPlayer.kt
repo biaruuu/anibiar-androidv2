@@ -109,6 +109,7 @@ import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.VidIcons
 import com.anibiar.app.ui.theme.FeatherIcons
 import com.anibiar.app.ui.theme.inter
+import com.anibiar.app.ui.theme.nflx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -443,6 +444,16 @@ fun KiroPlayer(
     }
     LaunchedEffect(captionState) { if (captionState == "error") com.anibiar.app.data.Diag.log("captions", "failed to load or parse the selected track"); if (captionState == "error") say("Captions couldn't load. Open Settings, Captions to retry", true) }
 
+    // Captions follow the player clock every frame (not the 200 ms UI tick), so a line appears and leaves exactly on time.
+    var capLine by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    LaunchedEffect(player, cues, capOffset, captionTrack) {
+        if (captionTrack < 0 || cues.isEmpty()) { capLine = null; return@LaunchedEffect }
+        while (true) {
+            val a = Captions.activeLine(cues, (player.currentPosition - capOffset) / 1000.0)
+            if (a != capLine) capLine = a
+            if (player.isPlaying) androidx.compose.runtime.withFrameMillis { } else delay(60)
+        }
+    }
     // Position, buffering, skip intro/outro, progress reporting.
     val onTimeNow by rememberUpdatedState(onTime)
     val autoSkipNow by rememberUpdatedState(autoSkip)
@@ -575,18 +586,16 @@ fun KiroPlayer(
         }
 
         // Captions
-        val active = Captions.activeLine(cues, (timeMs - capOffset) / 1000.0)
+        val active = capLine
         if (active != null) {
             val (rawLine, italic) = active
             // Netflix breaks long lines into two balanced ones (about 42 characters at most per line).
-            val line = if ('\n' in rawLine || rawLine.length <= 36) rawLine else {
-                val mid = rawLine.length / 2
-                val cut = (0 until rawLine.length).filter { rawLine[it] == ' ' }.minByOrNull { kotlin.math.abs(it - mid) }
-                if (cut == null) rawLine else rawLine.substring(0, cut) + "\n" + rawLine.substring(cut + 1)
-            }
             val netflix = captionStyle == 3
             val base = ((h.value * (if (netflix) 0.052f else 0.058f)).coerceIn(14f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
-            val face = inter(base, if (netflix) FontWeight.Medium else FontWeight.Bold, lineHeight = base * (if (netflix) 1.22f else 1.28f)).copy(
+            // Netflix: one line if it fits, else the fewest balanced lines (the Rust core does the line breaking).
+            val capChars = ((w.value * 0.8f) / (base * 0.54f)).toInt().coerceIn(14, 42)
+            val line = remember(rawLine, capChars) { com.anibiar.app.nativecore.Native.balance(rawLine, capChars) }
+            val face = nflx(base, if (netflix) FontWeight.Medium else FontWeight.Bold, lineHeight = base * (if (netflix) 1.22f else 1.28f)).copy(
                 fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center,
                 color = if (captionStyle == 2) Color(0xFFFFE066) else Color.White, letterSpacing = (base * 0.008f).sp,
                 // Netflix look: plain white text with a soft dark drop shadow, no outline and no box.
@@ -630,25 +639,25 @@ fun KiroPlayer(
         if (resumePrompt) Box(Modifier.fillMaxSize().background(Color(0x59000000)).clickable(enabled = true, indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {}, contentAlignment = Alignment.Center) {
             val fs = (w.value * 0.024f).coerceIn(11f, 16f)
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((fs * 0.7f).dp)) {
-                Text("Continue watching?", style = inter(fs * 1.15f, FontWeight.Bold), color = Color.White)
+                Text("Continue watching?", style = nflx(fs * 1.15f, FontWeight.Bold), color = Color.White)
                 Row(horizontalArrangement = Arrangement.spacedBy((fs * 0.8f).dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = inter(fs, FontWeight.Medium), color = Color(0xFF111111), maxLines = 1,
+                    Text("Continue from ${fmt(resumeFraction * player.duration / 1000.0)}", style = nflx(fs, FontWeight.Medium), color = Color(0xFF111111), maxLines = 1,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xF2FFFFFF)).clickable {
                             resumePrompt = false; player.playWhenReady = true
                         }.padding(horizontal = (fs * 1.1f).dp, vertical = (fs * 0.5f).dp))
-                    Text("Start from the beginning", style = inter(fs, FontWeight.Medium), color = Color(0xE6FFFFFF), maxLines = 1,
+                    Text("Start from the beginning", style = nflx(fs, FontWeight.Medium), color = Color(0xE6FFFFFF), maxLines = 1,
                         modifier = Modifier.clip(RoundedCornerShape(50)).clickable { resumePrompt = false; player.seekTo(0); player.playWhenReady = true }.padding(horizontal = 6.dp, vertical = (fs * 0.4f).dp))
                 }
             }
         }
         error?.let { e ->
             Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(e, style = inter(14f, FontWeight.SemiBold), color = Color.White, textAlign = TextAlign.Center)
+                Text(e, style = nflx(14f, FontWeight.SemiBold), color = Color.White, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(10.dp))
-                Text("Try again", style = inter(13f, FontWeight.SemiBold), color = Color.Black,
+                Text("Try again", style = nflx(13f, FontWeight.SemiBold), color = Color.Black,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { error = null; player.prepare(); player.play() }.padding(horizontal = 18.dp, vertical = 8.dp))
                 Spacer(Modifier.height(8.dp))
-                Text("Copy report", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+                Text("Copy report", style = nflx(13f, FontWeight.SemiBold), color = Color.White,
                     modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Color(0x80FFFFFF), RoundedCornerShape(50)).clickable {
                         (context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", "Kiro player report\n$e\n${com.anibiar.app.data.Streaming.lastPlayError}\n${java.util.Date()}"))
                         android.widget.Toast.makeText(context, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
@@ -660,9 +669,9 @@ fun KiroPlayer(
         Column(Modifier.align(Alignment.BottomEnd).padding(end = pad).padding(bottom = (w * 0.115f).coerce(64.dp, 120.dp)), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             skipToast?.let { (kind, from) ->
                 Row(Modifier.clip(RoundedCornerShape(50)).background(Color(0xB3000000)).border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(start = 14.dp, end = 6.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (kind == "intro") "Intro skipped" else "Outro skipped", style = inter(12.5f, FontWeight.Medium), color = Color.White)
+                    Text(if (kind == "intro") "Intro skipped" else "Outro skipped", style = nflx(12.5f, FontWeight.Medium), color = Color.White)
                     Spacer(Modifier.width(10.dp))
-                    Text("Undo", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
+                    Text("Undo", style = nflx(12.5f, FontWeight.SemiBold), color = Color.White,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x26FFFFFF)).clickable { player.seekTo((from * 1000).toLong()); skipToast = null }.padding(horizontal = 12.dp, vertical = 5.dp))
                 }
             }
@@ -674,7 +683,7 @@ fun KiroPlayer(
                     }.padding(horizontal = 16.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (kind == "intro") "Skip Intro" else "Skip Outro", style = inter(13.5f, FontWeight.SemiBold), color = Color.Black)
+                    Text(if (kind == "intro") "Skip Intro" else "Skip Outro", style = nflx(13.5f, FontWeight.SemiBold), color = Color.Black)
                     Spacer(Modifier.width(6.dp))
                     Icon(VidIcons.SeekForward10, null, tint = Color.Black, modifier = Modifier.size(22.dp))
                 }
@@ -683,14 +692,14 @@ fun KiroPlayer(
 
         // Notice
         notice?.let { (text, err) ->
-            Text(text, style = inter(12.5f, FontWeight.Medium), color = Color.White, textAlign = TextAlign.Center,
+            Text(text, style = nflx(12.5f, FontWeight.Medium), color = Color.White, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = pad + pill + 14.dp).clip(RoundedCornerShape(50)).background(if (err) Color(0xFFDC2626) else Color(0xD9000000)).padding(horizontal = 16.dp, vertical = 8.dp))
         }
 
         togetherNow?.let { ReactionLayer(it, controlsVisible && !inPip) }
         hud?.let { text ->
             Text(
-                text, style = inter(14f, FontWeight.SemiBold), color = Color.White,
+                text, style = nflx(14f, FontWeight.SemiBold), color = Color.White,
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 28.dp).clip(RoundedCornerShape(18.dp)).background(Color(0x99000000)).padding(horizontal = 14.dp, vertical = 8.dp),
             )
         }
@@ -758,7 +767,7 @@ fun KiroPlayer(
                     Row(Modifier.weight(1f).height(pill), verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             buildTime(timeMs / 1000.0, durationMs / 1000.0, if (w >= 420.dp) title else null),
-                            style = inter(timeSp, FontWeight.Medium).copy(shadow = Shadow(Color(0x99000000), Offset(0f, 1f), 3f)),
+                            style = nflx(timeSp, FontWeight.Medium).copy(shadow = Shadow(Color(0x99000000), Offset(0f, 1f), 3f)),
                             color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -789,16 +798,13 @@ fun KiroPlayer(
                     .verticalScroll(rememberScrollState()).padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Caption style"; "size" -> "Caption size"; "sync" -> "Caption timing"; else -> "Speed" }) { menuView = "main" }
+                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Style"; "size" -> "Size"; "sync" -> "Timing"; else -> "Speed" }) { menuView = if (menuView == "style" || menuView == "size" || menuView == "sync") "captions" else "main" }
                 when (menuView) {
                     "main" -> {
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
                         MenuRow(VidIcons.VolumeHigh, "Volume boost", boostLabel(boost) + if (readOnly) " · host" else "") { if (!readOnly) menuView = "boost" }
                         if (sortedSubs.isNotEmpty()) {
-                            MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed · tap to retry" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { if (captionState == "error") captionTry++ else menuView = "captions" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption style", CAPTION_STYLES[captionStyle]) { menuView = "style" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption size", CAPTION_SIZES[captionSize]) { menuView = "size" }
-                            MenuRow(VidIcons.ClosedCaptionsOn, "Caption timing", offsetLabel(capOffset)) { menuView = "sync" }
+                            MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { menuView = "captions" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
                     }
@@ -808,8 +814,13 @@ fun KiroPlayer(
                     }
                     "boost" -> BOOST_MB.indices.forEach { i -> OptionRow(boostLabel(i), boost == i) { boost = i; menuView = "main" } }
                     "captions" -> {
-                        OptionRow("Off", captionTrack < 0) { capLocal = false; captionTrack = -1; menuView = "main" }
-                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = false; captionTrack = i; menuView = "main" } }
+                        // Everything about captions lives here: language, then style, size and timing.
+                        if (captionState == "error") OptionRow("Couldn't load · tap to retry", false) { captionTry++ }
+                        OptionRow("Off", captionTrack < 0) { capLocal = false; captionTrack = -1 }
+                        sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = false; captionTrack = i } }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Style", CAPTION_STYLES[captionStyle]) { menuView = "style" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Size", CAPTION_SIZES[captionSize]) { menuView = "size" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Timing", offsetLabel(capOffset)) { menuView = "sync" }
                     }
                     "style" -> {
                         CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = false; captionStyle = i; capPrefs.edit().putInt("style", i).apply() } }
@@ -903,8 +914,8 @@ private fun MenuRow(icon: ImageVector, label: String, value: String, chevron: Bo
     ) {
         Icon(icon, null, tint = Color.White, modifier = Modifier.size(19.dp))
         Spacer(Modifier.width(8.dp))
-        Text(label, style = inter(12.5f, FontWeight.Medium, lineHeight = 15f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Text(value, style = inter(11.5f), color = Color(0x99FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
+        Text(label, style = nflx(12.5f, FontWeight.Medium, lineHeight = 15f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(value, style = nflx(11.5f), color = Color(0x99FFFFFF), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
         if (chevron) { Spacer(Modifier.width(2.dp)); Icon(VidIcons.ChevronRight, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
     }
 }
@@ -914,7 +925,7 @@ private fun MenuBack(title: String, onBack: () -> Unit) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onBack).padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(VidIcons.ChevronLeft, "Back", tint = Color.White, modifier = Modifier.size(19.dp))
         Spacer(Modifier.width(4.dp))
-        Text(title, style = inter(13f, FontWeight.SemiBold), color = Color.White)
+        Text(title, style = nflx(13f, FontWeight.SemiBold), color = Color.White)
     }
 }
 
@@ -925,7 +936,7 @@ private fun OptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = inter(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(label, style = nflx(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         if (selected) Icon(VidIcons.Check, null, tint = Color.White, modifier = Modifier.size(17.dp))
     }
 }
