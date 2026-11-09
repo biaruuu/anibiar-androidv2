@@ -408,3 +408,6 @@
 - New "Netflix" caption style, now the default: white medium-weight text, soft drop shadow, no outline or box
 - Long lines are split into two balanced lines
 - Removed the unused comment and shared-list tables from the server
+
+## 90 | Netflix Sans | 2026-11-09
+- The whole app now uses Netflix Sans, including dialogs, buttons, the profile share card and video captions
