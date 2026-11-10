@@ -450,3 +450,6 @@
 
 ## 100 | Design polish, part 1 | 2026-11-10
 - Skeleton loading on Home, Search and Details, accent colors and a pure-black AMOLED theme (Settings > Appearance), light haptics, friendlier empty states, and a parallax Home banner
+
+## 101 | Design polish, part 2 | 2026-11-10
+- Episode cards show Watched, NEW and a progress bar, an Up next card appears near the end of an episode, softer screen transitions, back-swipe preview, and the Details page is tinted with the anime cover color

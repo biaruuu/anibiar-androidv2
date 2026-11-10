@@ -153,6 +153,9 @@ fun KiroPlayer(
     readOnly: Boolean = false,
     /** Solo viewing: where you stopped last time (0..1). Asks "Continue watching?" before playing. */
     resumeFraction: Float = 0f,
+    /** Name of the next episode ("Episode 5"); shown as a card near the end of this one. */
+    nextLabel: String? = null,
+    onPlayNext: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -673,6 +676,24 @@ fun KiroPlayer(
                     Spacer(Modifier.width(10.dp))
                     Text("Undo", style = nflx(12.5f, FontWeight.SemiBold), color = Color.White,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x26FFFFFF)).clickable { player.seekTo((from * 1000).toLong()); skipToast = null }.padding(horizontal = 12.dp, vertical = 5.dp))
+                }
+            }
+            var nextHidden by remember(src) { mutableStateOf(false) }
+            val left = durationMs - timeMs
+            if (nextLabel != null && !readOnly && !nextHidden && skipToast == null && skipTarget == null && durationMs > 60_000 && left in 1..14_000) {
+                Row(
+                    Modifier.clip(RoundedCornerShape(18.dp)).background(Color(0xCC000000)).border(1.dp, GlassEdge, RoundedCornerShape(18.dp)).padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("Up next", style = nflx(11f, FontWeight.Medium), color = Color(0xFFB3B3B3))
+                        Text(nextLabel, style = nflx(14f, FontWeight.SemiBold), color = Color.White)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("Play now", style = nflx(13f, FontWeight.SemiBold), color = Color.Black,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { nextHidden = true; onPlayNext() }.padding(horizontal = 14.dp, vertical = 8.dp))
+                    Text("✕", style = nflx(14f, FontWeight.Medium), color = Color(0xFFB3B3B3),
+                        modifier = Modifier.clickable { nextHidden = true }.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
             }
             if (skipToast == null) skipTarget?.let { kind ->

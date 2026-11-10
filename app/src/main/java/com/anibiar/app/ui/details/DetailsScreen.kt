@@ -196,6 +196,9 @@ fun DetailsScreen(
 
         if (media != null) {
             DetailsBackdrop(media) { scrollPx }
+            // The anime's own cover colour washes in softly from the top.
+            val tint by androidx.compose.animation.animateColorAsState(com.anibiar.app.ui.home.accentOf(media.coverImage.color).copy(alpha = 0.22f), androidx.compose.animation.core.tween(600), label = "tint")
+            Box(Modifier.fillMaxWidth().height(460.dp).background(Brush.verticalGradient(listOf(tint, Color.Transparent))))
         }
 
         when {
@@ -1072,6 +1075,11 @@ private fun Episodes(
         (1..maxOf(count, maxKnown)).toList()
     }
 
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
+    val histVersion by app.history.version.collectAsStateWithLifecycle()
+    val hist = remember(media.id, histVersion) { app.history.load().firstOrNull { it.mediaId == media.id } }
+    val newest = numbers.lastOrNull()
+
     Column(Modifier.fillMaxWidth().padding(top = 36.dp)) {
         SectionHeader("Episodes", null, "${numbers.size} episodes", Modifier.padding(horizontal = side))
         Spacer(Modifier.height(14.dp))
@@ -1106,7 +1114,16 @@ private fun Episodes(
                                 Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f)),
                             ),
                         )
+                        val watched = hist != null && number < hist.episode
+                        if (watched) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)))
                         com.anibiar.app.ui.home.HoverOverlay(active, playSize = 46)
+                        if (watched) Text("✓ Watched", style = inter(11f, FontWeight.SemiBold), color = Color.White,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 3.dp))
+                        else if (number == newest && numbers.size > 1 && media.status == "RELEASING" && hist?.episode != number) Text("NEW", style = inter(11f, FontWeight.Bold), color = Color.Black,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(50)).background(Ani.Lavender).padding(horizontal = 8.dp, vertical = 3.dp))
+                        if (hist != null && hist.episode == number && hist.progress in 0.02f..0.97f) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x55FFFFFF))) {
+                            Box(Modifier.fillMaxWidth(hist.progress.coerceIn(0f, 1f)).fillMaxHeight().background(Ani.Lavender))
+                        }
                         InfoBadge(
                             text = "EP $number",
                             background = Color.Black.copy(alpha = 0.6f),

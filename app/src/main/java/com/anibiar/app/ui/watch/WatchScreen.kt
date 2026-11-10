@@ -342,6 +342,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 onAutoSkip = { autoSkip = it; prefsStore.edit().putBoolean("autoSkip", it).apply() },
                 startAt = together?.resumeSeconds(current?.number),
                 onTime = { t, d -> current?.let { saveProgress(t, d, it.number) } },
+                nextLabel = if (locked) null else next?.let { "Episode ${it.number}" },
+                onPlayNext = { next?.let { n -> if (!locked) select(n.number) } },
                 onEnded = {
                     if (autoNext && next != null && !locked) select(next.number)
                 },

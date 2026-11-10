@@ -322,7 +322,7 @@ private fun AppNavigation() {
             targetState = stack.lastOrNull(),
             transitionSpec = {
                 if (targetState != null) {
-                    (slideInHorizontally { it / 6 } + fadeIn()) togetherWith fadeOut()
+                    (slideInHorizontally { it / 8 } + fadeIn(androidx.compose.animation.core.tween(260)) + androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(260), initialScale = 0.94f)) togetherWith (fadeOut(androidx.compose.animation.core.tween(160)) + androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(220), targetScale = 0.97f))
                 } else {
                     fadeIn() togetherWith (slideOutHorizontally { it / 6 } + fadeOut())
                 }
