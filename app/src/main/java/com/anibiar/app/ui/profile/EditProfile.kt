@@ -95,7 +95,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
     }
 
     if (showStatus) StatusSheet(profile) { showStatus = false }
-    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D))) {
+    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
         when (page) {
             "name" -> FieldPage(
                 "Name", "Your name can only be changed once every 7 days.", profile?.displayName.orEmpty(), 30,

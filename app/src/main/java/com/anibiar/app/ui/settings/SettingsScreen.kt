@@ -88,7 +88,7 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
 
     Column(
-        Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding().verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding().verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp).padding(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 110.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -117,6 +117,7 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
                     ) { Text("Log in", style = inter(14f, FontWeight.Medium), color = Color.Black) }
                 }
             }
+            Section("Appearance") { AppearanceRows(context) }
             Section("App") { AppToolRows(context, ::toast) }
             Section("About") { aboutRows(context, ::toast) }
             return@Column
@@ -194,7 +195,8 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
             InfoRow("Inbox", if (unread > 0) "$unread new" else "", onClick = onOpenInbox)
         }
 
-        Section("App") { AppToolRows(context, ::toast) }
+        Section("Appearance") { AppearanceRows(context) }
+            Section("App") { AppToolRows(context, ::toast) }
 
         Section("About") { aboutRows(context, ::toast) }
 
@@ -355,4 +357,26 @@ private fun TextDialog(
         },
         dismissButton = { Text("Cancel", style = inter(15f), color = Ani.Muted, modifier = Modifier.clickable(onClick = onDismiss).padding(10.dp)) },
     )
+}
+
+
+@Composable
+private fun AppearanceRows(context: Context) {
+    val tick = com.anibiar.app.ui.theme.rememberTick()
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("Accent color", style = inter(15f), color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            com.anibiar.app.ui.theme.Appearance.accents.forEach { (name, c) ->
+                val on = com.anibiar.app.ui.theme.Appearance.accent == c
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(c).border(if (on) 3.dp else 1.dp, if (on) Color.White else Color(0x33FFFFFF), CircleShape)
+                        .clickable { tick(); com.anibiar.app.ui.theme.Appearance.setAccent(context, name) },
+                )
+            }
+        }
+    }
+    Divider()
+    val amoled = com.anibiar.app.ui.theme.Appearance.amoled
+    InfoRow("Pure black (AMOLED)", if (amoled) "On" else "Off", onClick = { tick(); com.anibiar.app.ui.theme.Appearance.setAmoled(context, !amoled) })
 }

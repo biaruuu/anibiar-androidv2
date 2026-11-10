@@ -306,6 +306,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
     }
 
     fun send() {
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
         val t = text.trim()
         if (t.isEmpty()) return
         // The box clears and the message appears at once; if sending fails, the text comes back.

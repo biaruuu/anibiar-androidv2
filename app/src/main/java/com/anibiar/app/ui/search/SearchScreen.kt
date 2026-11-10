@@ -244,7 +244,7 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
             }
 
             when {
-                state.loading && state.results.isEmpty() -> item(key = "loading") { Hint("Searching…") }
+                state.loading && state.results.isEmpty() -> item(key = "loading") { com.anibiar.app.ui.theme.GridSkeleton(Modifier.padding(top = 12.dp)) }
                 state.error != null && state.results.isEmpty() -> item(key = "error") {
                     Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(state.error.orEmpty(), style = inter(15f), color = Ani.Muted)
@@ -253,7 +253,11 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                     }
                 }
                 state.results.isEmpty() -> item(key = "empty") {
-                    Hint(if (filters.language == "DUB") "Dubbed releases aren't available yet." else "No anime found.")
+                    com.anibiar.app.ui.theme.EmptyState(
+                        com.anibiar.app.ui.theme.AniIcons.Search,
+                        if (filters.language == "DUB") "No dubs yet" else "No anime found",
+                        if (filters.language == "DUB") "Dubbed releases aren't available yet." else "Try another spelling or clear a filter.",
+                    )
                 }
                 else -> {
                     val rows = state.results.chunked(columns)

@@ -152,7 +152,7 @@ fun ProfileScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF0B0B0D))) {
+    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 90.dp),
@@ -164,7 +164,7 @@ fun ProfileScreen(
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
                     ThemeTint(profile?.profileTheme, Modifier.fillMaxSize())
                     EffectLayer(profile?.profileEffect, Modifier.fillMaxSize())
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Color(0xFF0B0B0D)))))
+                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Ani.Onyx))))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
                             Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 6f)), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -179,7 +179,7 @@ fun ProfileScreen(
                         }
                         Box(Modifier.requiredSize(96.dp)) {
                             Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
-                            StatusDot(profile?.status, 24.dp, Color(0xFF0B0B0D), Modifier.align(Alignment.BottomEnd))
+                            StatusDot(profile?.status, 24.dp, Ani.Onyx, Modifier.align(Alignment.BottomEnd))
                         }
                     }
                 }
@@ -471,7 +471,7 @@ private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit
             Text("@${u.username}", style = inter(12f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(10.dp))
             Text(
-                "Follow", style = inter(13f, FontWeight.Bold), color = Color(0xFF0B0B0D),
+                "Follow", style = inter(13f, FontWeight.Bold), color = Ani.Onyx,
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFB7A9FF)).clickable(onClick = onFollow).padding(vertical = 8.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
@@ -615,7 +615,7 @@ internal fun UserCard(
                 val iFollow = user.uid in myFollowing
                 Text(
                     if (iFollow) "Following" else if (user.uid in myFollowers) "Follow back" else "Follow",
-                    style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Color(0xFF0B0B0D),
+                    style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Ani.Onyx,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (iFollow) Color(0xFF232326) else Color(0xFFB7A9FF)).clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }

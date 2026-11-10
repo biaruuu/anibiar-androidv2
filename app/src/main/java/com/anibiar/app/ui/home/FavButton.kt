@@ -21,7 +21,9 @@ internal fun rememberFav(media: Media): Pair<Boolean, () -> Unit> {
     val app = context.applicationContext as AniBiarApp
     val favs by app.social.myFavorites.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val tick = com.anibiar.app.ui.theme.rememberTick()
     return (media.id in favs) to {
+        tick()
         scope.launch {
             runCatching { app.social.toggleFavorite(media.id, media.displayTitle, media.coverImage.extraLarge ?: media.coverImage.large) }
                 .onFailure { Toast.makeText(context, it.message ?: "Couldn't save", Toast.LENGTH_SHORT).show() }

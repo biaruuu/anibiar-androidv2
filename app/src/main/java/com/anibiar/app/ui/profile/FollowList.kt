@@ -75,7 +75,7 @@ internal fun FollowListScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 12.dp)) {
             Box(Modifier.align(Alignment.CenterStart)) {
                 com.anibiar.app.ui.theme.GlassBack(onBack)
@@ -155,7 +155,7 @@ internal fun FollowListScreen(
                                 .clickable { onToggle(u.uid) }.padding(horizontal = 14.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(label, style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Color(0xFF0B0B0D), maxLines = 1)
+                            Text(label, style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Ani.Onyx, maxLines = 1)
                         }
                         if (iFollow || theyFollow) {
                             Spacer(Modifier.size(6.dp))

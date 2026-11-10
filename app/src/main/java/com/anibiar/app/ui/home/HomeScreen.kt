@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -212,10 +213,7 @@ private fun HomeContent(
 
         when {
             state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
-                CircularProgressIndicator(
-                    color = Ani.Lavender,
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                com.anibiar.app.ui.theme.HomeSkeleton()
             }
 
             state.error != null -> ErrorState(
@@ -266,6 +264,13 @@ private fun HomeContent(
 
                     if (state.hero.isNotEmpty()) {
                         item(key = "hero") {
+                          Box(
+                            Modifier.graphicsLayer {
+                                val off = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 99999f
+                                translationY = off * 0.45f
+                                alpha = (1f - off / (size.height.coerceAtLeast(1f) * 1.15f)).coerceIn(0f, 1f)
+                            },
+                          ) {
                             HeroPager(
                                 items = state.hero,
                                 art = state.art,
@@ -276,6 +281,7 @@ private fun HomeContent(
                                 onDetails = onOpen,
                                 onAdd = onToggleSaved,
                             )
+                          }
                         }
                     }
 

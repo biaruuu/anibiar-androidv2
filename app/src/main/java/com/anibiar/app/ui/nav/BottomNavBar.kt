@@ -68,6 +68,7 @@ enum class NavTab(val label: String, val icon: ImageVector) {
 @Composable
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier, inboxBadge: Int = 0) {
     val tabs = NavTab.entries
+    val tick = com.anibiar.app.ui.theme.rememberTick()
     val shape = RoundedCornerShape(30.dp)
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -105,7 +106,9 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
                             c.consume()
                         } while (ev.changes.any { it.pressed })
                         down = false
-                        onSelect(tabs[((x - pad) / itemW).toInt().coerceIn(0, tabs.size - 1)])
+                        val pick = tabs[((x - pad) / itemW).toInt().coerceIn(0, tabs.size - 1)]
+                        if (pick != selected) tick()
+                        onSelect(pick)
                     }
                 },
         ) {

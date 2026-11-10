@@ -447,3 +447,6 @@
 
 ## 99 | Live updates and announcements | 2026-11-10
 - New announcements and app updates now show up on their own while the app is open, with no need to close and reopen it
+
+## 100 | Design polish, part 1 | 2026-11-10
+- Skeleton loading on Home, Search and Details, accent colors and a pure-black AMOLED theme (Settings > Appearance), light haptics, friendlier empty states, and a parallax Home banner

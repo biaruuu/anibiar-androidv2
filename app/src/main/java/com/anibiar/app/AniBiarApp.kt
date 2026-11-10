@@ -33,6 +33,7 @@ class AniBiarApp : Application(), ImageLoaderFactory {
         CrashLog.install(this)
         com.anibiar.app.data.Diag.init(this)
         Http.init(this)
+        com.anibiar.app.ui.theme.Appearance.load(this)
         com.anibiar.app.data.AppState.init(this)
         com.anibiar.app.social.LiveStats.start(this, appScope)
         com.anibiar.app.social.LiveSync.start(this, appScope)

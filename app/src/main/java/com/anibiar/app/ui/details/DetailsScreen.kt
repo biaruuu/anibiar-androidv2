@@ -299,9 +299,7 @@ fun DetailsScreen(
                 item(key = "footer") { Footer(side) }
             } }
 
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Ani.Lavender, strokeWidth = 3.dp, modifier = Modifier.size(34.dp))
-            }
+            state.loading -> com.anibiar.app.ui.theme.DetailsSkeleton()
 
             else -> ErrorState(
                 message = state.error ?: "Something went wrong.",

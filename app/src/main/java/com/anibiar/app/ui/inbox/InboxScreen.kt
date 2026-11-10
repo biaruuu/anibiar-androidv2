@@ -77,14 +77,9 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
         if (list == null) {
             Text("Loading…", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(16.dp))
         } else if (list.isEmpty()) {
-            Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                anns.forEach { com.anibiar.app.ui.home.AnnouncementCard(it, Modifier.padding(bottom = 10.dp)) }
-                Spacer(Modifier.height(80.dp))
-                Icon(AniIcons.Bell, null, tint = Ani.Muted, modifier = Modifier.size(40.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("Nothing here yet", style = inter(17f, FontWeight.SemiBold), color = Color.White)
-                Spacer(Modifier.height(4.dp))
-                Text("New followers and friend requests show up here.", style = inter(14f, lineHeight = 20f), color = Ani.Muted)
+            Column(Modifier.fillMaxSize().padding(top = 16.dp)) {
+                anns.forEach { com.anibiar.app.ui.home.AnnouncementCard(it, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) }
+                com.anibiar.app.ui.theme.EmptyState(AniIcons.Bell, "Nothing here yet", "New followers and friend requests show up here.")
             }
         } else {
             LazyColumn(

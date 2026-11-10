@@ -79,7 +79,7 @@ private val PANEL = Color(0xFF1B1B1F)
 fun AdminScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     var tab by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize().background(Color(0xFF0B0B0D)).statusBarsPadding().navigationBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding().navigationBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassBack(onBack)
             Spacer(Modifier.width(12.dp))
