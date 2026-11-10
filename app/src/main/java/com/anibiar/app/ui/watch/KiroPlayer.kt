@@ -717,6 +717,28 @@ fun KiroPlayer(
             }
         }
 
+        // One-time gesture hints on the very first playback.
+        val hintPrefs = remember { context.getSharedPreferences("player_hints", Context.MODE_PRIVATE) }
+        var hintOpen by remember { mutableStateOf(false) }
+        LaunchedEffect(player) {
+            if (hintPrefs.getBoolean("seen", false)) return@LaunchedEffect
+            while (!playedOnce[0]) delay(500)
+            delay(1500); hintOpen = true; delay(6500); hintOpen = false
+            hintPrefs.edit().putBoolean("seen", true).apply()
+        }
+        if (hintOpen && !inPip) Column(
+            Modifier.align(Alignment.Center).clip(RoundedCornerShape(18.dp)).background(Color(0xCC000000)).clickable { hintOpen = false; hintPrefs.edit().putBoolean("seen", true).apply() }.padding(horizontal = 20.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Gestures", style = nflx(13f, FontWeight.SemiBold), color = Color.White)
+            Spacer(Modifier.height(6.dp))
+            Text("Double-tap the sides to seek", style = nflx(12.5f, FontWeight.Medium), color = Color(0xFFD0D0D0))
+            Text("Swipe up or down: left brightness, right volume", style = nflx(12.5f, FontWeight.Medium), color = Color(0xFFD0D0D0))
+            Text("Press and hold to speed up", style = nflx(12.5f, FontWeight.Medium), color = Color(0xFFD0D0D0))
+            Spacer(Modifier.height(6.dp))
+            Text("Tap to dismiss", style = nflx(11f), color = Color(0xFF8A8A8A))
+        }
+
         // Notice
         notice?.let { (text, err) ->
             Text(text, style = nflx(12.5f, FontWeight.Medium), color = Color.White, textAlign = TextAlign.Center,

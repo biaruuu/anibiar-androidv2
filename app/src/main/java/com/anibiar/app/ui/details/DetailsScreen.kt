@@ -1109,14 +1109,46 @@ private fun Episodes(
     val hist = remember(media.id, histVersion) { app.history.load().firstOrNull { it.mediaId == media.id } }
     val newest = numbers.lastOrNull()
 
+    var epFilter by rememberSaveable(media.id) { mutableStateOf("All") }
+    val rowState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val rowScope = androidx.compose.runtime.rememberCoroutineScope()
+    val shownNumbers = remember(numbers, hist, epFilter) {
+        when {
+            hist == null || epFilter == "All" -> numbers
+            epFilter == "Unwatched" -> numbers.filter { it >= hist.episode }
+            else -> numbers.filter { it < hist.episode }
+        }
+    }
+
     Column(Modifier.fillMaxWidth().padding(top = 36.dp)) {
         SectionHeader("Episodes", null, "${numbers.size} episodes", Modifier.padding(horizontal = side))
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
+        // Filters and quick jumps; the watched filters only make sense once something has been watched.
+        androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = side), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (hist != null) items(listOf("All", "Unwatched", "Watched")) { f ->
+                val on = epFilter == f
+                Text(f, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { epFilter = f }.padding(horizontal = 14.dp, vertical = 7.dp))
+            }
+            if (numbers.size >= 24) {
+                item("jump-latest") {
+                    Text("Jump to latest", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { epFilter = "All"; rowScope.launch { rowState.animateScrollToItem(numbers.lastIndex) } }.padding(horizontal = 14.dp, vertical = 7.dp))
+                }
+                if (hist != null) item("jump-resume") {
+                    Text("Jump to EP ${hist.episode}", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { epFilter = "All"; rowScope.launch { rowState.animateScrollToItem((hist.episode - 1).coerceIn(0, numbers.lastIndex)) } }.padding(horizontal = 14.dp, vertical = 7.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        if (shownNumbers.isEmpty()) Text("Nothing here", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(horizontal = side, vertical = 12.dp))
         LazyRow(
+            state = rowState,
             contentPadding = PaddingValues(horizontal = side),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(numbers, key = { it }) { number ->
+            items(shownNumbers, key = { it }) { number ->
                 val info = byNumber[number]
                 val stream = streaming[number]
                 val title = info?.title?.takeIf { it.isNotBlank() }

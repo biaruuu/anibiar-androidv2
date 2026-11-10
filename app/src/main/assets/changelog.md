@@ -471,3 +471,6 @@
 
 ## 107 | Smoother screen switching | 2026-11-11
 - Search, Settings and Profile now fade and slide in, and poster cards are larger on tablets
+
+## 108 | Design polish, part 5 | 2026-11-11
+- A Resume card on Home, Short and sweet and Finished and bingeable rows, episode filters (All, Unwatched, Watched) with jump buttons, and a one-time gesture hint in the player
