@@ -48,6 +48,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 
 /** The look the person picked: accent colour and pure-black (AMOLED) backgrounds. Stored on the device. */
 object Appearance {
@@ -59,6 +61,9 @@ object Appearance {
     var amoled by mutableStateOf(false); private set
     /** Multiplies every text size: 0.9 small, 1.0 default, 1.15 large. */
     var textScale by mutableStateOf(1f); private set
+    /** How poster rows look: 0 poster only, 1 poster and title, 2 large cards with a score badge. */
+    var cardStyle by mutableStateOf(1); private set
+    val cardStyles = listOf("Poster only", "With titles", "Large")
     val textSizes = listOf("Small" to 0.9f, "Default" to 1f, "Large" to 1.15f)
     private const val PREFS = "appearance"
 
@@ -67,6 +72,11 @@ object Appearance {
         accents.firstOrNull { it.first == p.getString("accent", null) }?.let { accent = it.second }
         amoled = p.getBoolean("amoled", false)
         textScale = p.getFloat("text", 1f)
+        cardStyle = p.getInt("cards", 1).coerceIn(0, 2)
+    }
+    fun setCardStyle(context: Context, v: Int) {
+        cardStyle = v
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("cards", v).apply()
     }
     fun setTextScale(context: Context, v: Float) {
         textScale = v
@@ -188,4 +198,45 @@ fun ScoreRing(score: Int, modifier: Modifier = Modifier, size: androidx.compose.
         }
         Text("$score", style = inter(15f, FontWeight.Bold), color = Color.White)
     }
+}
+
+
+/** A springy pop plus a small burst of sparks when [on] turns true (favorite, like). Nothing happens on the first draw. */
+fun Modifier.favPop(on: Boolean): Modifier = composed {
+    val anim = remember { androidx.compose.animation.core.Animatable(1f) }
+    val spark = remember { androidx.compose.animation.core.Animatable(1f) }
+    var first by remember { mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(on) {
+        if (first) { first = false; return@LaunchedEffect }
+        if (on) {
+            spark.snapTo(0f)
+            kotlinx.coroutines.coroutineScope {
+                launch { spark.animateTo(1f, tween(520)) }
+                anim.snapTo(0.6f)
+                anim.animateTo(1f, androidx.compose.animation.core.spring(0.35f, 380f))
+            }
+        } else { anim.snapTo(0.8f); anim.animateTo(1f, androidx.compose.animation.core.spring(0.6f, 500f)) }
+    }
+    this
+        .graphicsLayer { scaleX = anim.value; scaleY = anim.value }
+        .drawWithContent {
+            drawContent()
+            val p = spark.value
+            if (p < 1f) {
+                val c = Offset(size.width / 2, size.height / 2)
+                val r = size.minDimension * (0.55f + 0.9f * p)
+                for (i in 0 until 8) {
+                    val a = Math.toRadians(i * 45.0).toFloat()
+                    drawCircle(Color(0xFFFFC94D).copy(alpha = (1f - p)), size.minDimension * 0.07f * (1f - p * 0.5f), Offset(c.x + kotlin.math.cos(a) * r, c.y + kotlin.math.sin(a) * r))
+                }
+            }
+        }
+}
+
+/** Fades and lifts an item in once, delayed by its [index], so a row of cards eases in one after another. */
+fun Modifier.staggerIn(index: Int, enabled: Boolean = true): Modifier = composed {
+    if (!enabled || index > 7) return@composed this
+    val a = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(index * 45L); a.animateTo(1f, tween(380)) }
+    this.graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 24.dp.toPx() }
 }

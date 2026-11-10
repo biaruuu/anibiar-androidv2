@@ -465,3 +465,6 @@
 
 ## 105 | Skip times fix | 2026-11-11
 - Skip Intro / Outro now accepts AniSkip timings from slightly different cuts of an episode, and tapping Auto skip shows where the times came from
+
+## 106 | Design polish, part 4 | 2026-11-11
+- Poster card styles (Settings > Appearance), cards ease in, bookmark pop animation, press and hold a poster for a quick preview, and a sticky title with Play button on the Details page

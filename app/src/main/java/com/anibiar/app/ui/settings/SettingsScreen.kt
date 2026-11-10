@@ -390,6 +390,19 @@ private fun AppearanceRows(context: Context) {
         }
     }
     Divider()
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("Poster cards", style = inter(15f), color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.anibiar.app.ui.theme.Appearance.cardStyles.forEachIndexed { i, name ->
+                val on = com.anibiar.app.ui.theme.Appearance.cardStyle == i
+                Box(
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setCardStyle(context, i) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Text(name, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
+            }
+        }
+    }
+    Divider()
     val amoled = com.anibiar.app.ui.theme.Appearance.amoled
     InfoRow("Pure black (AMOLED)", if (amoled) "On" else "Off", onClick = { tick(); com.anibiar.app.ui.theme.Appearance.setAmoled(context, !amoled) })
 }

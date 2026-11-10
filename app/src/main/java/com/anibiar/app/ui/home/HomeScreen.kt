@@ -10,6 +10,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -103,6 +105,8 @@ import com.anibiar.app.data.posterUrl
 import com.anibiar.app.data.timeAgo
 import com.anibiar.app.data.year
 import com.anibiar.app.ui.theme.Ani
+import com.anibiar.app.ui.theme.favPop
+import com.anibiar.app.ui.theme.staggerIn
 import com.anibiar.app.ui.theme.glass
 import com.anibiar.app.ui.theme.AniIcons
 import com.anibiar.app.ui.theme.inter
@@ -747,7 +751,7 @@ private fun HeroSlide(
                         .clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(20.dp))
+                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(20.dp).favPop(heroFav))
                 }
             }
         }
@@ -771,6 +775,11 @@ internal fun HeroChip(label: String) {
 
 @Composable
 private fun RecoRow(title: String, items: List<Media>, onClick: (Int) -> Unit) {
+    val style = com.anibiar.app.ui.theme.Appearance.cardStyle
+    val cardW = if (style == 2) 172.dp else 132.dp
+    var preview by remember { mutableStateOf<Media?>(null) }
+    var animate by remember { mutableStateOf(true) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(1500); animate = false }
     Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
         Text(
             title,
@@ -781,25 +790,35 @@ private fun RecoRow(title: String, items: List<Media>, onClick: (Int) -> Unit) {
         )
         Spacer(Modifier.height(14.dp))
         val rowState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val haptic = com.anibiar.app.ui.theme.rememberTick()
         LazyRow(
             state = rowState, contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
             flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(rowState),
         ) {
-            items(items, key = { it.id }) { m ->
-                Column(Modifier.width(132.dp).clickable { onClick(m.id) }) {
-                    PosterImage(
-                        url = m.posterUrl,
-                        contentDescription = m.displayTitle,
-                        maxSide = 400,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(m.displayTitle, style = inter(14f, FontWeight.Medium, lineHeight = 18f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    m.genres?.firstOrNull()?.let { Text(it, style = inter(12f), color = Ani.Muted, maxLines = 1) }
+            itemsIndexed(items, key = { _, it -> it.id }) { index, m ->
+                Column(Modifier.width(cardW).staggerIn(index, animate).combinedClickable(onClick = { onClick(m.id) }, onLongClick = { haptic(); preview = m })) {
+                    Box {
+                        PosterImage(
+                            url = m.posterUrl,
+                            contentDescription = m.displayTitle,
+                            maxSide = if (style == 2) 520 else 400,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(if (style == 2) 16.dp else 12.dp)).background(Ani.Item),
+                        )
+                        if (style == 2) m.averageScore?.let { sc ->
+                            Text("★ ${"%.1f".format(sc / 10f)}", style = inter(11.5f, FontWeight.Bold), color = Color.White,
+                                modifier = Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 3.dp))
+                        }
+                    }
+                    if (style != 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(m.displayTitle, style = inter(14f, FontWeight.Medium, lineHeight = 18f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        m.genres?.firstOrNull()?.let { Text(it, style = inter(12f), color = Ani.Muted, maxLines = 1) }
+                    }
                 }
             }
         }
     }
+    preview?.let { m -> QuickPreview(m, onClose = { preview = null }, onOpen = { preview = null; onClick(m.id) }) }
 }
 
 @Composable
@@ -1356,7 +1375,7 @@ private fun RankRow(
                                 if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark,
                                 contentDescription = "Favorite",
                                 tint = if (isFav) FavYellow else accent,
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(14.dp).favPop(isFav),
                             )
                         }
                     }
@@ -1427,6 +1446,41 @@ internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier
             contentAlignment = Alignment.Center,
         ) {
             Text("Try again", style = inter(15f, FontWeight.SemiBold), color = Color.White)
+        }
+    }
+}
+
+
+/** Opens on a long press: a larger look at an anime with its score, genres and synopsis, and one tap to open it. */
+@Composable
+private fun QuickPreview(m: Media, onClose: () -> Unit, onOpen: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Ani.Panel).border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(24.dp)),
+        ) {
+            Box {
+                PosterImage(
+                    url = m.bannerImage ?: m.posterUrl, contentDescription = m.displayTitle, maxSide = 800,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f).background(Ani.Item),
+                )
+                Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ani.Panel))))
+            }
+            Column(Modifier.padding(horizontal = 18.dp).padding(bottom = 18.dp)) {
+                Text(m.displayTitle, style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    m.averageScore?.let { HeroChip("★ ${"%.1f".format(it / 10f)}") }
+                    m.format?.let { HeroChip(it.replace('_', ' ')) }
+                    m.seasonYear?.let { HeroChip(it.toString()) }
+                    m.genres.orEmpty().take(3).forEach { HeroChip(it) }
+                }
+                val d = m.cleanDescription
+                if (d.isNotBlank()) Text(d, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+                Spacer(Modifier.height(16.dp))
+                Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+                    Text("Open", style = inter(15f, FontWeight.Bold), color = Color.Black)
+                }
+            }
         }
     }
 }

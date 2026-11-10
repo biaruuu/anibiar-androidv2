@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -93,6 +94,7 @@ import com.anibiar.app.data.airedEpisodes
 import com.anibiar.app.data.airedLabel
 import com.anibiar.app.data.backdropUrl
 import com.anibiar.app.data.cleanDescription
+import com.anibiar.app.ui.theme.favPop
 import com.anibiar.app.data.displayName
 import com.anibiar.app.data.displayTitle
 import com.anibiar.app.data.formatLabel
@@ -315,6 +317,26 @@ fun DetailsScreen(
             AniTopBar(scrolled = scrolled, onSearch = comingSoon, onLogo = onHome)
         }
 
+        val showMini by remember { androidx.compose.runtime.derivedStateOf { listState.firstVisibleItemIndex >= 2 } }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showMini && media != null,
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = with(androidx.compose.ui.platform.LocalDensity.current) { topBarPx.toDp() }),
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it },
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it },
+        ) {
+            media?.let { m ->
+                Row(
+                    Modifier.fillMaxWidth().background(Color(0xE60B0B0D)).padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(m.displayTitle, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(12.dp))
+                    Text("Play", style = inter(14f, FontWeight.Bold), color = Color.Black,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { onWatch(m.id, app.history.resumeEpisode(m.id)) }.padding(horizontal = 18.dp, vertical = 8.dp))
+                }
+            }
+        }
+
         fullscreenTrailer?.let { t -> TrailerFullscreen(t) { fullscreenTrailer = null } }
     }
 }
@@ -427,7 +449,7 @@ private fun Header(
             ) {
                 Icon(
                     if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (isFav) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFav) com.anibiar.app.ui.home.FavYellow else Color.White, modifier = Modifier.size(20.dp),
+                    tint = if (isFav) com.anibiar.app.ui.home.FavYellow else Color.White, modifier = Modifier.size(20.dp).favPop(isFav),
                 )
             }
         }
