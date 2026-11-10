@@ -6,7 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.widget.RemoteViews
-import com.anibiar.app.data.Schedule
+import com.anibiar.app.data.AiringSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,7 +22,7 @@ class AiringWidget : AppWidgetProvider() {
                 val lines = runCatching {
                     val now = System.currentTimeMillis()
                     val clock = DateFormat.getTimeInstance(DateFormat.SHORT)
-                    Schedule.today().filter { it.at > now - 3_600_000 }.take(5).map { "${clock.format(Date(it.at))}  ·  ${it.title}  ·  Ep ${it.episode}" }
+                    AiringSchedule.today().filter { it.at > now - 3_600_000 }.take(5).map { "${clock.format(Date(it.at))}  ·  ${it.title}  ·  Ep ${it.episode}" }
                 }.getOrDefault(emptyList())
                 ids.forEach { manager.updateAppWidget(it, build(context, lines)) }
             } finally { pending.finish() }

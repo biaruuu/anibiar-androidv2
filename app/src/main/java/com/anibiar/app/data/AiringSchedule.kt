@@ -17,7 +17,7 @@ import java.util.Calendar
 /** One episode that airs (or aired) today, from AniList's release schedule. */
 data class Airing(val mediaId: Int, val title: String, val cover: String?, val episode: Int, val at: Long, val popularity: Int)
 
-object Schedule {
+object AiringSchedule {
     private val json = Json { ignoreUnknownKeys = true }
     @Volatile private var cache: Pair<Long, List<Airing>>? = null
 

@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anibiar.app.data.Airing
-import com.anibiar.app.data.Schedule
+import com.anibiar.app.data.AiringSchedule
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.inter
 import kotlinx.coroutines.delay
@@ -42,7 +42,7 @@ import java.util.Date
 /** "Airing today": today's popular releases in air-time order, with a live countdown to each one. */
 @Composable
 fun AiringToday(onOpen: (Int) -> Unit) {
-    val list by produceState<List<Airing>>(emptyList()) { value = runCatching { Schedule.today() }.getOrDefault(emptyList()) }
+    val list by produceState<List<Airing>>(emptyList()) { value = runCatching { AiringSchedule.today() }.getOrDefault(emptyList()) }
     if (list.isEmpty()) return
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
