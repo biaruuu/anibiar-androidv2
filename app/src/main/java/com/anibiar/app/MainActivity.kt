@@ -131,6 +131,7 @@ private fun AppNavigation() {
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var adminOpen by rememberSaveable { mutableStateOf(false) }
     var inboxOpen by rememberSaveable { mutableStateOf(false) }
     var inboxTab by rememberSaveable { mutableStateOf(false) }
     var chatUid by rememberSaveable { mutableStateOf<String?>(null) }
@@ -253,12 +254,17 @@ private fun AppNavigation() {
         if (settingsOpen) {
             Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
                 com.anibiar.app.ui.settings.SettingsScreen(
+                    onAdmin = { adminOpen = true },
                     onLogin = { settingsOpen = false; profileOpen = true },
                     onOpenInbox = { inboxOpen = true },
                     onOpenProfile = { settingsOpen = false; profileOpen = true },
                     onBack = { settingsOpen = false },
                 )
             }
+        }
+
+        if (adminOpen) {
+            Box(Modifier.fillMaxSize().background(Ani.Onyx)) { com.anibiar.app.ui.admin.AdminScreen(onBack = { adminOpen = false }) }
         }
 
         if (profileOpen) {

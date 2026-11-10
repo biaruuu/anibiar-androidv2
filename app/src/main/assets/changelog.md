@@ -438,3 +438,6 @@
 
 ## 96 | Admin panel | 2026-11-10
 - Admin panel support: anime and stream links added by the owner show up in Home and play in the player; app updates are offered only after they are published.
+
+## 97 | Admin panel inside the app | 2026-11-10
+- Owner-only Admin panel in Settings: add anime and stream links (mp4 / HLS), draft or publish updates to test them first, and see live users and online stats

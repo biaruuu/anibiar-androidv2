@@ -72,7 +72,7 @@ private sealed interface Dlg {
 
 /** Account information, profile link, privacy and log out. One scrolling page, no sub-screens. */
 @Composable
-fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: () -> Unit, onBack: () -> Unit = {}) {
+fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: () -> Unit, onBack: () -> Unit = {}) {
     androidx.activity.compose.BackHandler(onBack = onBack)
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
@@ -184,6 +184,10 @@ fun SettingsScreen(onLogin: () -> Unit, onOpenInbox: () -> Unit, onOpenProfile: 
                 when (profile?.favoritesVisibility) { "me" -> "Only me"; "friends" -> "Friends"; else -> "Everyone" },
                 onClick = { dlg = Dlg.Favs },
             )
+        }
+
+        if (me?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)) Section("Owner") {
+            InfoRow("Admin panel", "Anime, streams, updates, stats", onClick = onAdmin)
         }
 
         Section("Notifications") {

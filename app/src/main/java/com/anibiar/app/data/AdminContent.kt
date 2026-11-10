@@ -21,6 +21,9 @@ object AdminContent {
 
     fun isCustom(id: Int) = id >= BASE
 
+    /** Forget cached lists after the admin panel changed something. */
+    fun refresh() { customCache = null; rowsCache.clear() }
+
     private class Cached<T>(val at: Long, val v: T)
     private var customCache: Cached<List<Media>>? = null
     private val rowsCache = ConcurrentHashMap<Int, Cached<List<kotlinx.serialization.json.JsonObject>>>()
