@@ -222,8 +222,10 @@ private fun rows(text: String): List<JsonObject> = runCatching { (json.parseToJs
     var title by remember { mutableStateOf("") }; var body by remember { mutableStateOf("") }
     var important by remember { mutableStateOf(false) }
     fun toast(m: String) = Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show()
-    fun load() { scope.launch { val (c, t) = rest("GET", "/rest/v1/announcements?select=*&order=created_at.desc", null); if (c in 200..299) list = rows(t) else toast("Couldn't load ($c)") } }
-    LaunchedEffect(Unit) { load() }
+    val appCtx = ctx.applicationContext as AniBiarApp
+    fun loadNow() { scope.launch { val (c, t) = rest("GET", "/rest/v1/announcements?select=*&order=created_at.desc", null); if (c in 200..299) list = rows(t) else toast("Couldn't load ($c)") } }
+    fun load() { loadNow(); com.anibiar.app.social.LiveSync.ping(appCtx) }
+    LaunchedEffect(Unit) { loadNow() }
 
     Heading("New announcement")
     Card {
@@ -270,7 +272,8 @@ private data class Build(val build: Int, val apk: String, val size: Long, val no
     var rels by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     fun toast(m: String) = Toast.makeText(ctx, m, Toast.LENGTH_LONG).show()
-    fun load() {
+    val appCtx = ctx.applicationContext as AniBiarApp
+    fun loadNow() {
         scope.launch {
             loading = true
             val gh = withContext(Dispatchers.IO) {
@@ -291,7 +294,8 @@ private data class Build(val build: Int, val apk: String, val size: Long, val no
             loading = false
         }
     }
-    LaunchedEffect(Unit) { load() }
+    fun load() { loadNow(); com.anibiar.app.social.LiveSync.ping(appCtx) }
+    LaunchedEffect(Unit) { loadNow() }
     fun statusOf(n: Int) = rels.firstOrNull { it.i("build") == n }?.s("status").orEmpty()
     val live = rels.filter { it.s("status") == "published" }.maxByOrNull { it.i("build") ?: 0 }?.i("build")
 

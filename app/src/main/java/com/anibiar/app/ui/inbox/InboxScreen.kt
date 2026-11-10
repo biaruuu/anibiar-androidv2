@@ -59,7 +59,8 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
     val notices by remember { social.notices() }.collectAsStateWithLifecycle(null)
     val myFollowing by social.myFollowing.collectAsStateWithLifecycle()
     val incoming by social.incomingRequests.collectAsStateWithLifecycle()
-    val anns by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>()) { value = com.anibiar.app.data.Announcements.load(app) }
+    val annTick by com.anibiar.app.social.LiveSync.tick.collectAsStateWithLifecycle()
+    val anns by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>(), annTick) { value = com.anibiar.app.data.Announcements.load(app) }
 
     // Let the unread dots show for a moment, then clear them.
     LaunchedEffect(Unit) { delay(1800); social.markAllRead() }

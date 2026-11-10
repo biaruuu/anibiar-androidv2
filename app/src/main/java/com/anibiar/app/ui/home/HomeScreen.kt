@@ -151,7 +151,8 @@ private fun HomeContent(
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
-    val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>()) { value = com.anibiar.app.data.Announcements.load(app) }
+    val annTick by com.anibiar.app.social.LiveSync.tick.collectAsStateWithLifecycle()
+    val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>(), annTick) { value = com.anibiar.app.data.Announcements.load(app) }
     var annGone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.Announcements.dismissed(app)) }
     val context = LocalContext.current
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }

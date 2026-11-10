@@ -163,7 +163,13 @@ private fun AppNavigation() {
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
     var update by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
-    androidx.compose.runtime.LaunchedEffect(Unit) { update = com.anibiar.app.update.Updater.check(context0) }
+    // Re-checks whenever the owner publishes or drafts a release (instant ping) and every 30 s while the app is open.
+    val liveTick by com.anibiar.app.social.LiveSync.tick.collectAsStateWithLifecycle()
+    var skippedBuild by androidx.compose.runtime.remember { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(liveTick) {
+        val found = com.anibiar.app.update.Updater.check(context0)
+        if (found != null && found.build != skippedBuild && update?.build != found.build) update = found
+    }
     // After an update: show what changed once.
     var whatsNew by androidx.compose.runtime.remember { mutableStateOf<List<com.anibiar.app.update.ChangeEntry>>(emptyList()) }
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -175,7 +181,7 @@ private fun AppNavigation() {
     if (whatsNew.isNotEmpty()) com.anibiar.app.update.WhatsNewDialog(whatsNew, "What's new in this update") {
         com.anibiar.app.update.Changelog.markSeen(context0, whatsNew.maxOf { it.id }); whatsNew = emptyList()
     }
-    update?.let { u -> com.anibiar.app.update.UpdateDialog(u, onDismiss = { update = null }) }
+    update?.let { u -> com.anibiar.app.update.UpdateDialog(u, onDismiss = { skippedBuild = u.build; update = null }) }
     var watchId by rememberSaveable { mutableStateOf(0) }
     var watchEp by rememberSaveable { mutableStateOf(1) }
     var joinRoom by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.social.Room?>(null) }

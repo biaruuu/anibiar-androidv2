@@ -444,3 +444,6 @@
 
 ## 98 | Announcements | 2026-11-10
 - Important notes and announcements from the team now appear on Home and at the top of your Inbox
+
+## 99 | Live updates and announcements | 2026-11-10
+- New announcements and app updates now show up on their own while the app is open, with no need to close and reopen it
