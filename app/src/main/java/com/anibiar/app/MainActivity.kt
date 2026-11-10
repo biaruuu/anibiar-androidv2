@@ -237,7 +237,11 @@ private fun AppNavigation() {
     Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
         HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
 
-        if (searchOpen) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = searchOpen,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) + androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(260)) { it / 24 },
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
+        ) {
             Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 com.anibiar.app.ui.search.SearchScreen(
                     onOpen = { id -> stack.add(id) },
@@ -259,7 +263,11 @@ private fun AppNavigation() {
                 )
             }
         }
-        if (settingsOpen) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = settingsOpen,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) + androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(260)) { it / 24 },
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
+        ) {
             Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 com.anibiar.app.ui.settings.SettingsScreen(
                     onAdmin = { adminOpen = true },
@@ -275,7 +283,11 @@ private fun AppNavigation() {
             Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) { com.anibiar.app.ui.admin.AdminScreen(onBack = { adminOpen = false }) }
         }
 
-        if (profileOpen) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = profileOpen,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)) + androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(260)) { it / 24 },
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)),
+        ) {
             Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 val a = authState
                 if (a != null) {

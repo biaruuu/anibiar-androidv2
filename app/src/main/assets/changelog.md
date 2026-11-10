@@ -468,3 +468,6 @@
 
 ## 106 | Design polish, part 4 | 2026-11-11
 - Poster card styles (Settings > Appearance), cards ease in, bookmark pop animation, press and hold a poster for a quick preview, and a sticky title with Play button on the Details page
+
+## 107 | Smoother screen switching | 2026-11-11
+- Search, Settings and Profile now fade and slide in, and poster cards are larger on tablets

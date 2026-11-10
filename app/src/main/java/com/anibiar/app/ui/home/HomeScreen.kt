@@ -776,7 +776,8 @@ internal fun HeroChip(label: String) {
 @Composable
 private fun RecoRow(title: String, items: List<Media>, onClick: (Int) -> Unit) {
     val style = com.anibiar.app.ui.theme.Appearance.cardStyle
-    val cardW = if (style == 2) 172.dp else 132.dp
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840
+    val cardW = (if (wide) 168.dp else 132.dp) + (if (style == 2) 40.dp else 0.dp)
     var preview by remember { mutableStateOf<Media?>(null) }
     var animate by remember { mutableStateOf(true) }
     androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(1500); animate = false }
