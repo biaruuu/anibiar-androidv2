@@ -69,6 +69,7 @@ import com.anibiar.app.data.EpisodesPayload
 import com.anibiar.app.data.HistoryItem
 import com.anibiar.app.data.Media
 import com.anibiar.app.data.SkipPayload
+import com.anibiar.app.data.SkipTimes
 import com.anibiar.app.data.Streaming
 import com.anibiar.app.data.WatchEpisode
 import com.anibiar.app.data.WatchPayload
@@ -267,9 +268,18 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         val mal = anime?.idMal; val n = current?.number
         if (mal != null && n != null && n > 0) value = Streaming.skip(mal, n)
     }
-    val own = stream?.intro != null || stream?.outro != null
-    val intro = if (own) stream?.intro else (watch?.intro ?: backup?.intro)
-    val outro = if (own) stream?.outro else (watch?.outro ?: backup?.outro)
+    // AniSkip v2, asked again with the real video length as soon as the player knows it, so the times match this cut.
+    var playerSecs by remember(id, current?.number) { mutableStateOf(0.0) }
+    class Tagged(val mal: Int, val ep: Int, val p: SkipPayload)
+    val aniSkip by produceState<Tagged?>(null, anime?.idMal, current?.number, playerSecs.toInt()) {
+        val mal = anime?.idMal; val n = current?.number
+        if (mal != null && n != null && n > 0) SkipTimes.fetch(mal, n, playerSecs)?.let { value = Tagged(mal, n, it) }
+    }
+    val ani = aniSkip?.takeIf { it.mal == anime?.idMal && it.ep == current?.number }?.p
+    // The server's own timing for this exact stream wins, then AniSkip, then the old gateway. Each part is chosen on its own.
+    val intro = stream?.intro ?: watch?.intro ?: ani?.intro ?: backup?.intro
+    val outro = stream?.outro ?: watch?.outro ?: ani?.outro ?: backup?.outro
+    val recap = ani?.recap
 
     val name = anime?.displayTitle ?: eps?.title ?: "Loading…"
     val seasons by produceState(emptyList<com.anibiar.app.ui.watch.SeasonEntry>(), anime?.id) {
@@ -335,7 +345,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 src = if (ready) stream?.src else null, format = stream?.format ?: "hls",
                 title = current?.let { "$name · Episode ${it.number}" } ?: name, poster = poster,
                 subtitles = if (stream?.kind == "hard") emptyList() else stream?.subtitles.orEmpty(),
-                intro = intro, outro = outro, skipLength = backup?.length,
+                intro = intro, outro = outro, recap = recap, onDuration = { playerSecs = it }, skipLength = backup?.length ?: ani?.length,
                 autoplay = autoplay, autoNext = autoNext, autoSkip = autoSkip,
                 onAutoplay = { autoplay = it; prefsStore.edit().putBoolean("autoplay", it).apply() },
                 onAutoNext = { autoNext = it; prefsStore.edit().putBoolean("autoNext", it).apply() },

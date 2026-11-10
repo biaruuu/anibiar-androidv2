@@ -459,3 +459,6 @@
 
 ## 103 | Genre chips and seek-bar markers | 2026-11-10
 - Genre chips on Home show picks for the genre you tap, and the intro and outro are marked in amber on the video seek bar
+
+## 104 | Smarter skip intro and outro | 2026-11-10
+- Skip Intro, Recap and Outro now use the latest AniSkip data matched to the exact length of the video you are watching, and the Online / Watching box moved out of Home

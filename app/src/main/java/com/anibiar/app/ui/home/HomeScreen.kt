@@ -310,7 +310,6 @@ private fun HomeContent(
                             }
                         }
     
-                        item(key = "live-stats") { LiveStatsCard() }
 
                     if (genreList.isNotEmpty()) {
                         item(key = "genre-chips") {
@@ -1429,32 +1428,5 @@ internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier
         ) {
             Text("Try again", style = inter(15f, FontWeight.SemiBold), color = Color.White)
         }
-    }
-}
-
-
-/** "● 12 Watching | 40 Online", updated live from the shared presence channel. */
-@androidx.compose.runtime.Composable
-private fun LiveStatsCard() {
-    val online by com.anibiar.app.social.LiveStats.online.collectAsStateWithLifecycle()
-    val watching by com.anibiar.app.social.LiveStats.watching.collectAsStateWithLifecycle()
-    if (online <= 0) return
-    val fmt = remember { java.text.NumberFormat.getIntegerInstance() }
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)
-            .background(Color(0xFF1B1B1F), RoundedCornerShape(22.dp)).padding(horizontal = 18.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(8.dp).background(Color(0xFF7CE38B), CircleShape))
-        Spacer(Modifier.width(8.dp))
-        Text(fmt.format(watching), style = inter(15f, FontWeight.SemiBold), color = Color.White)
-        Spacer(Modifier.width(6.dp))
-        Text("Watching", style = inter(15f, FontWeight.Normal), color = Color(0xFF9A9AA2))
-        Spacer(Modifier.width(16.dp))
-        Box(Modifier.width(1.dp).height(18.dp).background(Color(0xFF3A3A40)))
-        Spacer(Modifier.width(16.dp))
-        Text(fmt.format(online), style = inter(15f, FontWeight.SemiBold), color = Color.White)
-        Spacer(Modifier.width(6.dp))
-        Text("Online", style = inter(15f, FontWeight.Normal), color = Color(0xFF9A9AA2))
     }
 }

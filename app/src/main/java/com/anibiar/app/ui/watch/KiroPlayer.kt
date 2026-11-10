@@ -156,6 +156,9 @@ fun KiroPlayer(
     /** Name of the next episode ("Episode 5"); shown as a card near the end of this one. */
     nextLabel: String? = null,
     onPlayNext: () -> Unit = {},
+    recap: TimeRange? = null,
+    /** Called with the real video length in seconds once known (and if it changes). */
+    onDuration: (Double) -> Unit = {},
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -460,6 +463,7 @@ fun KiroPlayer(
     // Position, buffering, skip intro/outro, progress reporting.
     val onTimeNow by rememberUpdatedState(onTime)
     val autoSkipNow by rememberUpdatedState(autoSkip)
+    val onDurationNow by rememberUpdatedState(onDuration)
     LaunchedEffect(player) {
         var reported = 0L
         while (true) {
@@ -474,12 +478,12 @@ fun KiroPlayer(
                 }
             }
             bufferedMs = player.bufferedPosition
-            if (player.duration > 0) durationMs = player.duration
+            if (player.duration > 0) { if (kotlin.math.abs(player.duration - durationMs) > 500) onDurationNow(player.duration / 1000.0); durationMs = player.duration }
             val t = timeMs / 1000.0
-            fun inside(r: TimeRange?) = r != null && t >= r.start && t < r.end - 1
-            val kind = if (inside(intro)) "intro" else if (inside(outro)) "outro" else null
+            fun inside(r: TimeRange?) = r != null && t >= r.start - 0.3 && t < r.end - 1
+            val kind = if (inside(intro)) "intro" else if (inside(recap)) "recap" else if (inside(outro)) "outro" else null
             if (kind != null && autoSkipNow && !readOnlyNow && kind !in skipped && player.isPlaying) {
-                val r = if (kind == "intro") intro!! else outro!!
+                val r = when (kind) { "intro" -> intro!!; "recap" -> recap!!; else -> outro!! }
                 skipped += kind; skipToast = kind to t; skipTarget = null
                 remoteUntil[0] = System.currentTimeMillis() + 1000
                 player.seekTo((r.end * 1000).toLong())
@@ -672,7 +676,7 @@ fun KiroPlayer(
         Column(Modifier.align(Alignment.BottomEnd).padding(end = pad).padding(bottom = (w * 0.115f).coerce(64.dp, 120.dp)), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             skipToast?.let { (kind, from) ->
                 Row(Modifier.clip(RoundedCornerShape(50)).background(Color(0xB3000000)).border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(start = 14.dp, end = 6.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (kind == "intro") "Intro skipped" else "Outro skipped", style = nflx(12.5f, FontWeight.Medium), color = Color.White)
+                    Text(when (kind) { "intro" -> "Intro skipped"; "recap" -> "Recap skipped"; else -> "Outro skipped" }, style = nflx(12.5f, FontWeight.Medium), color = Color.White)
                     Spacer(Modifier.width(10.dp))
                     Text("Undo", style = nflx(12.5f, FontWeight.SemiBold), color = Color.White,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x26FFFFFF)).clickable { player.seekTo((from * 1000).toLong()); skipToast = null }.padding(horizontal = 12.dp, vertical = 5.dp))
@@ -699,12 +703,12 @@ fun KiroPlayer(
             if (skipToast == null) skipTarget?.let { kind ->
                 Row(
                     Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable {
-                        val r = if (kind == "intro") intro else outro
+                        val r = when (kind) { "intro" -> intro; "recap" -> recap; else -> outro }
                         if (r != null) { skipped += kind; skipToast = null; player.seekTo((r.end * 1000).toLong()); skipTarget = null }
                     }.padding(horizontal = 16.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (kind == "intro") "Skip Intro" else "Skip Outro", style = nflx(13.5f, FontWeight.SemiBold), color = Color.Black)
+                    Text(when (kind) { "intro" -> "Skip Intro"; "recap" -> "Skip Recap"; else -> "Skip Outro" }, style = nflx(13.5f, FontWeight.SemiBold), color = Color.Black)
                     Spacer(Modifier.width(6.dp))
                     Icon(VidIcons.SeekForward10, null, tint = Color.Black, modifier = Modifier.size(22.dp))
                 }
@@ -801,7 +805,7 @@ fun KiroPlayer(
                 TrackBar(
                     (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live && !readOnly,
                     Modifier.fillMaxWidth(), thumb = scrubFrac != null,
-                    marks = if (durationMs > 0) listOfNotNull(intro, outro).map { (it.start * 1000 / durationMs).toFloat() to (it.end * 1000 / durationMs).toFloat() } else emptyList(),
+                    marks = if (durationMs > 0) listOfNotNull(intro, recap, outro).map { (it.start * 1000 / durationMs).toFloat() to (it.end * 1000 / durationMs).toFloat() } else emptyList(),
                     onScrub = { scrubFrac = it; timeMs = (it * durationMs).toLong() },
                     onSeek = { f -> scrubFrac = null; if (readOnly) return@TrackBar; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
                     seekMode = true,

@@ -422,4 +422,4 @@ data class WatchPayload(
 )
 
 @Serializable
-data class SkipPayload(val intro: TimeRange? = null, val outro: TimeRange? = null, val length: Double? = null)
+data class SkipPayload(val intro: TimeRange? = null, val outro: TimeRange? = null, val length: Double? = null, val recap: TimeRange? = null)
