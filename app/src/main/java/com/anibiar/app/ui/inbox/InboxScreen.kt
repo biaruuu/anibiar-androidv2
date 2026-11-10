@@ -59,6 +59,7 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
     val notices by remember { social.notices() }.collectAsStateWithLifecycle(null)
     val myFollowing by social.myFollowing.collectAsStateWithLifecycle()
     val incoming by social.incomingRequests.collectAsStateWithLifecycle()
+    val anns by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>()) { value = com.anibiar.app.data.Announcements.load(app) }
 
     // Let the unread dots show for a moment, then clear them.
     LaunchedEffect(Unit) { delay(1800); social.markAllRead() }
@@ -76,6 +77,7 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
             Text("Loading…", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(16.dp))
         } else if (list.isEmpty()) {
             Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                anns.forEach { com.anibiar.app.ui.home.AnnouncementCard(it, Modifier.padding(bottom = 10.dp)) }
                 Spacer(Modifier.height(80.dp))
                 Icon(AniIcons.Bell, null, tint = Ani.Muted, modifier = Modifier.size(40.dp))
                 Spacer(Modifier.height(12.dp))
@@ -88,6 +90,7 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp),
             ) {
+                items(anns, key = { "ann-${it.id}" }) { a -> com.anibiar.app.ui.home.AnnouncementCard(a, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) }
                 items(list, key = { it.id }) { n ->
                     NoticeRow(
                         n, iFollow = n.actorId in myFollowing, pending = n.actorId in incoming,

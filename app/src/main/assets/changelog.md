@@ -441,3 +441,6 @@
 
 ## 97 | Admin panel inside the app | 2026-11-10
 - Owner-only Admin panel in Settings: add anime and stream links (mp4 / HLS), draft or publish updates to test them first, and see live users and online stats
+
+## 98 | Announcements | 2026-11-10
+- Important notes and announcements from the team now appear on Home and at the top of your Inbox

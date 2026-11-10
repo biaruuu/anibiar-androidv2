@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.BuildConfig
-import com.anibiar.app.data.AdminContent
 import com.anibiar.app.data.Http
 import com.anibiar.app.social.LiveStats
 import com.anibiar.app.ui.theme.Ani
@@ -87,14 +86,13 @@ fun AdminScreen(onBack: () -> Unit) {
             Text("Admin", style = inter(22f, FontWeight.ExtraBold), color = Color.White)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Stats", "Anime", "Streams", "Updates").forEachIndexed { i, t -> Pill(t, tab == i) { tab = i } }
+            listOf("Stats", "Announce", "Updates").forEachIndexed { i, t -> Pill(t, tab == i) { tab = i } }
         }
         Spacer(Modifier.height(10.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 60.dp)) {
             when (tab) {
                 0 -> StatsTab()
-                1 -> AnimeTab()
-                2 -> StreamsTab()
+                1 -> AnnounceTab()
                 else -> UpdatesTab()
             }
         }
@@ -217,158 +215,47 @@ private fun rows(text: String): List<JsonObject> = runCatching { (json.parseToJs
     }
 }
 
-/* ---------------- anime ---------------- */
-@Composable private fun AnimeTab() {
-    val rest0 = rememberRest(); val rest: suspend (String, String, String?) -> Pair<Int, String> = { m, p, b -> rest0(m, p, b, "return=minimal") }; val scope = rememberCoroutineScope(); val ctx = LocalContext.current
+/* ---------------- announcements ---------------- */
+@Composable private fun AnnounceTab() {
+    val rest = rememberRest(); val scope = rememberCoroutineScope(); val ctx = LocalContext.current
     var list by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
-    var editing by remember { mutableStateOf<Int?>(null) }
-    var title by remember { mutableStateOf("") }; var desc by remember { mutableStateOf("") }
-    var cover by remember { mutableStateOf("") }; var banner by remember { mutableStateOf("") }
-    var genres by remember { mutableStateOf("") }; var year by remember { mutableStateOf("") }
-    var eps by remember { mutableStateOf("") }; var score by remember { mutableStateOf("") }
-    var format by remember { mutableStateOf("TV") }; var status by remember { mutableStateOf("RELEASING") }
-    var published by remember { mutableStateOf(false) }
+    var title by remember { mutableStateOf("") }; var body by remember { mutableStateOf("") }
+    var important by remember { mutableStateOf(false) }
     fun toast(m: String) = Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show()
-    fun load() { scope.launch { val (c, t) = rest("GET", "/rest/v1/admin_anime?select=*&order=id.desc", null); if (c in 200..299) list = rows(t) else toast("Couldn't load ($c)") } }
+    fun load() { scope.launch { val (c, t) = rest("GET", "/rest/v1/announcements?select=*&order=created_at.desc", null); if (c in 200..299) list = rows(t) else toast("Couldn't load ($c)") } }
     LaunchedEffect(Unit) { load() }
-    fun clear() { editing = null; title = ""; desc = ""; cover = ""; banner = ""; genres = ""; year = ""; eps = ""; score = ""; format = "TV"; status = "RELEASING"; published = false }
 
-    Heading(if (editing == null) "Add anime" else "Edit anime")
+    Heading("New announcement")
     Card {
-        Field("Title", title, { title = it })
-        Field("Description", desc, { desc = it }, lines = 4)
-        Field("Cover image link", cover, { cover = it })
-        Field("Banner image link", banner, { banner = it })
-        Field("Genres (comma separated)", genres, { genres = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) { Field("Year", year, { year = it.filter(Char::isDigit).take(4) }, number = true) }
-            Box(Modifier.weight(1f)) { Field("Episodes", eps, { eps = it.filter(Char::isDigit).take(4) }, number = true) }
-            Box(Modifier.weight(1f)) { Field("Score 0-100", score, { score = it.filter(Char::isDigit).take(3) }, number = true) }
-        }
-        Text("Format", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { listOf("TV", "MOVIE", "OVA", "ONA", "SPECIAL").forEach { Pill(it, format == it) { format = it } } }
-        Text("Status", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { listOf("RELEASING", "FINISHED", "NOT_YET_RELEASED").forEach { Pill(it, status == it) { status = it } } }
-        Check("Published: everyone sees it. Off = only you see it in the app while signed in.", published) { published = it }
+        Field("Title", title, { title = it.take(80) })
+        Field("Message", body, { body = it.take(500) }, lines = 4)
+        Check("Mark as important (amber highlight)", important) { important = it }
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn(if (editing == null) "Add anime" else "Save", primary = true) {
-                if (title.isBlank()) { toast("A title is needed"); return@Btn }
-                val body = buildJsonObject {
-                    put("title", title.trim()); put("description", desc.trim().ifEmpty { null })
-                    put("cover_url", cover.trim().ifEmpty { null }); put("banner_url", banner.trim().ifEmpty { null })
-                    put("genres", buildJsonArray { genres.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { add(JsonPrimitive(it)) } })
-                    put("year", year.toIntOrNull()); put("episodes_total", eps.toIntOrNull()); put("score", score.toIntOrNull())
-                    put("format", format); put("status", status); put("published", published)
-                }.toString()
-                scope.launch {
-                    val id = editing
-                    val (c, t) = if (id == null) rest("POST", "/rest/v1/admin_anime", body) else rest("PATCH", "/rest/v1/admin_anime?id=eq.$id", body)
-                    if (c in 200..299) { toast(if (id == null) "Added" else "Saved"); clear(); AdminContent.refresh(); load() } else toast("Failed ($c) ${t.take(80)}")
-                }
-            }
-            if (editing != null) Btn("Cancel") { clear() }
+        Note("It is saved as a draft first. A draft shows on Home and in Inbox only for you, labelled Preview, so you can check it. Publish sends it to every user.")
+        Spacer(Modifier.height(10.dp))
+        Btn("Save as draft", primary = true) {
+            if (title.isBlank()) { toast("A title is needed"); return@Btn }
+            val json = buildJsonObject { put("title", title.trim()); put("body", body.trim()); put("important", important); put("status", "draft") }.toString()
+            scope.launch { val (c, _) = rest("POST", "/rest/v1/announcements", json); if (c in 200..299) { toast("Saved. Check Home to preview"); title = ""; body = ""; important = false; load() } else toast("Failed ($c)") }
         }
     }
-    Heading("Your anime (${list.size})")
-    if (list.isEmpty()) Note("Nothing added yet.")
+    Heading("Announcements (${list.size})")
+    if (list.isEmpty()) Note("Nothing yet.")
     list.forEach { a ->
-        val id = a.i("id") ?: return@forEach
+        val id = a.l("id"); val live = a.s("status") == "published"
         Card {
             Text(a.s("title"), style = inter(15f, FontWeight.SemiBold), color = Color.White)
-            Text("App id ${AdminContent.BASE + id} · ${a.s("format")} · ${a.s("status")}", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(vertical = 4.dp))
-            if (a.b("published")) Badge("Published", Color(0xFF6FE39A)) else Badge("Draft (only you)", Color(0xFFFFC94D))
+            if (a.s("body").isNotEmpty()) Text(a.s("body"), style = inter(13f, lineHeight = 18f), color = Ani.Soft, modifier = Modifier.padding(vertical = 4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (live) Badge("Published to everyone", Color(0xFF6FE39A)) else Badge("Draft (only you)", Color(0xFFFFC94D))
+                if (a.b("important")) Badge("Important", Color(0xFFFFC94D))
+            }
             Spacer(Modifier.height(10.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn("Edit") {
-                    editing = id; title = a.s("title"); desc = a.s("description"); cover = a.s("cover_url"); banner = a.s("banner_url")
-                    genres = (a["genres"] as? JsonArray).orEmpty().joinToString(", ") { it.jsonPrimitive.content }
-                    year = a.i("year")?.toString().orEmpty(); eps = a.i("episodes_total")?.toString().orEmpty(); score = a.i("score")?.toString().orEmpty()
-                    format = a.s("format").ifEmpty { "TV" }; status = a.s("status").ifEmpty { "RELEASING" }; published = a.b("published")
-                }
-                Btn(if (a.b("published")) "Unpublish" else "Publish") {
-                    scope.launch { rest("PATCH", "/rest/v1/admin_anime?id=eq.$id", """{"published":${!a.b("published")}}"""); AdminContent.refresh(); load() }
-                }
-                Btn("Delete", danger = true) {
-                    scope.launch {
-                        rest("DELETE", "/rest/v1/admin_sources?anime_ref=eq.${AdminContent.BASE + id}", null)
-                        rest("DELETE", "/rest/v1/admin_anime?id=eq.$id", null); AdminContent.refresh(); load(); toast("Deleted")
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* ---------------- streams ---------------- */
-@Composable private fun StreamsTab() {
-    val rest0 = rememberRest(); val rest: suspend (String, String, String?) -> Pair<Int, String> = { m, p, b -> rest0(m, p, b, "return=minimal") }; val scope = rememberCoroutineScope(); val ctx = LocalContext.current
-    var anime by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
-    var ref by remember { mutableStateOf("") }
-    var audio by remember { mutableStateOf("sub") }
-    var label by remember { mutableStateOf("Kiro") }
-    var bulk by remember { mutableStateOf("") }
-    var referer by remember { mutableStateOf("") }
-    var sub by remember { mutableStateOf("") }
-    var visible by remember { mutableStateOf(true) }
-    var links by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
-    fun toast(m: String) = Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show()
-    val refId = ref.toIntOrNull() ?: 0
-    fun load() { scope.launch { if (refId == 0) { links = emptyList(); return@launch }
-        val (c, t) = rest("GET", "/rest/v1/admin_sources?anime_ref=eq.$refId&select=*&order=audio,episode", null); if (c in 200..299) links = rows(t) } }
-    LaunchedEffect(Unit) { val (c, t) = rest("GET", "/rest/v1/admin_anime?select=id,title&order=id.desc", null); if (c in 200..299) anime = rows(t) }
-    LaunchedEffect(refId) { load() }
-
-    Heading("Add stream links")
-    Card {
-        Note("Type an AniList id (the number at the end of its anilist.co link), or tap one of your own anime below.")
-        Field("Anime id", ref, { ref = it.filter(Char::isDigit).take(8) }, number = true)
-        if (anime.isNotEmpty()) FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            anime.forEach { a -> val rid = AdminContent.BASE + (a.i("id") ?: 0); Pill(a.s("title").take(22), refId == rid) { ref = rid.toString() } }
-        }
-        Text("Audio", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { Pill("Sub", audio == "sub") { audio = "sub" }; Pill("Dub", audio == "dub") { audio = "dub" } }
-        Field("Server name shown in the player", label, { label = it })
-        Field("Episodes, one per line: episode then link", bulk, { bulk = it }, lines = 5)
-        Note("Example: 1 https://site.com/ep1.mp4   (links ending in .m3u8 play as HLS)")
-        Field("Referer (only if the link needs one)", referer, { referer = it })
-        Field("Subtitle link .vtt/.srt (optional)", sub, { sub = it })
-        Check("Visible to everyone. Off = only you see it while signed in.", visible) { visible = it }
-        Spacer(Modifier.height(12.dp))
-        Btn("Add links", primary = true) {
-            if (refId == 0) { toast("Enter an anime id"); return@Btn }
-            val arr = buildJsonArray {
-                for (raw in bulk.lines()) {
-                    val line = raw.trim(); if (line.isEmpty()) continue
-                    val m = Regex("^(\\d+)\\s*[|,\\s]\\s*(https?://\\S+)$", RegexOption.IGNORE_CASE).find(line)
-                    if (m == null) { toast("Can't read: ${line.take(40)}"); return@Btn }
-                    val url = m.groupValues[2]
-                    add(buildJsonObject {
-                        put("anime_ref", refId); put("episode", m.groupValues[1].toInt()); put("audio", audio); put("label", label.trim().ifEmpty { "Kiro" })
-                        put("url", url); put("format", if (Regex("\\.m3u8(\\?|$)", RegexOption.IGNORE_CASE).containsMatchIn(url)) "hls" else "file")
-                        put("referer", referer.trim().ifEmpty { null }); put("subtitle_url", sub.trim().ifEmpty { null }); put("published", visible)
-                    })
-                }
-            }
-            if (arr.isEmpty()) { toast("Paste at least one line"); return@Btn }
-            scope.launch {
-                val (c, t) = rest("POST", "/rest/v1/admin_sources", arr.toString())
-                if (c in 200..299) { toast("Added ${arr.size} link(s)"); bulk = ""; AdminContent.refresh(); load() } else toast("Failed ($c) ${t.take(80)}")
-            }
-        }
-    }
-    Heading("Links for this anime (${links.size})")
-    if (links.isEmpty()) Note("Nothing here yet.")
-    links.forEach { s ->
-        val id = s.i("id") ?: return@forEach
-        Card {
-            Text("Episode ${s.i("episode")} · ${s.s("audio").uppercase()} · ${s.s("label")}", style = inter(14.5f, FontWeight.SemiBold), color = Color.White)
-            Text(s.s("url"), style = inter(12f), color = Ani.Muted, maxLines = 2, modifier = Modifier.padding(vertical = 4.dp))
-            if (s.b("published")) Badge("Visible · ${s.s("format")}", Color(0xFF6FE39A)) else Badge("Hidden · ${s.s("format")}", Color(0xFFFFC94D))
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(if (s.b("published")) "Hide" else "Show") { scope.launch { rest("PATCH", "/rest/v1/admin_sources?id=eq.$id", """{"published":${!s.b("published")}}"""); AdminContent.refresh(); load() } }
-                Btn("Delete", danger = true) { scope.launch { rest("DELETE", "/rest/v1/admin_sources?id=eq.$id", null); AdminContent.refresh(); load() } }
+                if (!live) Btn("Publish to everyone", primary = true) {
+                    scope.launch { val (c, _) = rest("PATCH", "/rest/v1/announcements?id=eq.$id", """{"status":"published","published_at":"${java.time.Instant.now()}"}"""); toast(if (c in 200..299) "Published" else "Failed ($c)"); load() }
+                } else Btn("Pull back to draft") { scope.launch { rest("PATCH", "/rest/v1/announcements?id=eq.$id", """{"status":"draft","published_at":null}"""); load() } }
+                Btn("Delete", danger = true) { scope.launch { rest("DELETE", "/rest/v1/announcements?id=eq.$id", null); load() } }
             }
         }
     }
