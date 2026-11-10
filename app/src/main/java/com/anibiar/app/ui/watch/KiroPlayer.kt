@@ -801,6 +801,7 @@ fun KiroPlayer(
                 TrackBar(
                     (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live && !readOnly,
                     Modifier.fillMaxWidth(), thumb = scrubFrac != null,
+                    marks = if (durationMs > 0) listOfNotNull(intro, outro).map { (it.start * 1000 / durationMs).toFloat() to (it.end * 1000 / durationMs).toFloat() } else emptyList(),
                     onScrub = { scrubFrac = it; timeMs = (it * durationMs).toLong() },
                     onSeek = { f -> scrubFrac = null; if (readOnly) return@TrackBar; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
                     seekMode = true,
@@ -901,6 +902,8 @@ private fun buildTime(t: Double, d: Double, title: String?) =
 private fun TrackBar(
     frac: Float, buffered: Float, enabled: Boolean, modifier: Modifier, thumb: Boolean,
     onScrub: (Float) -> Unit = {}, onSeek: (Float) -> Unit, seekMode: Boolean = false,
+    /** Stretches of the timeline to highlight (intro / outro), as fractions 0..1. */
+    marks: List<Pair<Float, Float>> = emptyList(),
 ) {
     val f = frac.coerceIn(0f, 1f)
     val fNow by rememberUpdatedState(f)
@@ -921,6 +924,9 @@ private fun TrackBar(
     ) {
         Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color(0x4DFFFFFF)))
         if (buffered > 0f) Box(Modifier.fillMaxWidth(buffered.coerceIn(0f, 1f)).height(4.dp).clip(CircleShape).background(Color(0x80FFFFFF)))
+        if (marks.isNotEmpty()) androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape)) {
+            marks.forEach { (a, b) -> drawRect(Color(0xE6FFC94D), androidx.compose.ui.geometry.Offset(size.width * a.coerceIn(0f, 1f), 0f), androidx.compose.ui.geometry.Size(size.width * (b - a).coerceIn(0f, 1f), size.height)) }
+        }
         Box(Modifier.fillMaxWidth(f).height(4.dp).clip(CircleShape).background(Color.White))
         if (thumb) BoxWithConstraints(Modifier.fillMaxWidth()) { Box(Modifier.offset(x = (maxWidth * f) - 6.dp).size(12.dp).clip(CircleShape).background(Color.White)) }
     }

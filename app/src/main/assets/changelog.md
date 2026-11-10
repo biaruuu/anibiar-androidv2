@@ -456,3 +456,6 @@
 
 ## 102 | Design polish, part 3 | 2026-11-10
 - Text size setting, pull-to-refresh with the Kiro mascot, snap-scrolling rows, a score ring on Details, and a quick first-launch setup screen
+
+## 103 | Genre chips and seek-bar markers | 2026-11-10
+- Genre chips on Home show picks for the genre you tap, and the intro and outro are marked in amber on the video seek bar
