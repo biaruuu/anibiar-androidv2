@@ -296,7 +296,7 @@ private fun AppNavigation() {
 
         userStack.lastOrNull()?.let { uid ->
             androidx.compose.runtime.key(userStack.size, uid) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                     com.anibiar.app.ui.profile.ProfileScreen(
                         uid = uid,
                         onBack = { if (userStack.isNotEmpty()) userStack.removeAt(userStack.lastIndex) },
@@ -309,7 +309,7 @@ private fun AppNavigation() {
 
         chatUid?.let { cu ->
             androidx.compose.runtime.key(cu) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                     com.anibiar.app.ui.inbox.ChatScreen(
                         uid = cu, onBack = { chatUid = null },
                         onOpenUser = { chatUid = null; userStack.add(it) },
