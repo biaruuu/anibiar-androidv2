@@ -22,7 +22,7 @@ import kotlin.math.abs
  */
 object SkipTimes {
     private val json = Json { ignoreUnknownKeys = true }
-    private class Entry(val at: Long, val v: SkipPayload?)
+    private class Entry(val at: Long, val raw: List<JsonObject>?)
     private val cache = ConcurrentHashMap<String, Entry>()
 
     private fun range(o: JsonObject): TimeRange? {
@@ -32,28 +32,31 @@ object SkipTimes {
         return TimeRange(s, e)
     }
 
-    /** [lengthSec] is the real video length, or 0 while it isn't known yet. */
-    suspend fun fetch(mal: Int, ep: Int, lengthSec: Double): SkipPayload? {
-        val len = if (lengthSec > 60) Math.round(lengthSec * 1000) / 1000.0 else 0.0
-        val key = "$mal/$ep/${len.toInt()}"
-        cache[key]?.let { if (System.currentTimeMillis() - it.at < (if (it.v == null) 300_000 else 3_600_000)) return it.v }
-        val result = withContext(Dispatchers.IO) {
+    /** Every submission AniSkip has for this episode, cached. null = the request failed, empty = it has none. */
+    private suspend fun all(mal: Int, ep: Int): List<JsonObject>? {
+        val key = "$mal/$ep"
+        cache[key]?.let { e -> if (System.currentTimeMillis() - e.at < (if (e.raw == null) 60_000 else 3_600_000)) return e.raw }
+        val raw = withContext(Dispatchers.IO) {
             runCatching {
-                val url = "https://api.aniskip.com/v2/skip-times/$mal/$ep".toHttpUrl().newBuilder().apply {
-                    listOf("op", "ed", "mixed-op", "mixed-ed", "recap").forEach { addQueryParameter("types[]", it) }
-                    addQueryParameter("episodeLength", if (len > 0) len.toString() else "0")
-                }.build()
+                // Brackets are kept literal, exactly as the AniSkip site itself sends them.
+                val url = "https://api.aniskip.com/v2/skip-times/$mal/$ep?types[]=op&types[]=ed&types[]=mixed-op&types[]=mixed-ed&types[]=recap&episodeLength=0".toHttpUrl()
                 Http.plain.newCall(Request.Builder().url(url).header("Accept", "application/json").build()).execute().use { r ->
-                    if (!r.isSuccessful) return@use null
-                    val root = json.parseToJsonElement(r.body!!.string()).jsonObject
-                    val results = (root["results"] as? JsonArray).orEmpty().map { it.jsonObject }
-                    pick(results, len)
+                    when {
+                        r.code == 404 -> emptyList()
+                        !r.isSuccessful -> null
+                        else -> (json.parseToJsonElement(r.body!!.string()).jsonObject["results"] as? JsonArray).orEmpty().map { it.jsonObject }
+                    }
                 }
             }.getOrNull()
         }
-        // A failed request isn't cached as "nothing found" for long: only real answers (including empty ones) stick.
-        cache[key] = Entry(System.currentTimeMillis(), result)
-        return result
+        cache[key] = Entry(System.currentTimeMillis(), raw)
+        return raw
+    }
+
+    /** [lengthSec] is the real video length, or 0 while it isn't known yet. */
+    suspend fun fetch(mal: Int, ep: Int, lengthSec: Double): SkipPayload? {
+        val results = all(mal, ep) ?: return null
+        return pick(results, if (lengthSec > 60) lengthSec else 0.0)
     }
 
     private fun pick(results: List<JsonObject>, len: Double): SkipPayload? {
@@ -61,8 +64,8 @@ object SkipTimes {
             val c = results.filter { it["skipType"]?.jsonPrimitive?.contentOrNull in types }.mapNotNull { o ->
                 val r = range(o) ?: return@mapNotNull null
                 val el = o["episodeLength"]?.jsonPrimitive?.doubleOrNull ?: 0.0
-                // Timed for a different cut of the episode: don't trust it.
-                if (len > 0 && el > 0 && abs(el - len) > 6.0) return@mapNotNull null
+                // Timed for a very different cut of the episode (more than 45 s off): don't trust it.
+                if (len > 0 && el > 0 && abs(el - len) > 45.0) return@mapNotNull null
                 val end = if (len > 0) minOf(r.end, len) else r.end
                 val start = r.start.coerceAtLeast(0.0)
                 val dur = end - start
@@ -71,8 +74,8 @@ object SkipTimes {
             }
             return c.minByOrNull { it.second }?.first
         }
-        val intro = best("op", "mixed-op", minLen = 10.0, maxLen = 240.0)
-        val outro = best("ed", "mixed-ed", minLen = 10.0, maxLen = 400.0)
+        val intro = best("op", "mixed-op", minLen = 5.0, maxLen = 240.0)
+        val outro = best("ed", "mixed-ed", minLen = 5.0, maxLen = 400.0)
         val recap = best("recap", minLen = 8.0, maxLen = 240.0)
         if (intro == null && outro == null && recap == null) return null
         return SkipPayload(intro = intro, outro = outro, recap = recap, length = len.takeIf { it > 0 })

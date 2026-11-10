@@ -157,6 +157,8 @@ fun KiroPlayer(
     nextLabel: String? = null,
     onPlayNext: () -> Unit = {},
     recap: TimeRange? = null,
+    /** Where the skip times came from, shown when Auto skip is toggled. */
+    skipInfo: String = "",
     /** Called with the real video length in seconds once known (and if it changes). */
     onDuration: (Double) -> Unit = {},
 ) {
@@ -750,7 +752,7 @@ fun KiroPlayer(
                 GlassPill {
                     val sw = (w * 0.075f).coerce(25.dp, 38.dp); val sh = (w * 0.04f).coerce(13.dp, 20.dp)
                     GlassSwitch(autoplay, FeatherIcons.Play, sw, sh, live) { onAutoplay(!autoplay); say("Autoplay ${if (!autoplay) "on" else "off"}") }
-                    GlassSwitch(autoSkip, FeatherIcons.FastForward, sw, sh, live) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}") }
+                    GlassSwitch(autoSkip, FeatherIcons.FastForward, sw, sh, live) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}" + (if (skipInfo.isNotEmpty()) " · $skipInfo" else "")) }
                     GlassSwitch(autoNext, FeatherIcons.SkipForward, sw, sh, live) { onAutoNext(!autoNext); say("Auto next ${if (!autoNext) "on" else "off"}") }
                     BarButton(btn, VidIcons.Camera, ico, live) { screenshot(context, textureView) { say(it.first, it.second) } }
                     if (format == "file") BarButton(btn, VidIcons.Download, ico, live) {

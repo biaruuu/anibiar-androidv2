@@ -462,3 +462,6 @@
 
 ## 104 | Smarter skip intro and outro | 2026-11-10
 - Skip Intro, Recap and Outro now use the latest AniSkip data matched to the exact length of the video you are watching, and the Online / Watching box moved out of Home
+
+## 105 | Skip times fix | 2026-11-11
+- Skip Intro / Outro now accepts AniSkip timings from slightly different cuts of an episode, and tapping Auto skip shows where the times came from

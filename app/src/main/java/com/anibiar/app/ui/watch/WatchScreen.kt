@@ -280,6 +280,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
     val intro = stream?.intro ?: watch?.intro ?: ani?.intro ?: backup?.intro
     val outro = stream?.outro ?: watch?.outro ?: ani?.outro ?: backup?.outro
     val recap = ani?.recap
+    val skipSource = "mal=${anime?.idMal ?: "none"} len=${playerSecs.toInt()}s intro=${intro?.let { "${it.start.toInt()}-${it.end.toInt()}" } ?: "-"} outro=${outro?.let { "${it.start.toInt()}-${it.end.toInt()}" } ?: "-"} from=${if (stream?.intro != null || stream?.outro != null) "server" else if (ani != null) "aniskip" else if (backup != null) "gateway" else "none"}"
 
     val name = anime?.displayTitle ?: eps?.title ?: "Loading…"
     val seasons by produceState(emptyList<com.anibiar.app.ui.watch.SeasonEntry>(), anime?.id) {
@@ -345,7 +346,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 src = if (ready) stream?.src else null, format = stream?.format ?: "hls",
                 title = current?.let { "$name · Episode ${it.number}" } ?: name, poster = poster,
                 subtitles = if (stream?.kind == "hard") emptyList() else stream?.subtitles.orEmpty(),
-                intro = intro, outro = outro, recap = recap, onDuration = { playerSecs = it }, skipLength = backup?.length ?: ani?.length,
+                intro = intro, outro = outro, recap = recap, skipInfo = if (intro == null && outro == null && recap == null) "no skip times found" else skipSource, onDuration = { playerSecs = it }, skipLength = backup?.length ?: ani?.length,
                 autoplay = autoplay, autoNext = autoNext, autoSkip = autoSkip,
                 onAutoplay = { autoplay = it; prefsStore.edit().putBoolean("autoplay", it).apply() },
                 onAutoNext = { autoNext = it; prefsStore.edit().putBoolean("autoNext", it).apply() },
@@ -392,7 +393,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                             val ctx = LocalContext.current
                             Text("Copy report", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
                                 modifier = Modifier.glass(RoundedCornerShape(50)).clickable {
-                                    val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nplayer=${Streaming.lastPlayError ?: "-"}\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
+                                    val report = "Kiro report\nanime=$id ep=$ep audio=$audio server=${providerPref ?: "auto"}\nstage=${if (epsError != null) "episodes" else "stream"}\nerror=$err\nplayer=${Streaming.lastPlayError ?: "-"}\nskip=$skipSource\nepisodesLoaded=${epsRaw?.sub?.size ?: 0}/${epsRaw?.dub?.size ?: 0}\ntime=${java.util.Date()}"
                                     (ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(android.content.ClipData.newPlainText("report", report))
                                     android.widget.Toast.makeText(ctx, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
                                 }.padding(horizontal = 18.dp, vertical = 8.dp))
