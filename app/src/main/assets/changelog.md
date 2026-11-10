@@ -474,3 +474,6 @@
 
 ## 108 | Design polish, part 5 | 2026-11-11
 - A Resume card on Home, Short and sweet and Finished and bingeable rows, episode filters (All, Unwatched, Watched) with jump buttons, and a one-time gesture hint in the player
+
+## 109 | Home cleanup | 2026-11-11
+- Removed the genre chips and the Short and sweet / Finished and bingeable rows from Home

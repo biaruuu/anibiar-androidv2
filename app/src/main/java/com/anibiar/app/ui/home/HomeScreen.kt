@@ -159,11 +159,6 @@ private fun HomeContent(
     val annTick by com.anibiar.app.social.LiveSync.tick.collectAsStateWithLifecycle()
     val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>(), annTick) { value = com.anibiar.app.data.Announcements.load(app) }
     var annGone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.Announcements.dismissed(app)) }
-    var genre by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-    val genrePool = remember(state.trending, state.popular, state.topAiring, state.upcoming, state.reco, state.added) {
-        (state.trending + state.popular + state.topAiring + state.upcoming + state.reco + state.added).distinctBy { it.id }
-    }
-    val genreList = remember(genrePool) { genrePool.flatMap { it.genres.orEmpty() }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(10).map { it.key } }
     val context = LocalContext.current
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 
@@ -315,25 +310,6 @@ private fun HomeContent(
                         }
     
 
-                    if (genreList.isNotEmpty()) {
-                        item(key = "genre-chips") {
-                            androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
-                                items(genreList, key = { it }) { g ->
-                                    val on = genre == g
-                                    Text(g, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
-                                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { genre = if (on) null else g }.padding(horizontal = 16.dp, vertical = 8.dp))
-                                }
-                            }
-                        }
-                        val shorts = genrePool.filter { (it.episodes ?: 0) in 1..13 && it.status != "NOT_YET_RELEASED" }.take(14)
-                        val binge = genrePool.filter { it.status == "FINISHED" && (it.episodes ?: 0) >= 12 && (it.averageScore ?: 0) >= 70 }.take(14)
-                        if (genre == null && shorts.size >= 4) item(key = "col-short") { RecoRow("Short & sweet", shorts, onOpen) }
-                        if (genre == null && binge.size >= 4) item(key = "col-binge") { RecoRow("Finished and bingeable", binge, onOpen) }
-                        genre?.let { g ->
-                            val picks = genrePool.filter { g in it.genres.orEmpty() }
-                            if (picks.isNotEmpty()) item(key = "genre-row-$g") { RecoRow("$g picks", picks, onOpen) }
-                        }
-                    }
     
                         if (state.history.isNotEmpty()) {
                             item(key = "continue") {
