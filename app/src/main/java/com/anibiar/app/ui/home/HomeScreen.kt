@@ -156,6 +156,10 @@ private fun HomeContent(
     val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>(), annTick) { value = com.anibiar.app.data.Announcements.load(app) }
     var annGone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.Announcements.dismissed(app)) }
     var genre by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    val genrePool = remember(state.trending, state.popular, state.topAiring, state.upcoming, state.reco, state.added) {
+        (state.trending + state.popular + state.topAiring + state.upcoming + state.reco + state.added).distinctBy { it.id }
+    }
+    val genreList = remember(genrePool) { genrePool.flatMap { it.genres.orEmpty() }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(10).map { it.key } }
     val context = LocalContext.current
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 
@@ -308,10 +312,6 @@ private fun HomeContent(
     
                         item(key = "live-stats") { LiveStatsCard() }
 
-                    val genrePool = remember(state.trending, state.popular, state.topAiring, state.upcoming, state.reco, state.added) {
-                        (state.trending + state.popular + state.topAiring + state.upcoming + state.reco + state.added).distinctBy { it.id }
-                    }
-                    val genreList = remember(genrePool) { genrePool.flatMap { it.genres.orEmpty() }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(10).map { it.key } }
                     if (genreList.isNotEmpty()) {
                         item(key = "genre-chips") {
                             androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 14.dp)) {
