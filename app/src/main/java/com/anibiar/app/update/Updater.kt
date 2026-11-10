@@ -40,7 +40,21 @@ object Updater {
         }
     }.getOrDefault(emptyList())
 
+    /** What the admin panel says: (true, info) = an update to offer, (true, null) = nothing to offer, null = couldn't ask. Drafts are only offered to the admin account. */
+    private suspend fun fromAdmin(context: Context?): Pair<Boolean, UpdateInfo?>? {
+        val social = (context?.applicationContext as? com.anibiar.app.AniBiarApp)?.social ?: return null
+        val (code, text) = social.rest("POST", "/rest/v1/rpc/latest_release", "{}")
+        if (code !in 200..299) return null
+        val row = runCatching { json.parseToJsonElement(text).jsonArray.firstOrNull()?.jsonObject }.getOrNull() ?: return true to null
+        val build = row["build"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: return true to null
+        if (build <= BuildConfig.VERSION_CODE) return true to null
+        val url = row["apk_url"]?.jsonPrimitive?.contentOrNull ?: return true to null
+        return true to UpdateInfo(build, url, row["size"]?.jsonPrimitive?.longOrNull ?: 0L, row["notes"]?.jsonPrimitive?.contentOrNull.orEmpty(), newEntries(context))
+    }
+
     suspend fun check(context: Context? = null): UpdateInfo? = withContext(Dispatchers.IO) {
+        // Updates are only offered once published in the admin panel (the admin account also sees drafts, to test them first).
+        fromAdmin(context)?.let { return@withContext it.second }
         runCatching {
             val req = Request.Builder().url(LATEST).header("Accept", "application/vnd.github+json").build()
             client.newCall(req).execute().use { r ->

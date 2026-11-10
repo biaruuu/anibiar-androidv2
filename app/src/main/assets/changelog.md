@@ -435,3 +435,6 @@
 
 ## 95 | Live Online and Watching | 2026-11-10
 - Home now shows a live "Watching | Online" box: how many people have the app open and how many are watching a video right now, updating in real time
+
+## 96
+- Admin panel support: anime and stream links added by the owner show up in Home and play in the player; app updates are offered only after they are published.

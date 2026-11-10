@@ -219,7 +219,7 @@ object Streaming {
     private suspend fun episodesInner(id: Int): EpisodesPayload {
         epsCache[id]?.takeIf { System.currentTimeMillis() - it.at < 30_000 }?.let { return it.v }
         val r = kotlinx.coroutines.coroutineScope {
-            val srv = async { runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) } }
+            val srv = async { if (AdminContent.isCustom(id)) Result.success(null) else runCatching { gatewayEpisodes(id) ?: json.decodeFromString<EpisodesPayload>(get("/api/anime/$id/episodes")) } }
             val loc = async { runCatching { LocalSources.episodes(id) }.getOrNull().orEmpty() }
             val s = srv.await()
             val base = s.getOrNull()

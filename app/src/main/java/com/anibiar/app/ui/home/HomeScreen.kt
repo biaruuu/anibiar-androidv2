@@ -287,6 +287,8 @@ private fun HomeContent(
                         }
                     }
 
+                    if (state.added.isNotEmpty()) item(key = "added") { RecoRow("Added by AniBiar", state.added, onOpen) }
+
                     item(key = "latest-header") {
                         Spacer(Modifier.height(28.dp))
                         LatestHeader(

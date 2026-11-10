@@ -41,7 +41,7 @@ object LocalSources {
     const val HOSHI = "hoshi"    // JSON API, HLS
     const val YUKI = "yuki"      // sub + dub, vidmoly / nova players
     const val NAMI = "nami"      // anikoto: sub + dub, MegaPlay
-    val aliases = listOf(KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI)
+    val aliases = listOf(AdminContent.ALIAS, KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI)
 
     private const val KAZE_API = "https://animetsu.live/v2/api/anime"
     private const val KAZE_PROXY = "https://swiftstream.top/proxy"
@@ -826,8 +826,13 @@ object LocalSources {
 
     private suspend fun episodesEachInner(id: Int, onEach: suspend (String, Local) -> Unit) = coroutineScope {
         freshen()
+        // Anime added in the admin panel only have the admin links; every other provider would be asking about an id it doesn't know.
+        if (AdminContent.isCustom(id)) {
+            AdminContent.episodes(id)?.let { onEach(AdminContent.ALIAS, it) }
+            return@coroutineScope
+        }
         val jobs: List<Pair<String, suspend () -> Local>> = listOf(
-            KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
+            AdminContent.ALIAS to { AdminContent.episodes(id) ?: Local(emptyList(), emptyList()) }, KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
             YUKI to { nsEpisodes(id) }, NAMI to { akEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
         )
         jobs.map { (alias, f) -> async { runCatching { f() }.getOrNull()?.takeIf { it.sub.isNotEmpty() || it.dub.isNotEmpty() }?.let { onEach(alias, it) } } }.awaitAll()
@@ -843,6 +848,7 @@ object LocalSources {
     suspend fun watch(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = withContext(Dispatchers.Default) { watchInner(id, audio, ep, alias) }
 
     private suspend fun watchInner(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
+        AdminContent.ALIAS -> AdminContent.watch(id, audio, ep)
         KAZE -> kazeWatch(id, audio, ep)
         TSUKI -> if (audio == "sub") zoneWatch(id, ep) else emptyList()
         HOSHI -> if (audio == "sub") kaaWatch(id, ep) else emptyList()

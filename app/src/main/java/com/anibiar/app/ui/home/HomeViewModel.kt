@@ -24,6 +24,7 @@ data class HomeUiState(
     val latest: List<LatestEpisode> = emptyList(),
     val popular: List<Media> = emptyList(),
     val trending: List<Media> = emptyList(),
+    val added: List<Media> = emptyList(),
     val history: List<HistoryItem> = emptyList(),
     val reco: List<Media> = emptyList(),
     val recoBecause: String? = null,
@@ -47,6 +48,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         load()
         viewModelScope.launch { history.version.collect { _state.update { it.copy(history = history.load()) }; recommend() } }
         viewModelScope.launch { app.watchlist.ids.collect { recommend() } }
+        viewModelScope.launch { val a = runCatching { com.anibiar.app.data.AdminContent.custom() }.getOrNull().orEmpty(); _state.update { it.copy(added = a) } }
         // Connection came back: reload straight away instead of waiting for the next tick.
         viewModelScope.launch { com.anibiar.app.data.AppState.netUp.drop(1).collect { load() } }
     }

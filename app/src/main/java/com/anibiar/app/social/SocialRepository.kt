@@ -251,6 +251,10 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         tick.value++
     }
 
+    /** Plain REST call with the signed-in user's token when there is one (used for admin-managed content and releases). */
+    suspend fun rest(method: String, path: String, body: String? = null): Pair<Int, String> =
+        try { raw(method, path, body?.toByteArray()) } catch (e: CancellationException) { throw e } catch (e: Exception) { 0 to "" }
+
     private suspend fun raw(
         method: String,
         path: String,

@@ -226,6 +226,7 @@ class AnimeRepository(context: Context) {
     }
 
     suspend fun fetchDetails(id: Int): Media {
+        if (AdminContent.isCustom(id)) return AdminContent.media(id) ?: throw IOException("This anime is no longer available")
         val body = api.execute(Queries.DETAILS, mapOf("id" to id))
         val media = withContext(Dispatchers.Default) { decodeMedia(body) }
             ?: throw IOException("Unexpected AniList response")
@@ -234,6 +235,7 @@ class AnimeRepository(context: Context) {
     }
 
     suspend fun fetchCharacters(id: Int): CharacterConn? {
+        if (AdminContent.isCustom(id)) return null
         val body = api.execute(Queries.CHARACTERS, mapOf("id" to id))
         val chars = withContext(Dispatchers.Default) { decodeMedia(body)?.characters }
         if (chars != null) cache.write("chars_$id.json", body)
@@ -254,6 +256,7 @@ class AnimeRepository(context: Context) {
 
     /** ani.zip (thumbnails, titles, air dates) first, Jikan/MAL fills any gap. Never throws. */
     suspend fun fetchEpisodes(id: Int, idMal: Int?): List<EpisodeInfo> = withContext(Dispatchers.IO) {
+        if (AdminContent.isCustom(id)) return@withContext emptyList()
         val byNumber = sortedMapOf<Int, EpisodeInfo>()
         runCatching { aniZipEpisodes(id) }.getOrNull()?.forEach { byNumber[it.number] = it }
         val needsMore = byNumber.isEmpty() || byNumber.values.any { it.title.isNullOrBlank() || it.date == null }
