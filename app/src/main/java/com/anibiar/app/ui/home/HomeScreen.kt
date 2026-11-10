@@ -114,8 +114,6 @@ private const val MAX_EPISODE_PAGES = 5
 fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onContinue: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
-    val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>()) { value = com.anibiar.app.data.Announcements.load(app) }
-    var annGone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.Announcements.dismissed(app)) }
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
     // Live data: refresh whenever Home is on screen, then every minute while it stays visible.
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -152,6 +150,9 @@ private fun HomeContent(
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
+    val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
+    val annList by androidx.compose.runtime.produceState(emptyList<com.anibiar.app.data.Announcement>()) { value = com.anibiar.app.data.Announcements.load(app) }
+    var annGone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.data.Announcements.dismissed(app)) }
     val context = LocalContext.current
     val comingSoon = { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() }
 

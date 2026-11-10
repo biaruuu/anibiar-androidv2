@@ -217,7 +217,7 @@ private fun rows(text: String): List<JsonObject> = runCatching { (json.parseToJs
 
 /* ---------------- announcements ---------------- */
 @Composable private fun AnnounceTab() {
-    val rest = rememberRest(); val scope = rememberCoroutineScope(); val ctx = LocalContext.current
+    val rest0 = rememberRest(); val rest: suspend (String, String, String?) -> Pair<Int, String> = { m, p, b -> rest0(m, p, b, "return=minimal") }; val scope = rememberCoroutineScope(); val ctx = LocalContext.current
     var list by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
     var title by remember { mutableStateOf("") }; var body by remember { mutableStateOf("") }
     var important by remember { mutableStateOf(false) }
