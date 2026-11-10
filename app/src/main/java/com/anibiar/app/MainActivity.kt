@@ -232,11 +232,11 @@ private fun AppNavigation() {
     androidx.compose.runtime.LaunchedEffect(banner, bannerTick) { if (banner != null) { kotlinx.coroutines.delay(20_000); banner = null } }
 
     // Keep Home composed underneath so its scroll position survives opening a page.
-    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+    Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
         HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
 
         if (searchOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 com.anibiar.app.ui.search.SearchScreen(
                     onOpen = { id -> stack.add(id) },
                     onBack = { searchOpen = false },
@@ -258,7 +258,7 @@ private fun AppNavigation() {
             }
         }
         if (settingsOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 com.anibiar.app.ui.settings.SettingsScreen(
                     onAdmin = { adminOpen = true },
                     onLogin = { settingsOpen = false; profileOpen = true },
@@ -270,11 +270,11 @@ private fun AppNavigation() {
         }
 
         if (adminOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) { com.anibiar.app.ui.admin.AdminScreen(onBack = { adminOpen = false }) }
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) { com.anibiar.app.ui.admin.AdminScreen(onBack = { adminOpen = false }) }
         }
 
         if (profileOpen) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 val a = authState
                 if (a != null) {
                     com.anibiar.app.ui.profile.ProfileScreen(
@@ -289,14 +289,14 @@ private fun AppNavigation() {
         }
 
         if (inboxOpen && authState != null) {
-            Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                 com.anibiar.app.ui.inbox.InboxScreen(onBack = { inboxOpen = false }, onOpenUser = { userStack.add(it) }, onJoinRoom = { joinRoomById(it) })
             }
         }
 
         userStack.lastOrNull()?.let { uid ->
             androidx.compose.runtime.key(userStack.size, uid) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Onyx)) {
                     com.anibiar.app.ui.profile.ProfileScreen(
                         uid = uid,
                         onBack = { if (userStack.isNotEmpty()) userStack.removeAt(userStack.lastIndex) },
@@ -309,7 +309,7 @@ private fun AppNavigation() {
 
         chatUid?.let { cu ->
             androidx.compose.runtime.key(cu) {
-                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Onyx)) {
                     com.anibiar.app.ui.inbox.ChatScreen(
                         uid = cu, onBack = { chatUid = null },
                         onOpenUser = { chatUid = null; userStack.add(it) },
@@ -331,7 +331,7 @@ private fun AppNavigation() {
         ) { id ->
             if (id != null) {
                 // Opaque + swallow touches so Home underneath can't be scrolled through the page.
-                Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                     androidx.compose.runtime.key(stack.size, id) {
                         DetailsScreen(
                             id = id,
@@ -351,7 +351,7 @@ private fun AppNavigation() {
 
         if (watchId != 0) {
             androidx.compose.runtime.key(watchId, joinRoom?.id) {
-                Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+                Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
                     com.anibiar.app.ui.watch.WatchScreen(
                         id = watchId, startEp = watchEp, onBack = { watchId = 0 }, joinRoom = joinRoom,
                         onRoomMoved = { r -> joinRoom = r; watchEp = r.episode; watchId = r.animeId },
