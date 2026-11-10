@@ -85,6 +85,8 @@ class MainActivity : ComponentActivity() {
                             dismissButton = { androidx.compose.material3.TextButton(onClick = { crash = null }) { androidx.compose.material3.Text("Close") } },
                         )
                     }
+                    var onboard by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(!com.anibiar.app.ui.theme.Appearance.onboarded(this@MainActivity)) }
+                    if (onboard) com.anibiar.app.ui.splash.Onboarding(onDone = { onboard = false })
                     if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
                 }
             }

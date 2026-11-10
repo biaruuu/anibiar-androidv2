@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.anibiar.app.ui.home
 
@@ -211,149 +211,129 @@ private fun HomeContent(
 
         HeroBackdrop(url = backdrop, heroHeight = heroHeight, scrollPx = { scrollPx }, modifier = Modifier.fillMaxSize())
 
-        when {
-            state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
-                com.anibiar.app.ui.theme.HomeSkeleton()
-            }
-
-            state.error != null -> ErrorState(
-                message = state.error,
-                onRetry = onRetry,
-                modifier = Modifier.align(Alignment.Center),
-            )
-
-            else -> {
-                val pages = remember(state.latest) {
-                    state.latest.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+        var refreshing by remember { mutableStateOf(false) }
+        val refreshScope = androidx.compose.runtime.rememberCoroutineScope()
+        val st = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = refreshing,
+            state = st,
+            onRefresh = { refreshing = true; onRetry(); refreshScope.launch { delay(1400); refreshing = false } },
+            modifier = Modifier.fillMaxSize(),
+            indicator = {
+                Box(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp).graphicsLayer { alpha = if (refreshing) 1f else st.distanceFraction.coerceIn(0f, 1f); translationY = if (refreshing) 0f else (st.distanceFraction.coerceIn(0f, 1.3f) - 1f) * 60f }) {
+                    com.anibiar.app.ui.splash.KiroLogo(44.dp)
                 }
-                val pageCount = pages.size.coerceAtLeast(1)
-                val page = latestPage.coerceIn(0, pageCount - 1)
-                val rows = pages.getOrNull(page).orEmpty().chunked(columns)
-
-                LazyColumn(
-                    state = listState,
-                    // extra room so the floating tab bar never covers the last row
-                    contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp),
-                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
-                        // Only a real tap on empty space clears the hover; scrolling/dragging never does.
-                        val slop = viewConfiguration.touchSlop
-                        awaitPointerEventScope {
-                            var downAt: androidx.compose.ui.geometry.Offset? = null
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Final)
-                                for (c in event.changes) {
-                                    if (c.pressed && !c.previousPressed) {
-                                        downAt = if (c.isConsumed) null else c.position
-                                    } else if (!c.pressed && c.previousPressed) {
-                                        val start = downAt
-                                        if (start != null && (c.position - start).getDistance() < slop) armedId = null
-                                        downAt = null
+            },
+        ) {
+        when {
+                state.loading && state.hero.isEmpty() && state.latest.isEmpty() -> {
+                    com.anibiar.app.ui.theme.HomeSkeleton()
+                }
+    
+                state.error != null -> ErrorState(
+                    message = state.error,
+                    onRetry = onRetry,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+    
+                else -> {
+                    val pages = remember(state.latest) {
+                        state.latest.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                    }
+                    val pageCount = pages.size.coerceAtLeast(1)
+                    val page = latestPage.coerceIn(0, pageCount - 1)
+                    val rows = pages.getOrNull(page).orEmpty().chunked(columns)
+    
+                    LazyColumn(
+                        state = listState,
+                        // extra room so the floating tab bar never covers the last row
+                        contentPadding = PaddingValues(bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp),
+                        modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                            // Only a real tap on empty space clears the hover; scrolling/dragging never does.
+                            val slop = viewConfiguration.touchSlop
+                            awaitPointerEventScope {
+                                var downAt: androidx.compose.ui.geometry.Offset? = null
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Final)
+                                    for (c in event.changes) {
+                                        if (c.pressed && !c.previousPressed) {
+                                            downAt = if (c.isConsumed) null else c.position
+                                        } else if (!c.pressed && c.previousPressed) {
+                                            val start = downAt
+                                            if (start != null && (c.position - start).getDistance() < slop) armedId = null
+                                            downAt = null
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                ) {
-                    if (state.offline) item(key = "offline") {
-                        Text(
-                            "You're offline. Showing what was saved on this device.",
-                            style = inter(13f), color = Ani.Muted,
-                            modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-
-                    if (state.hero.isNotEmpty()) {
-                        item(key = "hero") {
-                          Box(
-                            Modifier.graphicsLayer {
-                                val off = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 99999f
-                                translationY = off * 0.45f
-                                alpha = (1f - off / (size.height.coerceAtLeast(1f) * 1.15f)).coerceIn(0f, 1f)
-                            },
-                          ) {
-                            HeroPager(
-                                items = state.hero,
-                                art = state.art,
-                                height = heroHeight,
-                                onPageChanged = { heroIndex = it },
-                                saved = saved,
-                                onWatch = onWatch,
-                                onDetails = onOpen,
-                                onAdd = onToggleSaved,
-                            )
-                          }
-                        }
-                    }
-
-                    annList.filter { it.id !in annGone || it.draft }.take(2).forEach { a ->
-                        item(key = "ann-${a.id}") {
-                            AnnouncementCard(a, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onDismiss = if (a.draft) null else { { com.anibiar.app.data.Announcements.dismiss(app, a.id); annGone = annGone + a.id } })
-                        }
-                    }
-
-                    item(key = "live-stats") { LiveStatsCard() }
-
-                    if (state.history.isNotEmpty()) {
-                        item(key = "continue") {
-                            ContinueWatching(
-                                entries = state.history,
-                                onClick = { onContinue(it.mediaId) },
-                                onRemove = onRemoveHistory,
-                            )
-                        }
-                    }
-
-                    if (state.added.isNotEmpty()) item(key = "added") { RecoRow("Added by AniBiar", state.added, onOpen) }
-
-                    item(key = "latest-header") {
-                        Spacer(Modifier.height(28.dp))
-                        LatestHeader(
-                            dubMode = dubMode,
-                            onModeChange = { dubMode = it },
-                            page = page,
-                            pageCount = pageCount,
-                            onPrev = { latestPage = (page - 1).coerceAtLeast(0) },
-                            onNext = { latestPage = (page + 1).coerceAtMost(pageCount - 1) },
-                        )
-                        Spacer(Modifier.height(14.dp))
-                    }
-
-                    if (dubMode) {
-                        item(key = "dub-empty") {
+                        },
+                    ) {
+                        if (state.offline) item(key = "offline") {
                             Text(
-                                text = "Dubbed releases aren't available yet.",
-                                style = inter(15f),
-                                color = Ani.Muted,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+                                "You're offline. Showing what was saved on this device.",
+                                style = inter(13f), color = Ani.Muted,
+                                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
                             )
                         }
-                    } else {
-                        items(rows.size, key = { "row-$page-$it" }) { index ->
-                            EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
-                            Spacer(Modifier.height(16.dp))
+    
+                        if (state.hero.isNotEmpty()) {
+                            item(key = "hero") {
+                              Box(
+                                Modifier.graphicsLayer {
+                                    val off = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 99999f
+                                    translationY = off * 0.45f
+                                    alpha = (1f - off / (size.height.coerceAtLeast(1f) * 1.15f)).coerceIn(0f, 1f)
+                                },
+                              ) {
+                                HeroPager(
+                                    items = state.hero,
+                                    art = state.art,
+                                    height = heroHeight,
+                                    onPageChanged = { heroIndex = it },
+                                    saved = saved,
+                                    onWatch = onWatch,
+                                    onDetails = onOpen,
+                                    onAdd = onToggleSaved,
+                                )
+                              }
+                            }
                         }
-                    }
-
-                    if (state.trending.isNotEmpty()) {
-                        val trPages = state.trending.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
-                        val trCount = trPages.size.coerceAtLeast(1)
-                        val trCur = trendingPage.coerceIn(0, trCount - 1)
-                        val trRows = trPages.getOrNull(trCur).orEmpty().chunked(columns)
-                        item(key = "trending-header") {
-                            Spacer(Modifier.height(12.dp))
+    
+                        annList.filter { it.id !in annGone || it.draft }.take(2).forEach { a ->
+                            item(key = "ann-${a.id}") {
+                                AnnouncementCard(a, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onDismiss = if (a.draft) null else { { com.anibiar.app.data.Announcements.dismiss(app, a.id); annGone = annGone + a.id } })
+                            }
+                        }
+    
+                        item(key = "live-stats") { LiveStatsCard() }
+    
+                        if (state.history.isNotEmpty()) {
+                            item(key = "continue") {
+                                ContinueWatching(
+                                    entries = state.history,
+                                    onClick = { onContinue(it.mediaId) },
+                                    onRemove = onRemoveHistory,
+                                )
+                            }
+                        }
+    
+                        if (state.added.isNotEmpty()) item(key = "added") { RecoRow("Added by AniBiar", state.added, onOpen) }
+    
+                        item(key = "latest-header") {
+                            Spacer(Modifier.height(28.dp))
                             LatestHeader(
-                                title = "Trending Now",
-                                dubMode = trendingDub,
-                                onModeChange = { trendingDub = it },
-                                page = trCur,
-                                pageCount = trCount,
-                                onPrev = { trendingPage = (trCur - 1).coerceAtLeast(0) },
-                                onNext = { trendingPage = (trCur + 1).coerceAtMost(trCount - 1) },
+                                dubMode = dubMode,
+                                onModeChange = { dubMode = it },
+                                page = page,
+                                pageCount = pageCount,
+                                onPrev = { latestPage = (page - 1).coerceAtLeast(0) },
+                                onNext = { latestPage = (page + 1).coerceAtMost(pageCount - 1) },
                             )
                             Spacer(Modifier.height(14.dp))
                         }
-                        if (trendingDub) {
-                            item(key = "trending-dub-empty") {
+    
+                        if (dubMode) {
+                            item(key = "dub-empty") {
                                 Text(
                                     text = "Dubbed releases aren't available yet.",
                                     style = inter(15f),
@@ -362,122 +342,157 @@ private fun HomeContent(
                                 )
                             }
                         } else {
-                            items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
-                                ) {
-                                    trRows[index].forEachIndexed { col, media ->
-                                        val rank = trCur * EPISODES_PER_PAGE + index * columns + col + 1
-                                        MediaGridCard(
-                                            media = media,
-                                            leftText = "#$rank",
-                                            rightText = "",
-                                            rating = media.averageScore?.let { it / 10f },
-                                            ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                            onClick = { onOpen(media.id) },
-                                            saved = media.id in saved,
-                                            onToggleSaved = { onToggleSaved(media.id) },
-                                            armed = armedId == "N${media.id}",
-                                            onArm = { armedId = "N${media.id}" },
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                    }
-                                    repeat((columns - trRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
-                                }
+                            items(rows.size, key = { "row-$page-$it" }) { index ->
+                                EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
                                 Spacer(Modifier.height(16.dp))
                             }
                         }
-                    }
-
-                    if (state.popular.isNotEmpty()) {
-                        val popPages = state.popular.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
-                        val popPageCount = popPages.size.coerceAtLeast(1)
-                        val popCur = popularPage.coerceIn(0, popPageCount - 1)
-                        val popRows = popPages.getOrNull(popCur).orEmpty().chunked(columns)
-                        item(key = "popular-header") {
-                            Spacer(Modifier.height(12.dp))
-                            LatestHeader(
-                                title = "Most Popular",
-                                dubMode = popularDub,
-                                onModeChange = { popularDub = it },
-                                page = popCur,
-                                pageCount = popPageCount,
-                                onPrev = { popularPage = (popCur - 1).coerceAtLeast(0) },
-                                onNext = { popularPage = (popCur + 1).coerceAtMost(popPageCount - 1) },
-                            )
-                            Spacer(Modifier.height(14.dp))
+    
+                        if (state.trending.isNotEmpty()) {
+                            val trPages = state.trending.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                            val trCount = trPages.size.coerceAtLeast(1)
+                            val trCur = trendingPage.coerceIn(0, trCount - 1)
+                            val trRows = trPages.getOrNull(trCur).orEmpty().chunked(columns)
+                            item(key = "trending-header") {
+                                Spacer(Modifier.height(12.dp))
+                                LatestHeader(
+                                    title = "Trending Now",
+                                    dubMode = trendingDub,
+                                    onModeChange = { trendingDub = it },
+                                    page = trCur,
+                                    pageCount = trCount,
+                                    onPrev = { trendingPage = (trCur - 1).coerceAtLeast(0) },
+                                    onNext = { trendingPage = (trCur + 1).coerceAtMost(trCount - 1) },
+                                )
+                                Spacer(Modifier.height(14.dp))
+                            }
+                            if (trendingDub) {
+                                item(key = "trending-dub-empty") {
+                                    Text(
+                                        text = "Dubbed releases aren't available yet.",
+                                        style = inter(15f),
+                                        color = Ani.Muted,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+                                    )
+                                }
+                            } else {
+                                items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                    ) {
+                                        trRows[index].forEachIndexed { col, media ->
+                                            val rank = trCur * EPISODES_PER_PAGE + index * columns + col + 1
+                                            MediaGridCard(
+                                                media = media,
+                                                leftText = "#$rank",
+                                                rightText = "",
+                                                rating = media.averageScore?.let { it / 10f },
+                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                                onClick = { onOpen(media.id) },
+                                                saved = media.id in saved,
+                                                onToggleSaved = { onToggleSaved(media.id) },
+                                                armed = armedId == "N${media.id}",
+                                                onArm = { armedId = "N${media.id}" },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        repeat((columns - trRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                            }
                         }
-                        if (popularDub) {
-                            item(key = "popular-dub-empty") {
-                                Text(
-                                    text = "Dubbed releases aren't available yet.",
-                                    style = inter(15f),
-                                    color = Ani.Muted,
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+    
+                        if (state.popular.isNotEmpty()) {
+                            val popPages = state.popular.chunked(EPISODES_PER_PAGE).take(MAX_EPISODE_PAGES)
+                            val popPageCount = popPages.size.coerceAtLeast(1)
+                            val popCur = popularPage.coerceIn(0, popPageCount - 1)
+                            val popRows = popPages.getOrNull(popCur).orEmpty().chunked(columns)
+                            item(key = "popular-header") {
+                                Spacer(Modifier.height(12.dp))
+                                LatestHeader(
+                                    title = "Most Popular",
+                                    dubMode = popularDub,
+                                    onModeChange = { popularDub = it },
+                                    page = popCur,
+                                    pageCount = popPageCount,
+                                    onPrev = { popularPage = (popCur - 1).coerceAtLeast(0) },
+                                    onNext = { popularPage = (popCur + 1).coerceAtMost(popPageCount - 1) },
+                                )
+                                Spacer(Modifier.height(14.dp))
+                            }
+                            if (popularDub) {
+                                item(key = "popular-dub-empty") {
+                                    Text(
+                                        text = "Dubbed releases aren't available yet.",
+                                        style = inter(15f),
+                                        color = Ani.Muted,
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
+                                    )
+                                }
+                            } else {
+                                items(popRows.size, key = { "pop-$popCur-$it" }) { index ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(13.dp),
+                                    ) {
+                                        popRows[index].forEachIndexed { col, media ->
+                                            val rank = popCur * EPISODES_PER_PAGE + index * columns + col + 1
+                                            MediaGridCard(
+                                                media = media,
+                                                leftText = "#$rank",
+                                                rightText = "",
+                                                rating = media.averageScore?.let { it / 10f },
+                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                                onClick = { onOpen(media.id) },
+                                                saved = media.id in saved,
+                                                onToggleSaved = { onToggleSaved(media.id) },
+                                                armed = armedId == "P${media.id}",
+                                                onArm = { armedId = "P${media.id}" },
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        repeat((columns - popRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                }
+                            }
+                        }
+    
+                        if (state.topAiring.isNotEmpty()) {
+                            item(key = "top-airing") {
+                                Spacer(Modifier.height(12.dp))
+                                ListPanel(
+                                    title = "TOP AIRING",
+                                    keyPrefix = "T",
+                                    items = state.topAiring,
+                                    dot = Ani.Lime,
+                                    onClick = { onOpen(it.id) },
+                                    saved = saved,
+                                    onToggleSaved = onToggleSaved,
+                                    armedId = armedId,
+                                    onArm = { armedId = it },
                                 )
                             }
-                        } else {
-                            items(popRows.size, key = { "pop-$popCur-$it" }) { index ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(13.dp),
-                                ) {
-                                    popRows[index].forEachIndexed { col, media ->
-                                        val rank = popCur * EPISODES_PER_PAGE + index * columns + col + 1
-                                        MediaGridCard(
-                                            media = media,
-                                            leftText = "#$rank",
-                                            rightText = "",
-                                            rating = media.averageScore?.let { it / 10f },
-                                            ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                            onClick = { onOpen(media.id) },
-                                            saved = media.id in saved,
-                                            onToggleSaved = { onToggleSaved(media.id) },
-                                            armed = armedId == "P${media.id}",
-                                            onArm = { armedId = "P${media.id}" },
-                                            modifier = Modifier.weight(1f),
-                                        )
-                                    }
-                                    repeat((columns - popRows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
-                                }
+                        }
+    
+                        if (state.upcoming.isNotEmpty()) {
+                            item(key = "upcoming") {
                                 Spacer(Modifier.height(16.dp))
+                                ListPanel(
+                                    title = "UPCOMING",
+                                    keyPrefix = "U",
+                                    items = state.upcoming,
+                                    dot = Ani.Lime,
+                                    onClick = { onOpen(it.id) },
+                                    saved = saved,
+                                    onToggleSaved = onToggleSaved,
+                                    armedId = armedId,
+                                    onArm = { armedId = it },
+                                )
+                                Spacer(Modifier.height(32.dp))
                             }
-                        }
-                    }
-
-                    if (state.topAiring.isNotEmpty()) {
-                        item(key = "top-airing") {
-                            Spacer(Modifier.height(12.dp))
-                            ListPanel(
-                                title = "TOP AIRING",
-                                keyPrefix = "T",
-                                items = state.topAiring,
-                                dot = Ani.Lime,
-                                onClick = { onOpen(it.id) },
-                                saved = saved,
-                                onToggleSaved = onToggleSaved,
-                                armedId = armedId,
-                                onArm = { armedId = it },
-                            )
-                        }
-                    }
-
-                    if (state.upcoming.isNotEmpty()) {
-                        item(key = "upcoming") {
-                            Spacer(Modifier.height(16.dp))
-                            ListPanel(
-                                title = "UPCOMING",
-                                keyPrefix = "U",
-                                items = state.upcoming,
-                                dot = Ani.Lime,
-                                onClick = { onOpen(it.id) },
-                                saved = saved,
-                                onToggleSaved = onToggleSaved,
-                                armedId = armedId,
-                                onArm = { armedId = it },
-                            )
-                            Spacer(Modifier.height(32.dp))
                         }
                     }
                 }
@@ -745,7 +760,11 @@ private fun RecoRow(title: String, items: List<Media>, onClick: (Int) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         Spacer(Modifier.height(14.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val rowState = androidx.compose.foundation.lazy.rememberLazyListState()
+        LazyRow(
+            state = rowState, contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+            flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(rowState),
+        ) {
             items(items, key = { it.id }) { m ->
                 Column(Modifier.width(132.dp).clickable { onClick(m.id) }) {
                     PosterImage(

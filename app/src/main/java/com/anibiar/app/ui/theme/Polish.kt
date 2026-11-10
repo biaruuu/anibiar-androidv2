@@ -57,13 +57,23 @@ object Appearance {
     )
     var accent by mutableStateOf(accents[0].second); private set
     var amoled by mutableStateOf(false); private set
+    /** Multiplies every text size: 0.9 small, 1.0 default, 1.15 large. */
+    var textScale by mutableStateOf(1f); private set
+    val textSizes = listOf("Small" to 0.9f, "Default" to 1f, "Large" to 1.15f)
     private const val PREFS = "appearance"
 
     fun load(context: Context) {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         accents.firstOrNull { it.first == p.getString("accent", null) }?.let { accent = it.second }
         amoled = p.getBoolean("amoled", false)
+        textScale = p.getFloat("text", 1f)
     }
+    fun setTextScale(context: Context, v: Float) {
+        textScale = v
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putFloat("text", v).apply()
+    }
+    fun onboarded(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("onboarded", false)
+    fun setOnboarded(context: Context) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("onboarded", true).apply() }
     fun setAccent(context: Context, name: String) {
         val c = accents.firstOrNull { it.first == name } ?: return
         accent = c.second
@@ -162,5 +172,20 @@ fun EmptyState(icon: ImageVector, title: String, hint: String, modifier: Modifie
                 Text(action, style = inter(14f, FontWeight.SemiBold), color = Color.Black)
             }
         }
+    }
+}
+
+
+/** A circular score: the arc fills to [score] out of 100 and takes the rating colour. */
+@Composable
+fun ScoreRing(score: Int, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 54.dp) {
+    val color = when { score >= 75 -> Color(0xFF6FE39A); score >= 60 -> Color(0xFFFFC94D); else -> Color(0xFFFF8A80) }
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+            val w = this.size.minDimension * 0.11f
+            drawArc(Color(0x26FFFFFF), 0f, 360f, false, topLeft = Offset(w / 2, w / 2), size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w), style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+            drawArc(color, -90f, 360f * score.coerceIn(0, 100) / 100f, false, topLeft = Offset(w / 2, w / 2), size = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w), style = androidx.compose.ui.graphics.drawscope.Stroke(w, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        }
+        Text("$score", style = inter(15f, FontWeight.Bold), color = Color.White)
     }
 }

@@ -562,7 +562,14 @@ private fun About(
         episodesText?.let { AboutRow("Episodes", it) }
         media.duration?.takeIf { it > 0 }?.let { AboutRow("Duration", "$it min per ep") }
         media.averageScore?.let {
-            AboutRow("AniList score", media.score10.orEmpty(), ratingColor(it / 10f), AniIcons.Star)
+            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                com.anibiar.app.ui.theme.ScoreRing(it)
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text("AniList score", style = inter(15f, FontWeight.SemiBold), color = Color.White)
+                    Text(media.score10.orEmpty() + " / 10", style = inter(13f), color = Ani.Muted)
+                }
+            }
         }
         malScore?.let { mal ->
             AboutRow("MAL score", mal, mal.toFloatOrNull()?.let { ratingColor(it) } ?: Color.White, AniIcons.Star)

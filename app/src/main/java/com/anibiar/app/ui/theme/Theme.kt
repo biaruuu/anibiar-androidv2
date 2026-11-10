@@ -98,7 +98,12 @@ fun AniBiarTheme(content: @Composable () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             color = Ani.Onyx,
             contentColor = Color.White,
-            content = content,
+            content = {
+                val d = androidx.compose.ui.platform.LocalDensity.current
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(d.density, d.fontScale * Appearance.textScale),
+                ) { content() }
+            },
         )
     }
 }

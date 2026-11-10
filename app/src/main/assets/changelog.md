@@ -453,3 +453,6 @@
 
 ## 101 | Design polish, part 2 | 2026-11-10
 - Episode cards show Watched, NEW and a progress bar, an Up next card appears near the end of an episode, softer screen transitions, back-swipe preview, and the Details page is tinted with the anime cover color
+
+## 102 | Design polish, part 3 | 2026-11-10
+- Text size setting, pull-to-refresh with the Kiro mascot, snap-scrolling rows, a score ring on Details, and a quick first-launch setup screen
