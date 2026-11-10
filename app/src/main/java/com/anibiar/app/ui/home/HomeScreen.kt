@@ -303,7 +303,9 @@ private fun HomeContent(
                             }
                         }
     
-                        annList.filter { it.id !in annGone || it.draft }.take(2).forEach { a ->
+                        item(key = "airing-today") { AiringToday(onOpen) }
+
+                    annList.filter { it.id !in annGone || it.draft }.take(2).forEach { a ->
                             item(key = "ann-${a.id}") {
                                 AnnouncementCard(a, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onDismiss = if (a.draft) null else { { com.anibiar.app.data.Announcements.dismiss(app, a.id); annGone = annGone + a.id } })
                             }

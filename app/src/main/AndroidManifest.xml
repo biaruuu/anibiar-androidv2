@@ -25,6 +25,10 @@
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/continue_widget_info" />
         </receiver>
+        <receiver android:name=".AiringWidget" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/airing_widget_info" />
+        </receiver>
         <service android:name=".social.CallService" android:exported="false" android:foregroundServiceType="microphone" />
 
         <provider

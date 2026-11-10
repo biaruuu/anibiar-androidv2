@@ -477,3 +477,6 @@
 
 ## 109 | Home cleanup | 2026-11-11
 - Removed the genre chips and the Short and sweet / Finished and bingeable rows from Home
+
+## 110 | Airing today, widget, media controls, list view | 2026-11-11
+- Airing today strip on Home with live countdowns, an Airing today widget, lock-screen and notification media controls while watching, and a Grid / List switch in Search

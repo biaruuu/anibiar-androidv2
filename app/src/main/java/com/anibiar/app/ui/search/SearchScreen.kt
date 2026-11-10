@@ -260,6 +260,31 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                     )
                 }
                 else -> {
+                    item(key = "view-toggle") {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        val tick = com.anibiar.app.ui.theme.rememberTick()
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            listOf(false to "Grid", true to "List").forEach { (isList, label) ->
+                                val on = com.anibiar.app.ui.theme.Appearance.listView == isList
+                                Text(label, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
+                                    modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, isList) }.padding(horizontal = 14.dp, vertical = 7.dp))
+                            }
+                        }
+                    }
+                    if (com.anibiar.app.ui.theme.Appearance.listView) {
+                        items(state.results.size, key = { "l${state.resultsPage}-${state.results[it].id}" }) { i ->
+                            val media = state.results[i]
+                            Row(Modifier.fillMaxWidth().clickable { onOpen(media.id) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                com.anibiar.app.ui.home.PosterImage(url = media.posterUrl, contentDescription = media.displayTitle, maxSide = 300, modifier = Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item))
+                                Spacer(Modifier.width(14.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(media.displayTitle, style = inter(15f, FontWeight.SemiBold, lineHeight = 19f), color = Color.White, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    Text(listOfNotNull(media.format?.replace('_', ' '), media.seasonYear?.toString(), media.averageScore?.let { "★ %.1f".format(it / 10f) }, (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.let { "$it eps" }).joinToString(" · "), style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(top = 3.dp))
+                                    Text(media.genres.orEmpty().take(3).joinToString(" · "), style = inter(12.5f), color = Ani.Soft, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+                                }
+                            }
+                        }
+                    } else {
                     val rows = state.results.chunked(columns)
                     val ranked = state.query.isBlank() && (filters.sort ?: "POPULARITY_DESC") in RANK_SORTS
                     items(rows.size, key = { "r${state.resultsPage}-$it-${rows[it].first().id}" }) { index ->
@@ -286,6 +311,7 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                             repeat((columns - rows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
                         Spacer(Modifier.height(12.dp))
+                    }
                     }
                     item(key = "bottompager") {
                         Spacer(Modifier.height(14.dp))

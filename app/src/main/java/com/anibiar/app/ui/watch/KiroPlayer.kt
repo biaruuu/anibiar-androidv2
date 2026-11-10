@@ -370,6 +370,11 @@ fun KiroPlayer(
             player.removeListener(l); player.release()
         }
     }
+    // System media controls (lock screen, notification shade, Bluetooth buttons) for what is playing.
+    DisposableEffect(player) {
+        val session = runCatching { androidx.media3.session.MediaSession.Builder(context, player).setId("kiro-${System.nanoTime()}").build() }.getOrNull()
+        onDispose { runCatching { session?.release() } }
+    }
     DisposableEffect(playing) { view.keepScreenOn = playing; onDispose { view.keepScreenOn = false } }
     LaunchedEffect(textureView) { textureView?.let { player.setVideoTextureView(it) } }
 
@@ -380,7 +385,8 @@ fun KiroPlayer(
         if (src == null) { player.stop(); player.clearMediaItems(); return@LaunchedEffect }
         Streaming.activeReferer = com.anibiar.app.data.LocalSources.referers[src]
         val item = MediaItem.Builder().setUri(Streaming.abs(src))
-            .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4).build()
+            .setMimeType(if (format == "hls") MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4)
+            .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder().setTitle(title).setArtist("Kiro").build()).build()
         player.setMediaItem(item, ((startAt ?: 0.0) * 1000).toLong())
         player.prepare()
         player.playWhenReady = autoplayNow
