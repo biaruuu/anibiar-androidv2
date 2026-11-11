@@ -1053,8 +1053,8 @@ internal fun MediaGridCard(
     val hover = rememberCardHover()
     val active = hover.pressed
     val accent = remember(media.coverImage.color) { accentOf(media.coverImage.color) }
-    val chipText by accentColor(active, accent, Color(0xFFE4E1EA))
-    val chipBg by accentColor(active, accent.copy(alpha = 0.28f), Color(0x2EFFFFFF))
+    val chipText by accentColor(active, accent, Ani.Soft)
+    val chipBg by accentColor(active, accent.copy(alpha = 0.28f), Ani.ButtonDark)
     val titleColor by accentColor(active, accent, Color.White)
     BoxWithConstraints(modifier.hoverCard(hover, onClick, onArm = onArm)) {
         // Badge size follows the card width so CC + format + year always fit on one line.
@@ -1174,9 +1174,8 @@ internal fun InfoBadge(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(8.dp))
             .background(background)
-            .border(1.dp, Color(0x2BFFFFFF), RoundedCornerShape(50))
             .padding(horizontal = hPad + 1.dp, vertical = vPad),
         verticalAlignment = Alignment.CenterVertically,
     ) {

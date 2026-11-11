@@ -65,18 +65,18 @@ fun AiringToday(onOpen: (Int) -> Unit) {
                 val left = a.at - now
                 val done = left <= 0
                 Column(Modifier.width(cardW).clickable { onOpen(a.mediaId) }) {
-                    PosterImage(
-                        url = a.cover, contentDescription = a.title, maxSide = if (style == 2) 520 else 400,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(if (style == 2) 16.dp else 12.dp)).background(Ani.Item),
-                    )
-                    if (style != 0) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(a.title, style = inter(14f, FontWeight.Medium, lineHeight = 18f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            if (done) "EP ${a.episode} · Aired" else "EP ${a.episode} · in ${countdown(left)}",
-                            style = inter(12f), color = if (done) Ani.Muted else Ani.Lavender, maxLines = 1,
-                        )
+                    Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(Ani.Item)) {
+                        PosterImage(url = a.cover, contentDescription = a.title, maxSide = 400, modifier = Modifier.fillMaxSize())
+                        Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))))
+                        Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("EP ${a.episode}", style = inter(11f, FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
+                            Text(if (done) "Aired" else "in ${countdown(left)}", style = inter(10.5f, FontWeight.Medium), color = Color.White.copy(alpha = 0.92f), maxLines = 1, softWrap = false)
+                        }
                     }
+                    Spacer(Modifier.height(7.dp))
+                    InfoBadge(text = clock.format(Date(a.at)), textSize = 9.5f, hPad = 5.dp, vPad = 4.dp, background = Ani.ButtonDark, textColor = Ani.Soft)
+                    Spacer(Modifier.height(7.dp))
+                    Text(a.title, style = inter(13.5f, FontWeight.Medium, lineHeight = 18f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

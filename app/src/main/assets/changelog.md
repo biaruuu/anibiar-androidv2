@@ -495,3 +495,7 @@
 ## 114 | Details and Airing rework | 2026-11-11
 - Lighter hero, Airing today as a normal poster row
 - Details: icon stats, all genres, episode rows; AniList score and genres removed from About
+
+## 115 | Cards restyle | 2026-11-11
+- Airing today uses the Latest Episodes card style
+- Flat chips on cards
