@@ -503,3 +503,8 @@
 ## 116 | Clean UI | 2026-11-11
 - Airing today is now a grid like Latest Episodes
 - No more shine on cards, buttons and chips; bottom bar is flat with no lens
+
+## 117 | Accent everywhere | 2026-11-11
+- Purple buttons now follow your accent color
+- Airing today moved under Most Popular with Sub/Dub and pages
+- Profile and player pills are see-through

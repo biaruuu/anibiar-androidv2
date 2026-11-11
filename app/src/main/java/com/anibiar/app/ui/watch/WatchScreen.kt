@@ -424,7 +424,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     }
                     Text("Dismiss", style = inter(13f), color = Ani.Muted, modifier = Modifier.clickable { requests = requests.drop(1) }.padding(8.dp))
                     Text("Accept", style = inter(13.5f, FontWeight.Bold), color = Color.Black,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFB7A9FF)).clickable {
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable {
                             requests = requests.drop(1)
                             val r = room; val t = together
                             if (rq.animeId != null && r != null && t != null) {
@@ -551,7 +551,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                     Text(
                         if (!micOk) "Mic off" else if (vMuted) "Muted" else "Mic on",
                         style = inter(12.5f, FontWeight.SemiBold), color = if (micOk && !vMuted) Color.Black else Color.White,
-                        modifier = Modifier.then(if (micOk && !vMuted) Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFB7A9FF)) else Modifier.glass(RoundedCornerShape(50)))
+                        modifier = Modifier.then(if (micOk && !vMuted) Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender) else Modifier.glass(RoundedCornerShape(50)))
                             .clickable { if (!micOk) micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) else voice?.setMuted(!vMuted) }
                             .padding(horizontal = 12.dp, vertical = 6.dp),
                     )

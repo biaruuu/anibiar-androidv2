@@ -472,7 +472,7 @@ private fun SuggestCard(u: UserProfile, onOpen: () -> Unit, onFollow: () -> Unit
             Spacer(Modifier.height(10.dp))
             Text(
                 "Follow", style = inter(13f, FontWeight.Bold), color = Ani.Onyx,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFB7A9FF)).clickable(onClick = onFollow).padding(vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onFollow).padding(vertical = 8.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
@@ -502,7 +502,7 @@ internal fun FollowButton(uid: String, myFollowing: Set<String>, myFollowers: Se
     val shape = RoundedCornerShape(50)
     Text(
         label, style = inter(13.5f, FontWeight.SemiBold), color = if (filled) Color(0xFF121214) else Color.White,
-        modifier = Modifier.then(if (filled) Modifier.clip(shape).background(Color(0xFFB7A9FF)) else Modifier.glass(shape))
+        modifier = Modifier.then(if (filled) Modifier.clip(shape).background(com.anibiar.app.ui.theme.Ani.Lavender) else Modifier.glass(shape))
             .clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
     )
 }
@@ -606,7 +606,7 @@ internal fun UserCard(
                 if (user.bio.isNotBlank()) Text(user.bio, style = inter(13f, lineHeight = 18f), color = Ani.Soft, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                 Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     user.followers?.let { Text(buildAnnotatedString { withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Bold)) { append("$it") }; append(" followers") }, style = inter(12f), color = Ani.Muted) }
-                    if (isFriend) Text("Friends", style = inter(11f, FontWeight.SemiBold), color = Color(0xFFB7A9FF), modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x26B7A9FF)).padding(horizontal = 8.dp, vertical = 2.dp))
+                    if (isFriend) Text("Friends", style = inter(11f, FontWeight.SemiBold), color = com.anibiar.app.ui.theme.Ani.Lavender, modifier = Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 2.dp))
                     else if (followsYou) Text("Follows you", style = inter(11f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF232326)).padding(horizontal = 8.dp, vertical = 2.dp))
                 }
             }
@@ -616,7 +616,7 @@ internal fun UserCard(
                 Text(
                     if (iFollow) "Following" else if (user.uid in myFollowers) "Follow back" else "Follow",
                     style = inter(13f, FontWeight.Bold), color = if (iFollow) Color.White else Ani.Onyx,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (iFollow) Color(0xFF232326) else Color(0xFFB7A9FF)).clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (iFollow) Color(0xFF232326) else com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
         }

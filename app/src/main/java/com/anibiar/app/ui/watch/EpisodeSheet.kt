@@ -40,7 +40,7 @@ import com.anibiar.app.ui.theme.FeatherIcons
 import com.anibiar.app.ui.theme.VidIcons
 import com.anibiar.app.ui.theme.inter
 
-val WebAccent = Color(0xFFB7A9FF)
+val WebAccent get() = com.anibiar.app.ui.theme.Ani.Lavender
 val WebLine = Color(0x2EFFFFFF)
 private val Muted = Color(0xFF9B98A0)
 
@@ -112,7 +112,7 @@ fun EpisodeSheet(
             ranges.forEachIndexed { i, r ->
                 val on = i == range; val s = RoundedCornerShape(50)
                 Text(r.first, style = inter(12f, FontWeight.SemiBold), color = if (on) WebAccent else Color.White,
-                    modifier = Modifier.clip(s).border(1.5.dp, if (on) WebAccent else WebLine, s).background(if (on) Color(0x29B7A9FF) else Color.Transparent).clickable { range = i }.padding(horizontal = 12.dp, vertical = 5.dp))
+                    modifier = Modifier.clip(s).border(1.5.dp, if (on) WebAccent else WebLine, s).background(if (on) com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.16f) else Color.Transparent).clickable { range = i }.padding(horizontal = 12.dp, vertical = 5.dp))
             }
         }
         if (visible.isEmpty()) {
@@ -157,7 +157,7 @@ fun EpisodeSheet(
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 78.dp).height(IntrinsicSize.Min).clip(s)
                             .border(1.5.dp, if (on) WebAccent else WebLine, s)
-                            .background(if (on) Color(0x42B7A9FF) else Color(0x0BFFFFFF)).clickable { onSelect(e.number) },
+                            .background(if (on) com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.26f) else Color(0x0BFFFFFF)).clickable { onSelect(e.number) },
                     ) {
                         Box(Modifier.width(115.dp).fillMaxHeight().background(Color(0xFF2A2A2E))) {
                             if (img != null) AsyncImage(img, null, contentScale = ContentScale.Crop,

@@ -31,7 +31,7 @@ fun GlassButton(onClick: () -> Unit, size: Dp = 36.dp, selected: Boolean = false
     val hi = if (selected) 0.30f else 0.14f
     Box(
         Modifier.size(size).clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Color(0xE61E1E20), Color(0xE61E1E20))))
+            .background(Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E))))
             .then(if (selected) Modifier.background(Color(0x40FFFFFF)) else Modifier)
             .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), CircleShape)
             .clickable(onClick = onClick),
@@ -100,7 +100,7 @@ fun GlassPill(modifier: Modifier = Modifier, content: @Composable androidx.compo
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
     androidx.compose.foundation.layout.Row(
         modifier.height(36.dp).clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xE61E1E20), Color(0xE61E1E20))))
+            .background(Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E))))
             .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), shape)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically, content = content,
@@ -113,7 +113,7 @@ fun PillIcon(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.size(width = 40.dp, height = 36.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = content)
 }
 
-val GlassBtnBrush: Brush = Brush.linearGradient(listOf(Color(0xE61E1E20), Color(0xE61E1E20)))
+val GlassBtnBrush: Brush = Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E)))
 val GlassRimBrush: Brush = Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF)))
 
 /** iMessage glass: clip, translucent sheen fill and a bright rim. Use on any button, pill or chip. */

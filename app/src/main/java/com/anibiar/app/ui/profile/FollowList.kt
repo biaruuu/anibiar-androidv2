@@ -106,7 +106,7 @@ internal fun FollowListScreen(
                 if (query.isEmpty()) Text("Search", style = inter(15f), color = Ani.Muted)
                 BasicTextField(
                     query, { query = it }, singleLine = true,
-                    textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(Color(0xFFB7A9FF)),
+                    textStyle = inter(15f).copy(color = Color.White), cursorBrush = SolidColor(com.anibiar.app.ui.theme.Ani.Lavender),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -142,8 +142,8 @@ internal fun FollowListScreen(
                         Text("@${u.username}", style = inter(12.5f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val sub = when { u.uid in myFriends -> "Friends"; theyFollow && !isMe -> "Follows you"; else -> null }
                         if (sub != null) Text(
-                            sub, style = inter(11f, FontWeight.SemiBold), color = Color(0xFFB7A9FF),
-                            modifier = Modifier.padding(top = 5.dp).clip(RoundedCornerShape(50)).background(Color(0x26B7A9FF)).padding(horizontal = 8.dp, vertical = 2.dp),
+                            sub, style = inter(11f, FontWeight.SemiBold), color = com.anibiar.app.ui.theme.Ani.Lavender,
+                            modifier = Modifier.padding(top = 5.dp).clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.15f)).padding(horizontal = 8.dp, vertical = 2.dp),
                         )
                     }
                     if (myUid != null && !isMe) {
@@ -151,7 +151,7 @@ internal fun FollowListScreen(
                         val label = when { iFollow -> "Following"; theyFollow -> "Follow back"; else -> "Follow" }
                         Box(
                             Modifier.widthIn(min = 92.dp).height(34.dp).clip(RoundedCornerShape(50))
-                                .background(if (iFollow) Color(0xFF232326) else Color(0xFFB7A9FF))
+                                .background(if (iFollow) Color(0xFF232326) else com.anibiar.app.ui.theme.Ani.Lavender)
                                 .clickable { onToggle(u.uid) }.padding(horizontal = 14.dp),
                             contentAlignment = Alignment.Center,
                         ) {

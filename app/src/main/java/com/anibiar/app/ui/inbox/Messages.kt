@@ -81,7 +81,7 @@ import kotlinx.coroutines.launch
 private val Bg = Color(0xFF0B0B0D)
 private val Panel = Color(0xFF151517)
 private val Item = Color(0xFF1A1A1C)
-private val Accent = Color(0xFFB7A9FF)
+private val Accent get() = com.anibiar.app.ui.theme.Ani.Lavender
 private val Muted = Color(0xFF9B98A0)
 private val Flame = Color(0xFFFF9A3C)
 

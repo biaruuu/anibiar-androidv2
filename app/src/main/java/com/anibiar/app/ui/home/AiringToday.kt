@@ -51,27 +51,45 @@ fun AiringToday(onOpen: (Int) -> Unit) {
     val clock = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
 
     val cols = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840) 5 else 3
-    var limit by remember { mutableStateOf(cols * 3) }
-    Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
-        Text("Airing today", style = inter(20f, FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+    val perPage = cols * 3
+    var dub by remember { mutableStateOf(false) }
+    var page by remember { mutableStateOf(0) }
+    val pageCount = ((list.size + perPage - 1) / perPage).coerceAtLeast(1)
+    val cur = page.coerceIn(0, pageCount - 1)
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        LatestHeader(
+            title = "Airing today",
+            dubMode = dub,
+            onModeChange = { dub = it },
+            page = cur,
+            pageCount = pageCount,
+            onPrev = { page = (cur - 1).coerceAtLeast(0) },
+            onNext = { page = (cur + 1).coerceAtMost(pageCount - 1) },
+        )
         Spacer(Modifier.height(14.dp))
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            list.take(limit).chunked(cols).forEach { rowItems ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (dub) {
+            Text("Dubbed releases aren't available yet.", style = inter(15f), color = Ani.Muted, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp))
+        } else Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            list.drop(cur * perPage).take(perPage).chunked(cols).forEach { rowItems ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                     rowItems.forEach { a ->
                         val left = a.at - now
                         val done = left <= 0
+                        val soon = !done && left < 3_600_000
                         Column(Modifier.weight(1f).clickable { onOpen(a.mediaId) }) {
                             Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(Ani.Item)) {
                                 PosterImage(url = a.cover, contentDescription = a.title, maxSide = 400, modifier = Modifier.fillMaxSize())
                                 Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))))
                                 Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                     Text("EP ${a.episode}", style = inter(11f, FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
-                                    Text(if (done) "Aired" else "in ${countdown(left)}", style = inter(10.5f, FontWeight.Medium), color = Color.White.copy(alpha = 0.92f), maxLines = 1, softWrap = false)
+                                    Text(if (done) "Aired" else "in ${countdown(left)}", style = inter(10.5f, FontWeight.SemiBold), color = if (soon) Ani.Lavender else Color.White.copy(alpha = 0.92f), maxLines = 1, softWrap = false)
                                 }
                             }
                             Spacer(Modifier.height(7.dp))
-                            InfoBadge(text = clock.format(Date(a.at)), textSize = 9.5f, hPad = 5.dp, vPad = 4.dp, background = Ani.ButtonDark, textColor = Ani.Soft)
+                            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                InfoBadge(text = clock.format(Date(a.at)), textSize = 9.5f, hPad = 5.dp, vPad = 4.dp, background = Ani.ButtonDark, textColor = Ani.Soft)
+                                InfoBadge(text = if (done) "Out" else "Soon", textSize = 9.5f, hPad = 5.dp, vPad = 4.dp, background = if (done) Ani.ButtonDark else Ani.Lavender.copy(alpha = 0.22f), textColor = if (done) Ani.Soft else Ani.Lavender)
+                            }
                             Spacer(Modifier.height(7.dp))
                             Text(a.title, style = inter(13.5f, FontWeight.Medium, lineHeight = 18f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
@@ -79,10 +97,6 @@ fun AiringToday(onOpen: (Int) -> Unit) {
                     repeat(cols - rowItems.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
-            if (list.size > limit) Text(
-                "Show more (${list.size - limit} left)", style = inter(14f, FontWeight.SemiBold), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { limit += cols * 3 }.padding(vertical = 12.dp),
-            )
         }
     }
 }

@@ -305,7 +305,6 @@ private fun HomeContent(
                             }
                         }
     
-                        item(key = "airing-today") { AiringToday(onOpen) }
 
                     annList.filter { it.id !in annGone || it.draft }.take(2).forEach { a ->
                             item(key = "ann-${a.id}") {
@@ -468,6 +467,8 @@ private fun HomeContent(
                             }
                         }
     
+                        item(key = "airing-today") { AiringToday(onOpen) }
+
                         if (state.topAiring.isNotEmpty()) {
                             item(key = "top-airing") {
                                 Spacer(Modifier.height(12.dp))

@@ -102,7 +102,7 @@ fun TogetherSheet(
                             }
                             if (isHost && !here) {
                                 Box(
-                                    Modifier.clip(RoundedCornerShape(50)).background(if (sent) Color(0xFF232326) else Color(0xFFB7A9FF))
+                                    Modifier.clip(RoundedCornerShape(50)).background(if (sent) Color(0xFF232326) else com.anibiar.app.ui.theme.Ani.Lavender)
                                         .clickable {
                                             scope.launch {
                                                 runCatching { social.inviteToRoom(room, f.uid) }
@@ -123,7 +123,7 @@ fun TogetherSheet(
                         val on = audio == k
                         val can = isHost && (k == "sub" || dubAvailable)
                         Text(label, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else if (can) Color.White else Ani.Muted,
-                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Color(0xFFB7A9FF) else Ani.ButtonDark).clickable(enabled = can && !on) { onAudio(k) }.padding(horizontal = 16.dp, vertical = 8.dp))
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) com.anibiar.app.ui.theme.Ani.Lavender else Ani.ButtonDark).clickable(enabled = can && !on) { onAudio(k) }.padding(horizontal = 16.dp, vertical = 8.dp))
                     }
                 }
                 if (servers.isNotEmpty()) {
@@ -131,14 +131,14 @@ fun TogetherSheet(
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                         servers.forEach { s ->
                             Text(s, style = inter(13.5f, FontWeight.SemiBold), color = if (s == server) Color.Black else Color.White,
-                                modifier = Modifier.clip(RoundedCornerShape(50)).background(if (s == server) Color(0xFFB7A9FF) else Ani.ButtonDark).clickable { onServer(s) }.padding(horizontal = 16.dp, vertical = 8.dp))
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(if (s == server) com.anibiar.app.ui.theme.Ani.Lavender else Ani.ButtonDark).clickable { onServer(s) }.padding(horizontal = 16.dp, vertical = 8.dp))
                         }
                     }
                     Text("Your server only affects your own video quality.", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(12.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFFB7A9FF)).clickable(onClick = onPickAnime),
+                    Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onPickAnime),
                     contentAlignment = Alignment.Center,
                 ) { Text(if (isHost) "Change anime" else "Request an anime", style = inter(14.5f, FontWeight.Bold), color = Color.Black) }
                 Spacer(Modifier.height(8.dp))
