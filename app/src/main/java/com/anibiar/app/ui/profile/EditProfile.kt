@@ -86,7 +86,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
             busy = false
         }
     }
-    val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) scope.launch {
             busy = true
             try { val b = withContext(Dispatchers.Default) { ImageProc.banner(context, uri) }; social.setBanner(b.bytes, b.mime, b.ext) } catch (e: Exception) { toast(e.message ?: "Couldn't upload") }
