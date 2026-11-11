@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -700,41 +701,30 @@ private fun HeroSlide(
 
             Spacer(Modifier.height(20.dp))
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val btnShape = RoundedCornerShape(20.dp)
+            Row(Modifier.fillMaxWidth().widthIn(max = 440.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(
                     modifier = Modifier
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White)
-                        .clickable(onClick = onWatch)
-                        .padding(horizontal = 14.dp),
+                        .weight(1f)
+                        .height(52.dp)
+                        .glass(btnShape)
+                        .clickable(onClick = onWatch),
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(AniIcons.Play, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Watch Now", style = inter(13.5f, FontWeight.Medium), color = Color.Black, maxLines = 1, softWrap = false)
-                }
-                Row(
-                    modifier = Modifier
-                        .height(40.dp)
-                        .glass(RoundedCornerShape(50))
-                        .clickable(onClick = onDetails)
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(AniIcons.Info, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Details", style = inter(13.5f, FontWeight.Medium), maxLines = 1, softWrap = false)
+                    Icon(AniIcons.Play, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Watch Now", style = inter(16f, FontWeight.Bold), color = Color.White, maxLines = 1, softWrap = false)
                 }
                 val (heroFav, toggleHeroFav) = rememberFav(media)
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .glass(CircleShape)
+                        .size(52.dp)
+                        .glass(btnShape)
                         .clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(if (heroFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(20.dp).favPop(heroFav))
+                    Icon(if (heroFav) AniIcons.Check else AniIcons.Add, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(26.dp).favPop(heroFav))
                 }
             }
         }

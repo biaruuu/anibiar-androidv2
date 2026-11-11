@@ -483,3 +483,7 @@
 
 ## 111 | Blue and liquid glass | 2026-11-11
 - iOS blue accent and iOS-style neutral colors, liquid glass cards in Settings, announcements, previews and the Details header, Airing today now matches the poster rows, and the big Resume card is gone
+
+## 112 | Hero and Details revamp | 2026-11-11
+- Home hero: glass Watch Now box with a square + favorite button
+- Details: centered poster and title, Play Ep. N with heart, stats row, genres, synopsis

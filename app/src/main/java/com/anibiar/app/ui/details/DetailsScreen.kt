@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
@@ -222,6 +224,7 @@ fun DetailsScreen(
                         posterWidth = posterW,
                         titleSize = titleSp,
                         inList = media.id in saved,
+                        playLabel = "Play Ep. ${app.history.resumeEpisode(media.id)}",
                         onWatch = { onWatch(media.id, app.history.resumeEpisode(media.id)) },
                         onToggleList = { app.watchlist.toggle(media.id) },
                         isFav = media.id in favIds,
@@ -398,67 +401,104 @@ private fun Header(
     onToggleList: () -> Unit,
     isFav: Boolean,
     onToggleFav: () -> Unit,
+    playLabel: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            PosterImage(
-                url = media.posterUrl,
-                contentDescription = media.displayTitle,
-                modifier = Modifier
-                    .width(posterWidth)
-                    .height(posterWidth * 1.5f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .border(1.dp, Ani.Border, RoundedCornerShape(16.dp)),
-            )
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = media.displayTitle,
-                    style = inter(titleSize, FontWeight.Bold, lineHeight = titleSize * 1.22f),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(10.dp))
-                val metaSize = titleSize * 0.52f
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(7.dp),
-                ) {
-                    media.seasonLabel?.let { MetaItem(AniIcons.Calendar, it, metaSize) }
-                    media.score10?.let { MetaItem(AniIcons.Star, it, metaSize, tint = ratingColor((media.averageScore ?: 0) / 10f)) }
-                    MetaItem(AniIcons.Tv, media.formatName, metaSize)
-                    media.duration?.takeIf { it > 0 }?.let { MetaItem(AniIcons.Schedule, "$it min", metaSize) }
-                }
+    val btnShape = RoundedCornerShape(18.dp)
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Poster, centred, sized from the available width so it suits phones, tablets and landscape.
+        val pw = (posterWidth * 2.1f).coerceIn(190.dp, 300.dp)
+        PosterImage(
+            url = media.posterUrl,
+            contentDescription = media.displayTitle,
+            modifier = Modifier
+                .width(pw)
+                .height(pw * 1.45f)
+                .clip(RoundedCornerShape(22.dp))
+                .border(1.dp, Ani.Border, RoundedCornerShape(22.dp)),
+        )
+        media.nextAiringEpisode?.let { n ->
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.clip(RoundedCornerShape(50)).background(Ani.Chip).padding(horizontal = 12.dp, vertical = 5.dp)) {
+                Text("EP ${n.episode} airing soon", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Soft, maxLines = 1)
             }
         }
-
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = media.displayTitle,
+            style = inter(titleSize * 1.1f, FontWeight.Bold, lineHeight = titleSize * 1.3f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ActionButton(
-                label = "Watch Now",
-                icon = AniIcons.Play,
-                filled = true,
-                onClick = onWatch,
-                modifier = Modifier.weight(1f),
-            )
+        Row(Modifier.fillMaxWidth().widthIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                Modifier.weight(1f).height(54.dp).clip(btnShape).background(Color.White).clickable(onClick = onWatch),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(AniIcons.Play, null, tint = Color.Black, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(playLabel, style = inter(16f, FontWeight.Bold), color = Color.Black, maxLines = 1, softWrap = false)
+            }
             Box(
-                Modifier.size(42.dp).glass(CircleShape)
-                    .then(if (isFav) Modifier.border(1.5.dp, com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.8f), CircleShape) else Modifier)
+                Modifier.size(54.dp).clip(btnShape).background(Ani.Panel)
+                    .border(1.dp, if (isFav) com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.8f) else Ani.Border, btnShape)
                     .clickable(onClick = onToggleFav),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     if (isFav) AniIcons.BookmarkFilled else AniIcons.Bookmark, if (isFav) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFav) com.anibiar.app.ui.home.FavYellow else Color.White, modifier = Modifier.size(20.dp).favPop(isFav),
+                    tint = if (isFav) com.anibiar.app.ui.home.FavYellow else Color.White, modifier = Modifier.size(24.dp).favPop(isFav),
                 )
+            }
+        }
+
+        // Stats row with dividers.
+        Spacer(Modifier.height(20.dp))
+        val stats = buildList {
+            media.averageScore?.let { add(Triple("$it%", "SCORE", true)) }
+            (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.let { add(Triple("$it", "EPISODES", false)) }
+            (media.year ?: media.seasonYear)?.let { add(Triple("$it", "YEAR", false)) }
+            add(Triple(media.formatName, "FORMAT", false))
+        }
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            stats.forEachIndexed { i, (v, l, star) ->
+                if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(Ani.Border))
+                Column(Modifier.weight(1f).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (star) { Icon(AniIcons.Star, null, tint = Color(0xFFFFD60A), modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp)) }
+                        Text(v, style = inter(16f, FontWeight.Bold), maxLines = 1, softWrap = false)
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(l, style = inter(10.5f, FontWeight.Medium), color = Ani.Muted, maxLines = 1)
+                }
+            }
+        }
+
+        // Genres separated by thin bars.
+        val genres = media.genres.orEmpty().take(5)
+        if (genres.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                genres.forEachIndexed { i, g ->
+                    if (i > 0) Box(Modifier.width(1.dp).height(12.dp).background(Ani.Border))
+                    Text(g, style = inter(13f, FontWeight.Medium), color = Ani.Soft, maxLines = 1, softWrap = false)
+                }
             }
         }
 
         val description = media.cleanDescription
         if (description.isNotBlank()) {
             Spacer(Modifier.height(16.dp))
-            Description(description)
+            Box(Modifier.fillMaxWidth()) { Description(description) }
         }
     }
 }
