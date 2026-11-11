@@ -191,9 +191,12 @@ fun DetailsScreen(
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val media = state.media
     var titleLogo by remember(media?.id) { mutableStateOf<String?>(null) }
+    var hdBackdrop by remember(media?.id) { mutableStateOf<String?>(null) }
     androidx.compose.runtime.LaunchedEffect(media?.id) {
         val m = media ?: return@LaunchedEffect
-        titleLogo = runCatching { app.repository.art(m)?.logo }.getOrNull()
+        val art = runCatching { app.repository.art(m) }.getOrNull()
+        titleLogo = art?.logo
+        hdBackdrop = art?.backdrop
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx).nestedScroll(scrollConnection)) {
@@ -206,7 +209,7 @@ fun DetailsScreen(
         val titleSp = (content.value / 328f * 22f).coerceIn(20f, 32f)
 
         if (media != null) {
-            DetailsBackdrop(media) { scrollPx }
+            DetailsBackdrop(media, hdBackdrop) { scrollPx }
         }
 
         when {
@@ -351,8 +354,8 @@ fun DetailsScreen(
 // ------------------------------------------------------------------ backdrop
 
 @Composable
-private fun DetailsBackdrop(media: Media, scrollPx: () -> Float) {
-    val url = media.coverImage.extraLarge ?: media.posterUrl
+private fun DetailsBackdrop(media: Media, hdArt: String?, scrollPx: () -> Float) {
+    val url = hdArt ?: media.coverImage.extraLarge ?: media.posterUrl
     val h = detailsHeroHeight()
     Box(Modifier.fillMaxWidth().height(h).drawWithContent {
         // Fade the art away as the page scrolls.
@@ -361,10 +364,10 @@ private fun DetailsBackdrop(media: Media, scrollPx: () -> Float) {
         drawRect(Ani.Onyx.copy(alpha = t))
     }) {
         AsyncImage(
-            model = url,
+            model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current).data(url).size(1600, 1600).precision(coil.size.Precision.INEXACT).crossfade(300).build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            alignment = Alignment.TopCenter,
+            alignment = if (hdArt != null) Alignment.Center else Alignment.TopCenter,
             filterQuality = FilterQuality.High,
             modifier = Modifier.fillMaxSize(),
         )

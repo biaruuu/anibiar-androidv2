@@ -203,6 +203,8 @@ fun KiroPlayer(
     var bufferedMs by remember { mutableLongStateOf(0L) }
     var videoRatio by remember { mutableFloatStateOf(16f / 9f) }
     var showControls by remember { mutableStateOf(true) }
+    var locked by remember { mutableStateOf(false) }
+    var lockHint by remember { mutableStateOf(false) }
     var scrubFrac by remember { mutableStateOf<Float?>(null) }
     var volume by remember { mutableFloatStateOf(1f) }
     var muted by remember { mutableStateOf(false) }
@@ -522,7 +524,7 @@ fun KiroPlayer(
         if (ended) { player.seekTo(0); ended = false; player.play() } else if (player.isPlaying) player.pause() else player.play()
     }
 
-    val controlsVisible = showControls || !playing || menuOpen
+    val controlsVisible = (showControls || !playing || menuOpen) && !locked
     // Host: tell everyone when my controls appear or hide, so their screens show the same thing.
     LaunchedEffect(controlsVisible, together) {
         val t = togetherNow ?: return@LaunchedEffect
@@ -552,7 +554,8 @@ fun KiroPlayer(
 
         // Video + gestures
         Box(
-            Modifier.fillMaxSize().pointerInput(Unit) {
+            Modifier.fillMaxSize().pointerInput(locked) {
+                if (locked) return@pointerInput
                 var side = 0
                 detectVerticalDragGestures(
                     onDragStart = { o -> side = if (o.x < size.width / 2) 0 else 1 },
@@ -571,7 +574,8 @@ fun KiroPlayer(
                         hud = "Volume ${(volume * 100).toInt()}%"
                     }
                 }
-            }.pointerInput(Unit) {
+            }.pointerInput(locked) {
+                if (locked) { detectTapGestures(onTap = { lockHint = true }); return@pointerInput }
                 detectTapGestures(
                     onPress = {
                         if (!readOnlyNow) {
@@ -759,6 +763,21 @@ fun KiroPlayer(
             )
         }
         LaunchedEffect(hud) { if (hud != null && !holdFast) { delay(900); hud = null } }
+        LaunchedEffect(lockHint, locked) { if (lockHint) { delay(2500); lockHint = false } }
+        if (locked) androidx.compose.animation.AnimatedVisibility(
+            visible = lockHint, modifier = Modifier.align(Alignment.CenterStart).padding(start = pad + 6.dp),
+            enter = androidx.compose.animation.fadeIn(), exit = androidx.compose.animation.fadeOut(),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier.size(pill + 8.dp).clip(CircleShape).background(Color(0x99000000)).border(1.dp, Color(0x33FFFFFF), CircleShape)
+                        .clickable { locked = false; lockHint = false; showControls = true; hud = "Unlocked" },
+                    contentAlignment = Alignment.Center,
+                ) { Icon(com.anibiar.app.ui.theme.AniIcons.Lock, "Unlock", tint = Color.White, modifier = Modifier.size(ico)) }
+                Spacer(Modifier.height(6.dp))
+                Text("Tap to unlock", style = inter(11.5f, FontWeight.Medium), color = Color.White.copy(alpha = 0.85f))
+            }
+        }
         LaunchedEffect(inPip) { if (inPip) { showControls = false; menuOpen = false } }
 
         // ---------------- controls ----------------
@@ -795,6 +814,7 @@ fun KiroPlayer(
                     if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
                         if (readOnly) { say("Only the host controls captions"); return@BarButton }; capLocal = false; captionTrack = if (captionTrack >= 0) -1 else 0
                     }
+                    BarButton(btn, com.anibiar.app.ui.theme.AniIcons.Lock, ico, live) { locked = true; lockHint = true; showControls = false; menuOpen = false; hud = null }
                     BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
                 }
             }

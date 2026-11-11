@@ -513,3 +513,8 @@
 - Banners can be live photos, videos, GIF or animated WebP and they move
 - Inbox suggested accounts use the namecard
 - Avatar decorations animate in chats too
+
+## 119 | Player lock and HD hero | 2026-11-12
+- Video player: lock button hides controls and blocks touches until you tap unlock
+- Details hero uses the original-size TMDB backdrop for a sharp image
+- Inbox suggestions show 3 namecards to stay smooth

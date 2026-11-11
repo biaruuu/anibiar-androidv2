@@ -171,7 +171,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                 item {
                     Text("Suggested accounts", style = inter(14f, FontWeight.Bold), color = Muted, modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp))
                 }
-                items(suggested.take(5), key = { "s" + it.uid }) { u ->
+                items(suggested.take(3), key = { "s" + it.uid }) { u ->
                     com.anibiar.app.ui.profile.UserCard(
                         user = u,
                         myUid = social.myId ?: "me",
