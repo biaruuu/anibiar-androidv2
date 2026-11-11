@@ -48,28 +48,28 @@ fun AiringToday(onOpen: (Int) -> Unit) {
     LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
     val clock = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
 
+    val wide = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840
+    val cardW = if (wide) 168.dp else 132.dp
     Column(Modifier.fillMaxWidth().padding(top = 28.dp)) {
-        Text("Airing today", style = inter(20f, FontWeight.SemiBold), modifier = Modifier.padding(horizontal = 16.dp))
+        Text("Airing today", style = inter(20f, FontWeight.SemiBold), maxLines = 1, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         Spacer(Modifier.height(14.dp))
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             items(list, key = { "${it.mediaId}-${it.episode}" }) { a ->
                 val left = a.at - now
                 val done = left <= 0
-                val shape = RoundedCornerShape(16.dp)
-                Row(
-                    Modifier.width(250.dp).clip(shape).background(Ani.Panel).border(1.dp, Color(0x1FFFFFFF), shape).clickable { onOpen(a.mediaId) }.padding(10.dp),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                ) {
-                    PosterImage(url = a.cover, contentDescription = a.title, maxSide = 300, modifier = Modifier.width(58.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item))
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(a.title, style = inter(14f, FontWeight.SemiBold, lineHeight = 18f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text("Episode ${a.episode}", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(top = 2.dp))
-                        Text(
-                            if (done) "Aired ${clock.format(Date(a.at))}" else "${clock.format(Date(a.at))} · in ${countdown(left)}",
-                            style = inter(12.5f, FontWeight.SemiBold), color = if (done) Ani.Muted else Ani.Lavender, modifier = Modifier.padding(top = 4.dp),
-                        )
+                Column(Modifier.width(cardW).clickable { onOpen(a.mediaId) }) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(Ani.Item)) {
+                        PosterImage(url = a.cover, contentDescription = a.title, maxSide = 400, modifier = Modifier.fillMaxSize())
+                        Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))))
+                        Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text("EP ${a.episode}", style = inter(11f, FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
+                            Text(if (done) "Aired" else "in ${countdown(left)}", style = inter(11f, FontWeight.SemiBold), color = if (done) Color.White.copy(alpha = 0.8f) else Ani.Lavender, maxLines = 1, softWrap = false)
+                        }
                     }
+                    Spacer(Modifier.height(7.dp))
+                    Text(clock.format(Date(a.at)), style = inter(12f), color = Ani.Muted, maxLines = 1)
+                    Spacer(Modifier.height(4.dp))
+                    Text(a.title, style = inter(14f, FontWeight.Medium, lineHeight = 18f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

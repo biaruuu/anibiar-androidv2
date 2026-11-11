@@ -480,3 +480,6 @@
 
 ## 110 | Airing today, widget, media controls, list view | 2026-11-11
 - Airing today strip on Home with live countdowns, an Airing today widget, lock-screen and notification media controls while watching, and a Grid / List switch in Search
+
+## 111 | Blue and liquid glass | 2026-11-11
+- iOS blue accent and iOS-style neutral colors, liquid glass cards in Settings, announcements, previews and the Details header, Airing today now matches the poster rows, and the big Resume card is gone

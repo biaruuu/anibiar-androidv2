@@ -2,6 +2,7 @@
 
 package com.anibiar.app.ui.details
 
+import com.anibiar.app.ui.theme.liquidGlass
 import kotlinx.coroutines.launch
 import android.content.Context
 import android.content.Intent
@@ -326,7 +327,7 @@ fun DetailsScreen(
         ) {
             media?.let { m ->
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xE60B0B0D)).padding(horizontal = 16.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(0.dp)).padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(m.displayTitle, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))

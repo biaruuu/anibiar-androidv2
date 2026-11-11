@@ -54,8 +54,9 @@ import kotlinx.coroutines.launch
 /** The look the person picked: accent colour and pure-black (AMOLED) backgrounds. Stored on the device. */
 object Appearance {
     val accents = listOf(
-        "Lavender" to Color(0xFFB9A1DF), "Lime" to Color(0xFFAAFF01), "Rose" to Color(0xFFFF8FB1),
-        "Sky" to Color(0xFF7CC4FF), "Amber" to Color(0xFFFFC94D), "Mint" to Color(0xFF6FE39A),
+        // Apple system colors (dark mode): systemBlue is the default.
+        "Blue" to Color(0xFF0A84FF), "Indigo" to Color(0xFF5E5CE6), "Sky" to Color(0xFF64D2FF),
+        "Green" to Color(0xFF30D158), "Orange" to Color(0xFFFF9F0A), "Pink" to Color(0xFFFF375F),
     )
     var accent by mutableStateOf(accents[0].second); private set
     var amoled by mutableStateOf(false); private set
@@ -247,3 +248,18 @@ fun Modifier.staggerIn(index: Int, enabled: Boolean = true): Modifier = composed
     androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.delay(index * 45L); a.animateTo(1f, tween(380)) }
     this.graphicsLayer { alpha = a.value; translationY = (1f - a.value) * 24.dp.toPx() }
 }
+
+
+/**
+ * iOS-style liquid glass: a frosted translucent body, a soft light bloom from the top-left, and a bright
+ * rim that fades around the edge. (A true backdrop blur isn't available to Compose views, so the body is a tinted translucent layer.)
+ */
+fun Modifier.liquidGlass(shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(22.dp)): Modifier = this
+    .clip(shape)
+    .background(Color(0xB3141416))
+    .background(Brush.verticalGradient(listOf(Color(0x2EFFFFFF), Color(0x0AFFFFFF))))
+    .drawWithContent {
+        drawRect(Brush.radialGradient(listOf(Color(0x24FFFFFF), Color.Transparent), center = Offset(size.width * 0.15f, 0f), radius = size.width * 0.75f))
+        drawContent()
+    }
+    .border(1.dp, Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x14FFFFFF), Color(0x40FFFFFF))), shape)

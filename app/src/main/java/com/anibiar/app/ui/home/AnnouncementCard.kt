@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.home
 
+import com.anibiar.app.ui.theme.liquidGlass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,7 +30,7 @@ fun AnnouncementCard(a: Announcement, modifier: Modifier = Modifier, onDismiss: 
     val accent = if (a.important) Color(0xFFFFC94D) else Ani.Lavender
     val shape = RoundedCornerShape(18.dp)
     Column(
-        modifier.fillMaxWidth().clip(shape).background(accent.copy(alpha = 0.10f)).border(1.dp, accent.copy(alpha = 0.45f), shape).padding(14.dp),
+        modifier.fillMaxWidth().liquidGlass(shape).background(accent.copy(alpha = 0.14f)).border(1.dp, accent.copy(alpha = 0.40f), shape).padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(if (a.important) "IMPORTANT" else "ANNOUNCEMENT", style = inter(11f, FontWeight.Bold), color = accent)

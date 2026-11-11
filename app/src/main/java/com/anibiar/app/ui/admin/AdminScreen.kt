@@ -2,6 +2,7 @@
 
 package com.anibiar.app.ui.admin
 
+import com.anibiar.app.ui.theme.liquidGlass
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -113,7 +114,7 @@ fun AdminScreen(onBack: () -> Unit) {
 }
 
 @Composable private fun Card(content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(18.dp)).background(PANEL).border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(18.dp)).padding(14.dp)) { content() }
+    Column(Modifier.fillMaxWidth().padding(bottom = 10.dp).liquidGlass(RoundedCornerShape(20.dp)).padding(14.dp)) { content() }
 }
 
 @Composable private fun Heading(t: String) { Text(t, style = inter(17f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(top = 14.dp, bottom = 8.dp)) }

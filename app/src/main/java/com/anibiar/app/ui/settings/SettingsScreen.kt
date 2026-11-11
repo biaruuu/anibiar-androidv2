@@ -1,5 +1,6 @@
 package com.anibiar.app.ui.settings
 
+import com.anibiar.app.ui.theme.liquidGlass
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -262,7 +263,7 @@ private fun aboutRows(context: Context, toast: (String) -> Unit) {
 @Composable
 private fun Card(content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(20.dp)
-    Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) { content() }
+    Box(Modifier.fillMaxWidth().liquidGlass(shape)) { content() }
 }
 
 @Composable

@@ -2,6 +2,7 @@
 
 package com.anibiar.app.ui.home
 
+import com.anibiar.app.ui.theme.liquidGlass
 import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -824,31 +825,11 @@ private fun ContinueWatching(
             Icon(AniIcons.ChevronRight, contentDescription = null, tint = Ani.Muted, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.height(14.dp))
-        entries.firstOrNull()?.let { top ->
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 14.dp).clip(RoundedCornerShape(20.dp)).background(Ani.Panel)
-                    .border(1.dp, Color(0x1FFFFFFF), RoundedCornerShape(20.dp)).clickable { onClick(top) }.padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(0.42f).aspectRatio(16f / 9f).clip(RoundedCornerShape(14.dp)).background(Ani.Item)) {
-                    AsyncImage(model = top.image, contentDescription = top.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(top.progress.coerceIn(0f, 1f)).height(3.dp).background(Ani.Lavender))
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(0.58f)) {
-                    Text("Pick up where you left off", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Lavender)
-                    Text(top.title, style = inter(15f, FontWeight.SemiBold, lineHeight = 19f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp))
-                    Text("Episode ${top.episode} · ${(top.progress.coerceIn(0f, 1f) * 100).toInt()}% watched", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(top = 2.dp))
-                    Text("Resume", style = inter(13.5f, FontWeight.Bold), color = Color.Black,
-                        modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 18.dp, vertical = 7.dp))
-                }
-            }
-        }
-        if (entries.size > 1) LazyRow(
+        LazyRow(
             contentPadding = PaddingValues(horizontal = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(entries.drop(1), key = { it.mediaId }) { item ->
+            items(entries, key = { it.mediaId }) { item ->
                 Column(Modifier.width(240.dp).clickable { onClick(item) }) {
                     Box(
                         Modifier
@@ -1459,7 +1440,7 @@ internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier
 private fun QuickPreview(m: Media, onClose: () -> Unit, onOpen: () -> Unit) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onClose) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Ani.Panel).border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(24.dp)),
+            Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(28.dp)),
         ) {
             Box {
                 PosterImage(
