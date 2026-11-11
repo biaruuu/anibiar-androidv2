@@ -508,3 +508,8 @@
 - Purple buttons now follow your accent color
 - Airing today moved under Most Popular with Sub/Dub and pages
 - Profile and player pills are see-through
+
+## 118 | Live banners and namecards | 2026-11-12
+- Banners can be live photos, videos, GIF or animated WebP and they move
+- Inbox suggested accounts use the namecard
+- Avatar decorations animate in chats too

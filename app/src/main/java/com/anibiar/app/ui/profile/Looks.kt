@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -56,7 +57,7 @@ object Looks {
 }
 
 /** Avatars at least this big play the decoration's animation; smaller ones (lists) show its first frame to stay light. */
-private val AnimateFrom = 56.dp
+private val AnimateFrom = 24.dp
 
 /** A decoration drawn 20% larger than the avatar it sits on. Does not clip, so it can overhang. */
 @Composable
@@ -161,4 +162,36 @@ fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
 fun ThemeTint(id: String?, modifier: Modifier = Modifier) {
     val t = Looks.theme(id) ?: return
     Box(modifier.background(Brush.verticalGradient(listOf(t.color.copy(alpha = 0.38f), t.color.copy(alpha = 0.10f), Color.Transparent))))
+}
+
+
+/** Banner media: still, GIF/animated WebP (Coil animates them) or a looping muted MP4 (live photos). */
+@Composable
+fun BannerMedia(url: String, modifier: Modifier = Modifier, alpha: Float = 1f) {
+    if (!url.substringBefore('?').endsWith(".mp4", ignoreCase = true)) {
+        AsyncImage(url, null, contentScale = ContentScale.Crop, alpha = alpha, modifier = modifier)
+        return
+    }
+    val ctx = LocalContext.current
+    val player = remember(url) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(ctx).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(url))
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL
+            volume = 0f
+            playWhenReady = true
+            prepare()
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(player) { onDispose { player.release() } }
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { c ->
+            androidx.media3.ui.PlayerView(c).apply {
+                useController = false
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                this.player = player
+            }
+        },
+        modifier = modifier.alpha(alpha),
+    )
 }

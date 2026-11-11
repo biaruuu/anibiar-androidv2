@@ -171,21 +171,15 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                 item {
                     Text("Suggested accounts", style = inter(14f, FontWeight.Bold), color = Muted, modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 8.dp))
                 }
-                items(suggested.take(6), key = { "s" + it.uid }) { u ->
-                    Row(Modifier.fillMaxWidth().clickable { onOpenUser(u.uid) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(u.avatarUrl, u.username, 46.dp, deco = u.avatarDeco)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(u.shownName, style = inter(14.5f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("@${u.username}", style = inter(12.5f), color = Muted, maxLines = 1)
-                        }
-                        Text(
-                            "Follow", style = inter(13f, FontWeight.Bold), color = Color(0xFF0B0B0D),
-                            modifier = Modifier.clip(RoundedCornerShape(50)).background(Accent)
-                                .clickable { scope.launch { runCatching { social.follow(u.uid) }; suggested = suggested.filter { it.uid != u.uid } } }
-                                .padding(horizontal = 18.dp, vertical = 7.dp),
-                        )
-                    }
+                items(suggested.take(5), key = { "s" + it.uid }) { u ->
+                    com.anibiar.app.ui.profile.UserCard(
+                        user = u,
+                        myUid = social.myId ?: "me",
+                        myFollowing = emptySet(),
+                        myFollowers = emptySet(),
+                        onOpen = { onOpenUser(u.uid) },
+                        onToggle = { scope.launch { runCatching { social.follow(u.uid) }; suggested = suggested.filter { it.uid != u.uid } } },
+                    )
                 }
             }
         }

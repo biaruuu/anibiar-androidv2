@@ -89,7 +89,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
     val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) scope.launch {
             busy = true
-            try { val b = withContext(Dispatchers.Default) { ImageProc.banner(context, uri) }; social.setBanner(b.bytes, b.gif) } catch (e: Exception) { toast(e.message ?: "Couldn't upload") }
+            try { val b = withContext(Dispatchers.Default) { ImageProc.banner(context, uri) }; social.setBanner(b.bytes, b.mime, b.ext) } catch (e: Exception) { toast(e.message ?: "Couldn't upload") }
             busy = false
         }
     }
@@ -177,10 +177,10 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                         onClick = { page = "look" },
                     )
                     FormRow(
-                        "Banner", "", onClick = { pickBanner.launch("image/*") },
+                        "Banner", "", onClick = { pickBanner.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
                         trailing = {
                             Box(Modifier.width(72.dp).height(34.dp).clip(RoundedCornerShape(8.dp)).background(com.anibiar.app.ui.theme.GlassFill)) {
-                                if (profile?.bannerUrl != null) AsyncImage(profile.bannerUrl, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                if (profile?.bannerUrl != null) BannerMedia(profile.bannerUrl, Modifier.fillMaxSize())
                                 else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1F2A2E)))))
                             }
                         },
@@ -306,7 +306,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
             // Live preview of the namecard
             val shape = RoundedCornerShape(18.dp)
             Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) {
-                if (profile?.bannerUrl != null) AsyncImage(profile.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
+                if (profile?.bannerUrl != null) BannerMedia(profile.bannerUrl, Modifier.matchParentSize(), alpha = 0.5f)
                 Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
                 ThemeTint(theme, Modifier.matchParentSize())
                 EffectLayer(fx, Modifier.matchParentSize())

@@ -141,12 +141,12 @@ fun ProfileScreen(
             busy = false
         }
     }
-    val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         if (uri != null) scope.launch {
             busy = true
             try {
                 val b = withContext(Dispatchers.Default) { ImageProc.banner(context, uri) }
-                social.setBanner(b.bytes, b.gif)
+                social.setBanner(b.bytes, b.mime, b.ext)
             } catch (e: Exception) { toast(e.message ?: "Couldn't upload") }
             busy = false
         }
@@ -397,7 +397,7 @@ private fun Banner(url: String?, modifier: Modifier) {
     if (url == null) {
         Box(modifier.background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF15151A), Color(0xFF1F2A2E)))))
     } else {
-        AsyncImage(url, null, contentScale = ContentScale.Crop, modifier = modifier)
+        BannerMedia(url, modifier)
     }
 }
 
@@ -417,7 +417,7 @@ fun Avatar(url: String?, name: String?, size: Dp, modifier: Modifier = Modifier,
                 Text((name?.firstOrNull() ?: '?').uppercase(), style = inter((size.value * 0.42f), FontWeight.Bold), color = Ani.Lavender)
             }
         }
-        if (deco != null && size >= 36.dp) DecoOverlay(deco, size)
+        if (deco != null && size >= 24.dp) DecoOverlay(deco, size)
     }
 }
 
@@ -590,7 +590,7 @@ internal fun UserCard(
             .background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape).clickable(onClick = onOpen),
     ) {
         // Banner shows through softly behind the content, fading into the card.
-        if (user.bannerUrl != null) AsyncImage(user.bannerUrl, null, contentScale = ContentScale.Crop, alpha = 0.5f, modifier = Modifier.matchParentSize())
+        if (user.bannerUrl != null) BannerMedia(user.bannerUrl, Modifier.matchParentSize(), alpha = 0.5f)
         Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
         ThemeTint(user.profileTheme, Modifier.matchParentSize())
         EffectLayer(user.profileEffect, Modifier.matchParentSize())

@@ -790,9 +790,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         uploadImage("avatars", bytes, "image/jpeg", "jpg", "avatar_url", old)
     }
 
-    suspend fun setBanner(bytes: ByteArray, gif: Boolean) = net {
+    suspend fun setBanner(bytes: ByteArray, mime: String, ext: String) = net {
         val old = session?.uid?.let { fetchProfile(it)?.bannerUrl }
-        uploadImage("banners", bytes, if (gif) "image/gif" else "image/jpeg", if (gif) "gif" else "jpg", "banner_url", old)
+        uploadImage("banners", bytes, mime, ext, "banner_url", old)
     }
 
     // ---------------------------------------------------------------- friends
