@@ -486,7 +486,6 @@ private fun Header(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                itemVerticalAlignment = Alignment.CenterVertically,
             ) {
                 genres.forEachIndexed { i, g ->
                     if (i > 0) Box(Modifier.width(1.dp).height(12.dp).background(Ani.Border))
