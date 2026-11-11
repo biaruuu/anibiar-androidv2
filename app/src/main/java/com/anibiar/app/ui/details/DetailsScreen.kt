@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -189,6 +190,11 @@ fun DetailsScreen(
     }
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val media = state.media
+    var titleLogo by remember(media?.id) { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.LaunchedEffect(media?.id) {
+        val m = media ?: return@LaunchedEffect
+        titleLogo = runCatching { app.repository.art(m)?.logo }.getOrNull()
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx).nestedScroll(scrollConnection)) {
         val maxContent = if (maxWidth >= 900.dp) 900.dp else 720.dp
@@ -201,9 +207,6 @@ fun DetailsScreen(
 
         if (media != null) {
             DetailsBackdrop(media) { scrollPx }
-            // The anime's own cover colour washes in softly from the top.
-            val tint by androidx.compose.animation.animateColorAsState(com.anibiar.app.ui.home.accentOf(media.coverImage.color).copy(alpha = 0.22f), androidx.compose.animation.core.tween(600), label = "tint")
-            Box(Modifier.fillMaxWidth().height(460.dp).background(Brush.verticalGradient(listOf(tint, Color.Transparent))))
         }
 
         when {
@@ -215,8 +218,7 @@ fun DetailsScreen(
                 modifier = Modifier.fillMaxSize().clearOnEmptyTap { armedId = null },
             ) {
                 item(key = "top") {
-                    val minTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp
-                    Spacer(Modifier.height(maxOf(with(androidx.compose.ui.platform.LocalDensity.current) { topBarPx.toDp() }, minTop) + 14.dp))
+                    Spacer(Modifier.height(0.dp))
                 }
                 item(key = "header") {
                     Header(
@@ -224,6 +226,7 @@ fun DetailsScreen(
                         posterWidth = posterW,
                         titleSize = titleSp,
                         inList = media.id in saved,
+                        logo = titleLogo,
                         playLabel = "Play Ep. ${app.history.resumeEpisode(media.id)}",
                         onWatch = { onWatch(media.id, app.history.resumeEpisode(media.id)) },
                         onToggleList = { app.watchlist.toggle(media.id) },
@@ -349,44 +352,39 @@ fun DetailsScreen(
 
 @Composable
 private fun DetailsBackdrop(media: Media, scrollPx: () -> Float) {
-    val context = LocalContext.current
-    val url = media.bannerImage ?: media.posterUrl
-    val canBlur = android.os.Build.VERSION.SDK_INT >= 31
-    val request = remember(url, canBlur) {
-        val builder = ImageRequest.Builder(context).data(url).crossfade(true)
-        // Real blur (API 31+) gets the full-resolution art; older phones get a tiny decode that scales up soft.
-        if (canBlur) builder.size(Size.ORIGINAL) else builder.size(160, 160)
-        builder.build()
-    }
-    // Same technique as the Home hero: the art stays fixed and a scrim drawn on top darkens with the scroll
-    // distance. It is read only while drawing, so scrolling never recomposes and the fade tracks your finger.
-    Box(Modifier.fillMaxWidth().height(760.dp)) {
+    val url = media.coverImage.extraLarge ?: media.posterUrl
+    val h = detailsHeroHeight()
+    Box(Modifier.fillMaxWidth().height(h).drawWithContent {
+        // Fade the art away as the page scrolls.
+        drawContent()
+        val t = (scrollPx() / this.density / 500f).coerceIn(0f, 1f)
+        drawRect(Ani.Onyx.copy(alpha = t))
+    }) {
         AsyncImage(
-            model = request,
+            model = url,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = Alignment.TopCenter,
             filterQuality = FilterQuality.High,
-            modifier = Modifier.fillMaxSize().blur(26.dp),
+            modifier = Modifier.fillMaxSize(),
         )
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Ani.Onyx.copy(alpha = 0.10f),
-                    0.40f to Ani.Onyx.copy(alpha = 0.34f),
-                    0.70f to Ani.Onyx.copy(alpha = 0.72f),
-                    0.90f to Ani.Onyx.copy(alpha = 0.95f),
+                    0f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.82f to Ani.Onyx.copy(alpha = 0.85f),
                     1f to Ani.Onyx,
                 ),
             ),
         )
-        Box(
-            Modifier.fillMaxSize().drawBehind {
-                // Smoothstep over ~800dp: still visible behind "About this anime", gone by the Trailer.
-                val t = (scrollPx() / this.density / 800f).coerceIn(0f, 1f)
-                drawRect(Ani.Onyx.copy(alpha = t * t * (3f - 2f * t)))
-            },
-        )
     }
+}
+
+@Composable
+private fun detailsHeroHeight(): Dp {
+    val w = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    return (minOf(w, 560) * 1.05f).dp
 }
 
 // ------------------------------------------------------------------ header
@@ -402,40 +400,39 @@ private fun Header(
     isFav: Boolean,
     onToggleFav: () -> Unit,
     playLabel: String,
+    logo: String?,
     modifier: Modifier = Modifier,
 ) {
-    val btnShape = RoundedCornerShape(18.dp)
+    val btnShape = RoundedCornerShape(12.dp)
     Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        // Poster, centred, sized from the available width so it suits phones, tablets and landscape.
-        val pw = (posterWidth * 2.1f).coerceIn(190.dp, 300.dp)
-        PosterImage(
-            url = media.posterUrl,
-            contentDescription = media.displayTitle,
-            modifier = Modifier
-                .width(pw)
-                .height(pw * 1.45f)
-                .clip(RoundedCornerShape(22.dp))
-                .border(1.dp, Ani.Border, RoundedCornerShape(22.dp)),
-        )
+        Spacer(Modifier.height(detailsHeroHeight() - 210.dp))
         media.nextAiringEpisode?.let { n ->
-            Spacer(Modifier.height(14.dp))
-            Box(Modifier.clip(RoundedCornerShape(50)).background(Ani.Chip).padding(horizontal = 12.dp, vertical = 5.dp)) {
+            Box(Modifier.clip(RoundedCornerShape(50)).background(Color(0x66000000)).padding(horizontal = 12.dp, vertical = 5.dp)) {
                 Text("EP ${n.episode} airing soon", style = inter(11.5f, FontWeight.SemiBold), color = Ani.Soft, maxLines = 1)
             }
+            Spacer(Modifier.height(10.dp))
         }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = media.displayTitle,
-            style = inter(titleSize * 1.1f, FontWeight.Bold, lineHeight = titleSize * 1.3f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (logo != null) {
+            AsyncImage(
+                model = logo,
+                contentDescription = media.displayTitle,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth(0.75f).widthIn(max = 340.dp).height(110.dp),
+            )
+        } else {
+            Text(
+                text = media.displayTitle,
+                style = inter(titleSize * 1.15f, FontWeight.Bold, lineHeight = titleSize * 1.35f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth().widthIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
-                Modifier.weight(1f).height(54.dp).clip(btnShape).background(Color.White).clickable(onClick = onWatch),
+                Modifier.weight(1f).height(46.dp).clip(btnShape).background(Color.White).clickable(onClick = onWatch),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -444,7 +441,7 @@ private fun Header(
                 Text(playLabel, style = inter(16f, FontWeight.Bold), color = Color.Black, maxLines = 1, softWrap = false)
             }
             Box(
-                Modifier.size(54.dp).clip(btnShape).background(Ani.Panel)
+                Modifier.size(46.dp).clip(btnShape).background(Ani.Panel)
                     .border(1.dp, if (isFav) com.anibiar.app.ui.home.FavYellow.copy(alpha = 0.8f) else Ani.Border, btnShape)
                     .clickable(onClick = onToggleFav),
                 contentAlignment = Alignment.Center,

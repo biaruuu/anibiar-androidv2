@@ -487,3 +487,7 @@
 ## 112 | Hero and Details revamp | 2026-11-11
 - Home hero: glass Watch Now box with a square + favorite button
 - Details: centered poster and title, Play Ep. N with heart, stats row, genres, synopsis
+
+## 113 | Hero and Details fix | 2026-11-11
+- Flat dark hero buttons (Watch Now, Details, +), smaller and less rounded
+- Details: full poster on top with title logo, no blur

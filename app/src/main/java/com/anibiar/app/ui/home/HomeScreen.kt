@@ -701,30 +701,36 @@ private fun HeroSlide(
 
             Spacer(Modifier.height(20.dp))
 
-            val btnShape = RoundedCornerShape(20.dp)
-            Row(Modifier.fillMaxWidth().widthIn(max = 440.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Flat dark-tinted boxes (no shine, no bright rim) so the artwork behind shows through.
+            val btnShape = RoundedCornerShape(12.dp)
+            val boxFill = Color(0x73262628)
+            Row(Modifier.fillMaxWidth().widthIn(max = 420.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp)
-                        .glass(btnShape)
+                        .height(44.dp)
+                        .clip(btnShape)
+                        .background(boxFill)
                         .clickable(onClick = onWatch),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(AniIcons.Play, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Watch Now", style = inter(16f, FontWeight.Bold), color = Color.White, maxLines = 1, softWrap = false)
+                    Icon(AniIcons.Play, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Watch Now", style = inter(14.5f, FontWeight.Bold), color = Color.White, maxLines = 1, softWrap = false)
+                }
+                Box(
+                    modifier = Modifier.size(44.dp).clip(btnShape).background(boxFill).clickable(onClick = onDetails),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(AniIcons.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(21.dp))
                 }
                 val (heroFav, toggleHeroFav) = rememberFav(media)
                 Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .glass(btnShape)
-                        .clickable(onClick = toggleHeroFav),
+                    modifier = Modifier.size(44.dp).clip(btnShape).background(boxFill).clickable(onClick = toggleHeroFav),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(if (heroFav) AniIcons.Check else AniIcons.Add, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(26.dp).favPop(heroFav))
+                    Icon(if (heroFav) AniIcons.Check else AniIcons.Add, contentDescription = "Favorite", tint = if (heroFav) FavYellow else Color.White, modifier = Modifier.size(23.dp).favPop(heroFav))
                 }
             }
         }
