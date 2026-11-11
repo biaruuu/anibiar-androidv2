@@ -499,3 +499,7 @@
 ## 115 | Cards restyle | 2026-11-11
 - Airing today uses the Latest Episodes card style
 - Flat chips on cards
+
+## 116 | Clean UI | 2026-11-11
+- Airing today is now a grid like Latest Episodes
+- No more shine on cards, buttons and chips; bottom bar is flat with no lens

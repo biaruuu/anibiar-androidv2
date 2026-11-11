@@ -320,7 +320,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
 
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val glass = Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036)))
-    val rim = Brush.linearGradient(listOf(Color(0x99FFFFFF), Color(0x1AFFFFFF), Color(0x66FFFFFF)))
+    val rim = Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF)))
     viewer?.let { url ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { viewer = null }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             Box(Modifier.fillMaxSize().background(Color(0xF2000000)).clickable { viewer = null }, contentAlignment = Alignment.Center) {

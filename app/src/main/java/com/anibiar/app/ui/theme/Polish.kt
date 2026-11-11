@@ -257,9 +257,4 @@ fun Modifier.staggerIn(index: Int, enabled: Boolean = true): Modifier = composed
 fun Modifier.liquidGlass(shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(22.dp)): Modifier = this
     .clip(shape)
     .background(Color(0xB3141416))
-    .background(Brush.verticalGradient(listOf(Color(0x2EFFFFFF), Color(0x0AFFFFFF))))
-    .drawWithContent {
-        drawRect(Brush.radialGradient(listOf(Color(0x24FFFFFF), Color.Transparent), center = Offset(size.width * 0.15f, 0f), radius = size.width * 0.75f))
-        drawContent()
-    }
-    .border(1.dp, Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x14FFFFFF), Color(0x40FFFFFF))), shape)
+    .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), shape)

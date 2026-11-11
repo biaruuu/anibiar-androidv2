@@ -741,9 +741,8 @@ private fun HeroSlide(
 internal fun HeroChip(label: String) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(Brush.linearGradient(listOf(Color(0x99202028), Color(0xB3050507), Color(0x99181820))))
-            .border(1.dp, Brush.linearGradient(listOf(Color(0x80FFFFFF), Color(0x14FFFFFF), Color(0x4DFFFFFF))), RoundedCornerShape(50))
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0x73262628))
             .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
         Text(label, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, softWrap = false)
