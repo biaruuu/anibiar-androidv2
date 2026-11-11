@@ -389,7 +389,7 @@ private fun AppNavigation() {
             val edge = androidx.compose.foundation.shape.RoundedCornerShape(22.dp)
             Row(
                 Modifier.align(androidx.compose.ui.Alignment.TopCenter).statusBarsPadding().padding(12.dp).fillMaxWidth()
-                    .clip(edge).background(androidx.compose.ui.graphics.Color(0xFF1B1B1F)).border(1.dp, androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.25f), edge).padding(12.dp),
+                    .clip(edge).background(androidx.compose.ui.graphics.Color(0xFF1B1B1F)).border(1.dp, com.anibiar.app.ui.theme.Ani.Lavender.copy(alpha = 0.25f), edge).padding(12.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             ) {
                 if (r.cover != null) coil.compose.AsyncImage(
@@ -398,14 +398,14 @@ private fun AppNavigation() {
                 )
                 androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
                 androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
-                    androidx.compose.material3.Text("WATCH TOGETHER", style = com.anibiar.app.ui.theme.inter(10.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Lavender)
+                    androidx.compose.material3.Text("WATCH TOGETHER", style = com.anibiar.app.ui.theme.inter(10.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = com.anibiar.app.ui.theme.Ani.Lavender)
                     androidx.compose.material3.Text("$who invited you", style = com.anibiar.app.ui.theme.inter(15f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     androidx.compose.material3.Text("${r.title} · Episode ${r.episode}", style = com.anibiar.app.ui.theme.inter(12.5f), color = Ani.Muted, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                     Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                         androidx.compose.material3.Text(
                             "Join", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.Bold), color = androidx.compose.ui.graphics.Color.Black,
-                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(androidx.compose.ui.graphics.com.anibiar.app.ui.theme.Ani.Lavender).clickable { joinRoomById(r.id) }.padding(horizontal = 22.dp, vertical = 8.dp),
+                            modifier = Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable { joinRoomById(r.id) }.padding(horizontal = 22.dp, vertical = 8.dp),
                         )
                         androidx.compose.material3.Text(
                             "Not now", style = com.anibiar.app.ui.theme.inter(13.5f, androidx.compose.ui.text.font.FontWeight.SemiBold), color = androidx.compose.ui.graphics.Color.White,
