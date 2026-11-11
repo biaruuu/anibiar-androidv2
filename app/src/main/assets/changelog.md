@@ -518,3 +518,9 @@
 - Video player: lock button hides controls and blocks touches until you tap unlock
 - Details hero uses the original-size TMDB backdrop for a sharp image
 - Inbox suggestions show 3 namecards to stay smooth
+
+## 120 | Engagement stage 1 | 2026-11-12
+- Level, XP and badges (calculated in Rust)
+- Daily streak goal and mood picker on Home
+- Profile showcase of 5 pinned favorites
+- Episode alerts check every 30 minutes

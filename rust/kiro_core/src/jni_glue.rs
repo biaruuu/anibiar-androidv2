@@ -143,3 +143,10 @@ pub extern "system" fn Java_com_anibiar_app_nativecore_Native_planImageNative<'l
     }) else { return null_mut() };
     env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
 }
+
+/// Returns `xp\tlevel\tfloor\tnext\tbadges`.
+#[no_mangle]
+pub extern "system" fn Java_com_anibiar_app_nativecore_Native_engageSummary<'l>(env: JNIEnv<'l>, _c: JClass<'l>, total: jni::sys::jlong, best: jint, shows: jint, max_day: jni::sys::jlong) -> jstring {
+    let Ok(out) = catch_unwind(|| crate::engage::summary(total, best as i64, shows as i64, max_day)) else { return null_mut() };
+    env.new_string(out).map(|j| j.into_raw()).unwrap_or(null_mut())
+}

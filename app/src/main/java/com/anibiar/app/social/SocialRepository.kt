@@ -79,6 +79,8 @@ data class UserProfile(
     val profileEffect: String? = null,
     val profileTheme: String? = null,
     val shareActivity: Boolean = true,
+    val xp: Long = 0L,
+    val showcase: List<Fav> = emptyList(),
 ) {
     /** The name people see: the display name if set, otherwise the username. */
     val shownName: String get() = displayName?.takeIf { it.isNotBlank() } ?: username
@@ -419,6 +421,10 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         profileEffect = o["profile_effect"]?.jsonPrimitive?.contentOrNull,
         profileTheme = o["profile_theme"]?.jsonPrimitive?.contentOrNull,
         shareActivity = o["share_activity"]?.jsonPrimitive?.booleanOrNull ?: true,
+        xp = o["xp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L,
+        showcase = runCatching {
+            o["showcase"]?.jsonArray?.map { e -> val x = e.jsonObject; Fav(x["id"]!!.jsonPrimitive.content.toInt(), x["title"]!!.jsonPrimitive.content, x["cover"]?.jsonPrimitive?.contentOrNull) }
+        }.getOrNull().orEmpty(),
     )
 
     private fun count(e: JsonElement?): Int? = runCatching { e?.jsonArray?.firstOrNull()?.jsonObject?.get("count")?.jsonPrimitive?.contentOrNull?.toInt() }.getOrNull()
@@ -442,7 +448,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme,share_activity"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme,share_activity,xp,showcase"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -788,6 +794,21 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     suspend fun setAvatar(bytes: ByteArray) = net {
         val old = session?.uid?.let { fetchProfile(it)?.avatarUrl }
         uploadImage("avatars", bytes, "image/jpeg", "jpg", "avatar_url", old)
+    }
+
+    /** Level and showcase are stored on the profile so friends can see them. */
+    suspend fun setXp(xp: Long) = net {
+        val me = session?.uid ?: return@net
+        raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("xp", xp) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        Unit
+    }
+
+    suspend fun setShowcase(items: List<Fav>) = net {
+        val me = session?.uid ?: return@net
+        val arr = kotlinx.serialization.json.JsonArray(items.take(5).map { f -> buildJsonObject { put("id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) } } })
+        val (c, t) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("showcase", arr) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (c !in 200..299) fail(c, t)
+        refreshSoon()
     }
 
     suspend fun setBanner(bytes: ByteArray, mime: String, ext: String) = net {

@@ -2,6 +2,7 @@
 //! Everything here is plain Rust (no dependencies); `jni_glue` is a thin wrapper for the app.
 
 pub mod captions;
+pub mod engage;
 pub mod fuzzy;
 pub mod hls;
 pub mod linebreak;

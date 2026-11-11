@@ -5,7 +5,7 @@ import com.anibiar.app.nativecore.Native
 import java.io.File
 
 /** Summary shown on the profile. Seconds everywhere. */
-data class StatsSummary(val total: Long, val week: Long, val streak: Int, val bestStreak: Int, val shows: Int, val genres: List<Pair<String, Long>>)
+data class StatsSummary(val total: Long, val week: Long, val streak: Int, val bestStreak: Int, val shows: Int, val genres: List<Pair<String, Long>>, val maxDay: Long = 0L, val today: Long = 0L)
 
 /** Watch time per day and anime, kept on-device. Aggregated in Rust ([Native.stats]). */
 class WatchStats(context: Context, private val catalog: Catalog) {
@@ -61,6 +61,8 @@ class WatchStats(context: Context, private val catalog: Catalog) {
         return StatsSummary(
             h[0].toLong(), h[1].toLong(), h[2].toInt(), h[3].toInt(), h[4].toInt(),
             lines.drop(1).mapNotNull { l -> l.split('\t').takeIf { it.size == 2 }?.let { it[0] to (it[1].toLongOrNull() ?: 0L) } },
+            maxDay = h.getOrNull(5)?.toLongOrNull() ?: snapshot.groupBy({ it.first.substringBefore('\t') }, { it.second }).values.maxOfOrNull { it.sum() } ?: 0L,
+            today = snapshot.filter { it.first.substringBefore('\t') == today.toString() }.sumOf { it.second },
         )
     }
 

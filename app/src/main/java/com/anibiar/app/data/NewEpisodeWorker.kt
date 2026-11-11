@@ -23,7 +23,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-/** Checks every couple of hours whether a show you watch or saved has a new episode out, and says so in a notification. */
+/** Checks every half hour whether a show you watch or saved has a new episode out, and says so in a notification. */
 class NewEpisodeWorker(private val ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
         if (!enabled(ctx)) return Result.success()
@@ -62,7 +62,7 @@ class NewEpisodeWorker(private val ctx: Context, params: WorkerParameters) : Cor
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, "New episodes", NotificationManager.IMPORTANCE_DEFAULT))
         val open = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.let { PendingIntent.getActivity(ctx, id, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT) }
         val n = NotificationCompat.Builder(ctx, CHANNEL).setSmallIcon(ctx.applicationInfo.icon)
-            .setContentTitle(title).setContentText("Episode $ep is out").setContentIntent(open).setAutoCancel(true).build()
+            .setContentTitle(title).setContentText("Episode $ep is out. Tap to watch.").setContentIntent(open).setAutoCancel(true).build()
         runCatching { NotificationManagerCompat.from(ctx).notify(id, n) }
     }
 
@@ -77,7 +77,7 @@ class NewEpisodeWorker(private val ctx: Context, params: WorkerParameters) : Cor
         fun apply(c: Context) {
             val wm = WorkManager.getInstance(c.applicationContext)
             if (!enabled(c)) { wm.cancelUniqueWork(WORK); return }
-            val req = PeriodicWorkRequestBuilder<NewEpisodeWorker>(2, TimeUnit.HOURS)
+            val req = PeriodicWorkRequestBuilder<NewEpisodeWorker>(30, TimeUnit.MINUTES)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build()
             wm.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, req)
         }

@@ -31,6 +31,12 @@ object Native {
     /** mode 0: anime description, 1: scraped HTML snippet, 2: entities only. Null when Rust isn't usable. */
     fun html(s: String, mode: Int): String? = if (available) runCatching { htmlText(s, mode) }.getOrNull() else null
 
+    @JvmStatic private external fun engageSummary(total: Long, best: Int, shows: Int, maxDay: Long): String?
+
+    /** xp, level, floor, next, badges (see rust/kiro_core/src/engage.rs). Null when Rust isn't usable. */
+    fun engage(total: Long, best: Int, shows: Int, maxDay: Long): String? =
+        if (available) runCatching { engageSummary(total, best, shows, maxDay) }.getOrNull() else null
+
     fun versionOrNull(): String? = if (available) runCatching { version() }.getOrNull() else null
 
     /** Records split by U+001E, fields by U+001F: start, end, italic, text. Null when Rust isn't usable. */

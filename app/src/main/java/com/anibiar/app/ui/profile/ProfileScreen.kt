@@ -247,6 +247,12 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                 }
             }
+            if (isMe) item(key = "level") {
+                com.anibiar.app.ui.engage.LevelCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onXp = { xp -> scope.launch { runCatching { social.setXp(xp) } } })
+            }
+            item(key = "showcase") {
+                com.anibiar.app.ui.engage.Showcase(profile, isMe, favs, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onOpen = onOpenAnime, onSave = { list -> scope.launch { runCatching { social.setShowcase(list) }.onFailure { toast(it.message ?: "Couldn't save") } } })
+            }
             item(key = "fav-tabs") {
                 Box(Modifier.fillMaxWidth().height(50.dp)) {
                     Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Ani.Border))
