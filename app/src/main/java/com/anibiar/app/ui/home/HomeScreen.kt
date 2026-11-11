@@ -609,11 +609,11 @@ private fun HeroBackdrop(
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Ani.Onyx.copy(alpha = 0.60f),
+                            0f to Ani.Onyx.copy(alpha = 0.40f),
                             0.16f to Color.Transparent,
-                            0.55f to Ani.Onyx.copy(alpha = 0.30f),
-                            0.80f to Ani.Onyx.copy(alpha = 0.62f),
-                            0.93f to Ani.Onyx.copy(alpha = 0.92f),
+                            0.58f to Color.Transparent,
+                            0.80f to Ani.Onyx.copy(alpha = 0.45f),
+                            0.93f to Ani.Onyx.copy(alpha = 0.88f),
                             1f to Ani.Onyx,
                         ),
                     ),
@@ -626,7 +626,7 @@ private fun HeroBackdrop(
                 .drawBehind {
                     val s = scrollPx() / heroHeight.toPx()
                     val alpha = when {
-                        s <= 0.35f -> 0.08f + 0.37f * (s / 0.35f)
+                        s <= 0.35f -> 0.0f + 0.45f * (s / 0.35f)
                         s <= 0.71f -> 0.45f + 0.25f * ((s - 0.35f) / 0.36f)
                         s <= 1.16f -> 0.70f + 0.20f * ((s - 0.71f) / 0.45f)
                         s <= 1.6f -> 0.90f + 0.09f * ((s - 1.16f) / 0.44f)

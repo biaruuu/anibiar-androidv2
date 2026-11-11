@@ -456,27 +456,26 @@ private fun Header(
         // Stats row with dividers.
         Spacer(Modifier.height(20.dp))
         val stats = buildList {
-            media.averageScore?.let { add(Triple("$it%", "SCORE", true)) }
-            (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.let { add(Triple("$it", "EPISODES", false)) }
-            (media.year ?: media.seasonYear)?.let { add(Triple("$it", "YEAR", false)) }
-            add(Triple(media.formatName, "FORMAT", false))
+            media.averageScore?.let { add(Stat(AniIcons.Star, "$it%", "SCORE", ratingColor(it / 10f))) }
+            (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.let { add(Stat(AniIcons.Checklist, "$it EP", "EPISODES", Ani.Muted)) }
+            (media.year ?: media.seasonYear)?.let { add(Stat(AniIcons.Calendar, "$it", "YEAR", Ani.Muted)) }
+            add(Stat(AniIcons.Info, (media.format ?: media.formatName).replace("_", " "), "FORMAT", Ani.Muted))
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-            stats.forEachIndexed { i, (v, l, star) ->
+            stats.forEachIndexed { i, st ->
                 if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(Ani.Border))
                 Column(Modifier.weight(1f).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (star) { Icon(AniIcons.Star, null, tint = Color(0xFFFFD60A), modifier = Modifier.size(15.dp)); Spacer(Modifier.width(4.dp)) }
-                        Text(v, style = inter(16f, FontWeight.Bold), maxLines = 1, softWrap = false)
-                    }
+                    Icon(st.icon, null, tint = st.tint, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.height(5.dp))
+                    Text(st.value, style = inter(16f, FontWeight.Bold), color = if (i == 0 && st.tint != Ani.Muted) st.tint else Color.White, maxLines = 1, softWrap = false)
                     Spacer(Modifier.height(2.dp))
-                    Text(l, style = inter(10.5f, FontWeight.Medium), color = Ani.Muted, maxLines = 1)
+                    Text(st.label, style = inter(10.5f, FontWeight.Medium), color = Ani.Muted, maxLines = 1)
                 }
             }
         }
 
         // Genres separated by thin bars.
-        val genres = media.genres.orEmpty().take(5)
+        val genres = media.genres.orEmpty()
         if (genres.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
             FlowRow(
@@ -498,6 +497,8 @@ private fun Header(
         }
     }
 }
+
+private class Stat(val icon: ImageVector, val value: String, val label: String, val tint: Color)
 
 @Composable
 private fun MetaItem(icon: ImageVector?, text: String, size: Float, dot: Color? = null, tint: Color? = null) {
@@ -620,16 +621,6 @@ private fun About(
         }
         episodesText?.let { AboutRow("Episodes", it) }
         media.duration?.takeIf { it > 0 }?.let { AboutRow("Duration", "$it min per ep") }
-        media.averageScore?.let {
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                com.anibiar.app.ui.theme.ScoreRing(it)
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("AniList score", style = inter(15f, FontWeight.SemiBold), color = Color.White)
-                    Text(media.score10.orEmpty() + " / 10", style = inter(13f), color = Ani.Muted)
-                }
-            }
-        }
         malScore?.let { mal ->
             AboutRow("MAL score", mal, mal.toFloatOrNull()?.let { ratingColor(it) } ?: Color.White, AniIcons.Star)
         }
@@ -647,30 +638,6 @@ private fun About(
             Text("Also known as", style = inter(13.5f), color = Ani.Muted)
             Spacer(Modifier.height(4.dp))
             Text(synonyms.joinToString(" · "), style = inter(13f, lineHeight = 19f), color = Ani.Soft)
-        }
-
-        val genres = media.genres.orEmpty()
-        if (genres.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text("Genres", style = inter(13f), color = Ani.Muted)
-            Spacer(Modifier.height(10.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                genres.forEach { genre ->
-                    Text(
-                        text = genre,
-                        style = inter(11.5f, FontWeight.Medium),
-                        color = Color.White,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Ani.Chip)
-                            .padding(horizontal = 9.dp, vertical = 5.dp),
-                    )
-                }
-            }
         }
 
         val studios = media.studioNames.distinctBy { it.first.lowercase() }
@@ -1147,6 +1114,7 @@ private fun Episodes(
     val newest = numbers.lastOrNull()
 
     var epFilter by rememberSaveable(media.id) { mutableStateOf("All") }
+    var newestFirst by rememberSaveable(media.id) { mutableStateOf(false) }
     val rowState = androidx.compose.foundation.lazy.rememberLazyListState()
     val rowScope = androidx.compose.runtime.rememberCoroutineScope()
     val shownNumbers = remember(numbers, hist, epFilter) {
@@ -1167,92 +1135,53 @@ private fun Episodes(
                 Text(f, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { epFilter = f }.padding(horizontal = 14.dp, vertical = 7.dp))
             }
-            if (numbers.size >= 24) {
-                item("jump-latest") {
-                    Text("Jump to latest", style = inter(13f, FontWeight.SemiBold), color = Color.White,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { epFilter = "All"; rowScope.launch { rowState.animateScrollToItem(numbers.lastIndex) } }.padding(horizontal = 14.dp, vertical = 7.dp))
-                }
-                if (hist != null) item("jump-resume") {
-                    Text("Jump to EP ${hist.episode}", style = inter(13f, FontWeight.SemiBold), color = Color.White,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { epFilter = "All"; rowScope.launch { rowState.animateScrollToItem((hist.episode - 1).coerceIn(0, numbers.lastIndex)) } }.padding(horizontal = 14.dp, vertical = 7.dp))
-                }
+            if (numbers.size >= 12) item("sort") {
+                Text(if (newestFirst) "Newest first" else "Oldest first", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { newestFirst = !newestFirst }.padding(horizontal = 14.dp, vertical = 7.dp))
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
         if (shownNumbers.isEmpty()) Text("Nothing here", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(horizontal = side, vertical = 12.dp))
-        LazyRow(
-            state = rowState,
-            contentPadding = PaddingValues(horizontal = side),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(shownNumbers, key = { it }) { number ->
+        val ordered = if (newestFirst) shownNumbers.reversed() else shownNumbers
+        var limit by rememberSaveable(media.id) { mutableStateOf(30) }
+        val thumbW = (cardWidth * 0.62f).coerceIn(130.dp, 220.dp)
+        Column(Modifier.fillMaxWidth().padding(horizontal = side), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            ordered.take(limit).forEach { number ->
                 val info = byNumber[number]
                 val stream = streaming[number]
                 val title = info?.title?.takeIf { it.isNotBlank() }
                     ?: stream?.first?.takeIf { it.isNotBlank() }
                     ?: "Episode $number"
-                val shape = RoundedCornerShape(16.dp)
-                val hover = com.anibiar.app.ui.home.rememberCardHover()
-                val arm = com.anibiar.app.ui.home.LocalCardArm.current
-                val active = hover.active() || arm?.armed == "E$number"
-                val titleColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender, Color.White)
-                val borderColor by com.anibiar.app.ui.home.accentColor(active, Ani.Lavender.copy(alpha = 0.7f), Ani.Border)
-                Column(Modifier.width(cardWidth).hoverCard(hover, { onClick(number) }, onArm = arm?.let { a -> { a.arm("E$number") } })) {
-                    Box(
-                        Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape)
-                            .border(1.dp, borderColor, shape).background(Ani.Item),
-                    ) {
-                        PosterImage(
-                            url = info?.image ?: stream?.second ?: fallbackArt,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Box(
-                            Modifier.fillMaxSize().background(
-                                Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f)),
-                            ),
-                        )
-                        val watched = hist != null && number < hist.episode
+                val watched = hist != null && number < hist.episode
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onClick(number) }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.width(thumbW).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp)).background(Ani.Item)) {
+                        PosterImage(url = info?.image ?: stream?.second ?: fallbackArt, contentDescription = null, modifier = Modifier.fillMaxSize())
                         if (watched) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)))
-                        com.anibiar.app.ui.home.HoverOverlay(active, playSize = 46)
-                        if (watched) Text("✓ Watched", style = inter(11f, FontWeight.SemiBold), color = Color.White,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 8.dp, vertical = 3.dp))
-                        else if (number == newest && numbers.size > 1 && media.status == "RELEASING" && hist?.episode != number) Text("NEW", style = inter(11f, FontWeight.Bold), color = Color.Black,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(50)).background(Ani.Lavender).padding(horizontal = 8.dp, vertical = 3.dp))
+                        Icon(AniIcons.Play, null, tint = Color.White, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).size(20.dp))
                         if (hist != null && hist.episode == number && hist.progress in 0.02f..0.97f) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Color(0x55FFFFFF))) {
                             Box(Modifier.fillMaxWidth(hist.progress.coerceIn(0f, 1f)).fillMaxHeight().background(Ani.Lavender))
                         }
-                        InfoBadge(
-                            text = "EP $number",
-                            background = Color.Black.copy(alpha = 0.6f),
-                            textColor = Color.White,
-                            textSize = 11f,
-                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
-                        )
-                        (info?.runtime ?: media.duration)?.takeIf { it > 0 }?.let { mins ->
-                            InfoBadge(
-                                text = "${mins}m",
-                                background = Color.Black.copy(alpha = 0.6f),
-                                textColor = Color.White,
-                                textSize = 11f,
-                                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                            )
-                        }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = title,
-                        style = inter(14f, FontWeight.Medium, lineHeight = 19f),
-                        color = titleColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    info?.date?.let { date ->
-                        Spacer(Modifier.height(3.dp))
-                        Text(date, style = inter(12.5f), color = Ani.Muted, maxLines = 1)
+                    Column(Modifier.weight(1f)) {
+                        Text(title, style = inter(15f, FontWeight.SemiBold, lineHeight = 19f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("E$number", style = inter(11.5f, FontWeight.Bold), color = Color.White, modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Ani.ButtonDark).padding(horizontal = 7.dp, vertical = 2.dp))
+                            info?.date?.let { Spacer(Modifier.width(8.dp)); Text(it, style = inter(12.5f), color = Ani.Muted, maxLines = 1) }
+                            if (watched) { Spacer(Modifier.width(8.dp)); Text("Watched", style = inter(12f), color = Ani.Muted) }
+                            else if (number == newest && numbers.size > 1 && media.status == "RELEASING" && hist?.episode != number) { Spacer(Modifier.width(8.dp)); Text("NEW", style = inter(11.5f, FontWeight.Bold), color = Ani.Lavender) }
+                        }
+                        info?.overview?.takeIf { it.isNotBlank() }?.let {
+                            Spacer(Modifier.height(5.dp))
+                            Text(it, style = inter(13f, lineHeight = 17f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
+            if (ordered.size > limit) Text(
+                "Show more (${ordered.size - limit} left)", style = inter(14f, FontWeight.SemiBold), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { limit += 30 }.padding(vertical = 12.dp),
+            )
         }
     }
 }

@@ -491,3 +491,7 @@
 ## 113 | Hero and Details fix | 2026-11-11
 - Flat dark hero buttons (Watch Now, Details, +), smaller and less rounded
 - Details: full poster on top with title logo, no blur
+
+## 114 | Details and Airing rework | 2026-11-11
+- Lighter hero, Airing today as a normal poster row
+- Details: icon stats, all genres, episode rows; AniList score and genres removed from About
