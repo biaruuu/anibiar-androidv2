@@ -572,3 +572,8 @@
 - Highlight viewer is full screen with owner avatar and name, HD covers, hold to pause
 - Who can view highlights is now on the profile
 - Removed the big level card from the profile (level lives on the Badges page)
+
+## 129 | Highlights fixes | 2026-11-13
+- Highlight viewer loads covers again, white View details button
+- Highlights privacy moved to Settings → Privacy
+- Animated badges when you unlock them all, developer has every badge

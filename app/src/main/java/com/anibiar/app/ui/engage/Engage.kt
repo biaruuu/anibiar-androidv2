@@ -132,17 +132,7 @@ fun Highlights(
     modifier: Modifier = Modifier, onOpen: (Int) -> Unit,
 ) {
     if (items.isEmpty()) return
-    var privacy by remember { mutableStateOf(false) }
     Column(modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Highlights", style = inter(15f, FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
-            if (isMe) Row(Modifier.clip(RoundedCornerShape(50)).background(Ani.Chip).clickable { privacy = true }.padding(horizontal = 11.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(5.dp))
-                Text("Who can view", style = inter(12f, FontWeight.SemiBold), color = Ani.Soft)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
         androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
             items(items, key = { it.id }) { h ->
                 Column(Modifier.width(76.dp).clickable(enabled = h.items.isNotEmpty()) {
@@ -159,7 +149,6 @@ fun Highlights(
             }
         }
     }
-    if (privacy) HighlightPrivacyDialog(items) { privacy = false }
 }
 
 private val AUD = listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me")
@@ -192,4 +181,22 @@ private fun HighlightPrivacyDialog(items: List<com.anibiar.app.social.Highlight>
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onClose).padding(vertical = 12.dp))
         }
     }
+}
+
+/** Settings → Privacy: loads your highlights and lets you choose who can view each one. */
+@Composable
+fun HighlightPrivacySettings(onClose: () -> Unit) {
+    val app = LocalContext.current.applicationContext as AniBiarApp
+    var items by remember { mutableStateOf<List<com.anibiar.app.social.Highlight>?>(null) }
+    LaunchedEffect(Unit) { items = app.social.myId?.let { runCatching { app.social.highlightsOf(it) }.getOrDefault(emptyList()) } ?: emptyList() }
+    val list = items ?: return
+    if (list.isEmpty()) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = onClose) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Ani.Panel).padding(20.dp)) {
+                Text("No highlights yet", style = inter(17f, FontWeight.Bold), color = Color.White)
+                Text("Create one in Edit profile, then choose who can view it here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
+                Text("OK", style = inter(14f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onClose).padding(vertical = 12.dp))
+            }
+        }
+    } else HighlightPrivacyDialog(list, onClose)
 }

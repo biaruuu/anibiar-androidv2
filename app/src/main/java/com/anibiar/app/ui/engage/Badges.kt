@@ -30,7 +30,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -135,8 +137,11 @@ private val LOCKED_B = Color(0xFF26262B)
 
 /** One badge drawn as vector art: gradient body, lighter rim, soft gloss and a white glyph. */
 @Composable
-fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolean = false) {
+fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolean = false, special: Boolean = false) {
     val d = BADGES[id] ?: return
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "badge")
+    val sweep by t.animateFloat(-0.4f, 1.4f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2200, easing = androidx.compose.animation.core.LinearEasing)), label = "sweep")
+    val glow by t.animateFloat(0.25f, 0.75f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse), label = "glow")
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = this.size.minDimension
@@ -144,10 +149,15 @@ fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolea
             val b = if (locked) LOCKED_B else d.c2
             val outer = shapePath(d.shape, w, w * 0.02f)
             val inner = shapePath(d.shape, w, w * 0.09f)
+            if (special) drawCircle(Brush.radialGradient(listOf(d.c1.copy(alpha = glow), Color.Transparent), center, w * 0.62f), w * 0.62f, center)
             drawPath(outer, Brush.verticalGradient(listOf(Color.White.copy(alpha = if (locked) 0.18f else 0.75f), b), 0f, w))
             drawPath(inner, Brush.linearGradient(listOf(a, b), Offset(w * 0.15f, 0f), Offset(w * 0.85f, w)))
             clipPath(inner) {
                 drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (locked) 0.08f else 0.38f), Color.Transparent), 0f, w * 0.55f))
+            }
+            if (special) clipPath(inner) {
+                val x = sweep * w
+                drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.7f), Color.Transparent), Offset(x - w * 0.25f, 0f), Offset(x + w * 0.05f, w * 0.5f)))
             }
             drawPath(inner, Color.Black.copy(alpha = 0.18f), style = Stroke(w * 0.012f))
         }
@@ -159,21 +169,22 @@ fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolea
 @Composable
 fun BadgePill(ids: List<String>, isMe: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shown = ids.filter { it in BADGES }
+    val all = shown.size == BADGES.size
     if (shown.isEmpty() && !isMe) return
     Row(modifier.clip(RoundedCornerShape(10.dp)).background(Color(0x99101014)).border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         if (shown.isEmpty()) {
             Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(15.dp))
             Text("Badges", style = inter(12f, FontWeight.SemiBold), color = Ani.Soft)
-        } else shown.take(4).forEach { BadgeArt(it, 22.dp) }
+        } else shown.take(4).forEach { BadgeArt(it, 22.dp, special = all) }
         if (shown.size > 4) Text("+${shown.size - 4}", style = inter(11.5f, FontWeight.Bold), color = Ani.Soft)
     }
 }
 
 @Composable
-private fun BadgeTile(id: String, locked: Boolean, onClick: () -> Unit) {
+private fun BadgeTile(id: String, locked: Boolean, special: Boolean = false, onClick: () -> Unit) {
     Box(Modifier.size(82.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF131316)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        BadgeArt(id, 56.dp, locked = locked)
+        BadgeArt(id, 56.dp, locked = locked, special = special)
     }
 }
 
@@ -185,7 +196,9 @@ fun BadgesScreen(req: BadgesRequest, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val (stats, eng) = if (req.isMe) rememberEngage() else (null to null)
-    val earned = if (req.isMe && eng != null) eng.badges else req.ids
+    val isDev = req.isMe && (LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp).social.authState.collectAsState().value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
+    val earned = if (isDev) BADGES.keys.toList() else if (req.isMe && eng != null) eng.badges else req.ids
+    val complete = BADGES.keys.all { it in earned }
     var info by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } }) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
@@ -216,11 +229,12 @@ fun BadgesScreen(req: BadgesRequest, onClose: () -> Unit) {
                     }
                 }
             }
+            if (complete) CompleteBanner(isDev)
             Text(if (req.isMe) "Your badges" else "Badges", style = inter(18f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 12.dp))
             val mine = BADGES.keys.filter { it in earned }
             if (mine.isEmpty()) Text("No badges yet.", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
             FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                mine.forEach { BadgeTile(it, false) { info = it } }
+                mine.forEach { BadgeTile(it, false, special = complete) { info = it } }
             }
             if (req.isMe) {
                 Text("Available to unlock", style = inter(18f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(start = 20.dp, top = 28.dp, bottom = 12.dp))
@@ -234,7 +248,7 @@ fun BadgesScreen(req: BadgesRequest, onClose: () -> Unit) {
             val d = BADGES[id]
             if (d != null) androidx.compose.ui.window.Dialog(onDismissRequest = { info = null }) {
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color(0xFF17171B)).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    BadgeArt(id, 96.dp, locked = id !in earned)
+                    BadgeArt(id, 96.dp, locked = id !in earned, special = complete)
                     Text(d.name, style = inter(19f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(top = 14.dp))
                     Text(d.how, style = inter(13.5f), color = Ani.Muted, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
                     Text(if (id in earned) "Earned" else "Locked", style = inter(12f, FontWeight.Bold), color = if (id in earned) Color(0xFF30D158) else Ani.Soft, modifier = Modifier.padding(top = 12.dp))
@@ -244,9 +258,26 @@ fun BadgesScreen(req: BadgesRequest, onClose: () -> Unit) {
     }
 }
 
+/** Shown once every badge is earned (or for the developer): a slowly shifting gradient banner. */
+@Composable
+private fun CompleteBanner(dev: Boolean) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "complete")
+    val shift by t.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(3600, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "s")
+    val shape = RoundedCornerShape(16.dp)
+    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(shape)
+        .background(Brush.linearGradient(listOf(Color(0xFFFFD166), Color(0xFFFF5E7E), Color(0xFF8E3DFF), Color(0xFF3AA8FF)), Offset(-300f + 900f * shift, 0f), Offset(500f + 900f * shift, 300f)))
+        .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(EngageIcons.Crown, null, tint = Color.White, modifier = Modifier.size(30.dp))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(if (dev) "Developer: every badge" else "Collection complete", style = inter(16f, FontWeight.ExtraBold), color = Color.White)
+            Text(if (dev) "All badges are unlocked on this account." else "You unlocked every badge.", style = inter(12.5f), color = Color(0xE6FFFFFF))
+        }
+    }
+}
+
 // ------------------------------------------------------------------------------------------ highlight viewer
 
-private fun hd(url: String?): String? = url?.replace("/medium/", "/extraLarge/")?.replace("/large/", "/extraLarge/")
 
 /** Full-screen story-style viewer. Tap the sides to move, hold to pause. */
 @Composable
@@ -269,14 +300,14 @@ fun HighlightViewer(req: HlRequest, onClose: () -> Unit) {
         if (i < last) i++ else onClose()
     }
     val f = h.items[i.coerceIn(0, last)]
-    val cover = hd(f.cover)
+    val cover = f.cover
     Box(Modifier.fillMaxSize().background(Color(0xFF08080A)).pointerInput(i) {
         detectTapGestures(
             onPress = { paused = true; tryAwaitRelease(); paused = false },
             onTap = { o -> if (o.x < size.width / 3f) { if (i > 0) i-- else p = 0f } else if (i < last) i++ else onClose() },
         )
     }) {
-        PosterImage(cover, null, Modifier.fillMaxSize().blur(36.dp).alpha(0.55f), maxSide = 400)
+        PosterImage(cover, null, Modifier.fillMaxSize().blur(36.dp).alpha(0.6f), maxSide = 300)
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xCC000000), Color(0x33000000), Color(0x99000000), Color(0xF0000000)))))
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -297,13 +328,13 @@ fun HighlightViewer(req: HlRequest, onClose: () -> Unit) {
             }
             Spacer(Modifier.weight(1f))
             Box(Modifier.fillMaxWidth(0.76f).aspectRatio(2f / 3f).shadow(28.dp, RoundedCornerShape(22.dp)).clip(RoundedCornerShape(22.dp)).background(Ani.Item)) {
-                PosterImage(cover, f.title, Modifier.fillMaxSize(), maxSide = 1800)
+                PosterImage(cover, f.title, Modifier.fillMaxSize(), maxSide = 1200)
             }
             Spacer(Modifier.height(18.dp))
             Text(f.title, style = inter(20f, FontWeight.ExtraBold), color = Color.White, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(14.dp))
             Text("View details", style = inter(14.5f, FontWeight.Bold), color = Color.Black,
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Ani.Lavender).clickable { onClose(); req.onOpen(f.animeId) }.padding(horizontal = 30.dp, vertical = 12.dp))
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { onClose(); req.onOpen(f.animeId) }.padding(horizontal = 30.dp, vertical = 12.dp))
             Spacer(Modifier.weight(1f))
         }
     }

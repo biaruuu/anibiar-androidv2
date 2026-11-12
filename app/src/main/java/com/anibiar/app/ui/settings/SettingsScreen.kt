@@ -86,6 +86,8 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
         if (uid == null) value = null else social.profile(uid).collect { value = it }
     }
     var dlg by remember { mutableStateOf<Dlg?>(null) }
+    var hlPrivacy by remember { mutableStateOf(false) }
+    if (hlPrivacy) com.anibiar.app.ui.engage.HighlightPrivacySettings { hlPrivacy = false }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
 
     Column(
@@ -173,6 +175,8 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
         }
 
         Section("Privacy") {
+            InfoRow("Who can view my highlights", "Choose for each highlight", onClick = { hlPrivacy = true })
+            Divider()
             InfoRow("Who can send me friend requests", if (profile?.friendRequests == "nobody") "Nobody" else "Mutual followers", onClick = { dlg = Dlg.Requests })
             Divider()
             InfoRow(
