@@ -98,7 +98,7 @@ private fun rememberCooldown(): Int {
 
 /** Passwordless sign-in: enter an email, get a link, tap it and you're in. No form, no password. */
 @Composable
-fun AuthScreen(onClose: () -> Unit) {
+fun AuthScreen(onClose: () -> Unit, onGuest: (() -> Unit)? = null) {
     var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
     var email by rememberSaveable { mutableStateOf("") }
 
@@ -119,7 +119,7 @@ fun AuthScreen(onClose: () -> Unit) {
             },
             label = "authStep",
         ) { sent ->
-            if (sent == null) EmailStep(email, { email = it }, onClose) { sentTo = it }
+            if (sent == null) EmailStep(email, { email = it }, onClose, onGuest) { sentTo = it }
             else SentStep(sent, onBack = { sentTo = null })
         }
     }
@@ -133,7 +133,7 @@ private fun BackArrow(onClick: () -> Unit) {
 private fun validEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s.trim()).matches()
 
 @Composable
-private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> Unit, onSent: (String) -> Unit) {
+private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> Unit, onGuest: (() -> Unit)?, onSent: (String) -> Unit) {
     val context = LocalContext.current
     val app = context.applicationContext as AniBiarApp
     val scope = rememberCoroutineScope()
@@ -154,7 +154,7 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
     BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding()) {
         val logo = min(maxWidth * 0.52f, maxHeight * 0.26f).coerceAtLeast(96.dp)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp)) { BackArrow(onClose) }
+            Row(Modifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp).height(48.dp)) { if (onGuest == null) BackArrow(onClose) }
             Spacer(Modifier.weight(1f).height(16.dp))
             KiroLogo(logo)
             Spacer(Modifier.height(6.dp))
@@ -188,6 +188,12 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
                 SocialButton("Continue with Google", BrandIcons.Google) { Toast.makeText(context, "Google sign-in is coming soon", Toast.LENGTH_SHORT).show() }
                 Spacer(Modifier.height(8.dp))
                 SocialButton("Continue with Discord", BrandIcons.Discord) { Toast.makeText(context, "Discord sign-in is coming soon", Toast.LENGTH_SHORT).show() }
+                if (onGuest != null) {
+                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable(onClick = onGuest), contentAlignment = Alignment.Center) {
+                        Text("Continue as guest", style = inter(14f, FontWeight.Medium), color = Color.White)
+                    }
+                }
                 Spacer(Modifier.height(18.dp))
                 Terms()
                 Spacer(Modifier.height(14.dp))
@@ -336,3 +342,7 @@ private fun Terms() {
         modifier = Modifier.fillMaxWidth().clickable { Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show() },
     )
 }
+
+private const val GUEST_PREFS = "app_prefs"
+fun isGuest(c: android.content.Context) = c.getSharedPreferences(GUEST_PREFS, android.content.Context.MODE_PRIVATE).getBoolean("guest", false)
+fun setGuest(c: android.content.Context, on: Boolean) = c.getSharedPreferences(GUEST_PREFS, android.content.Context.MODE_PRIVATE).edit().putBoolean("guest", on).apply()

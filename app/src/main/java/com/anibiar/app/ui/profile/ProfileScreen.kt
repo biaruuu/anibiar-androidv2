@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import com.anibiar.app.ui.engage.levelRing
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -177,8 +178,14 @@ fun ProfileScreen(
                                 BigStat("Friends", friendIds.size) { open("friends") }
                             }
                         }
-                        Box(Modifier.requiredSize(96.dp)) {
+                        val live = if (isMe) com.anibiar.app.ui.engage.rememberEngage().second else null
+                        val liveLevel = live?.level
+                        val xp = maxOf(profile?.xp ?: 0L, live?.xp ?: 0L)
+                        val lvl = maxOf(liveLevel ?: 1, com.anibiar.app.data.EngageCalc.levelOf(xp))
+                        val prog = ((xp - com.anibiar.app.data.EngageCalc.xpFor(lvl)).toFloat() / (com.anibiar.app.data.EngageCalc.xpFor(lvl + 1) - com.anibiar.app.data.EngageCalc.xpFor(lvl)).coerceAtLeast(1)).coerceIn(0f, 1f)
+                        Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender)) {
                             Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
+                            com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomStart))
                             StatusDot(profile?.status, 24.dp, Ani.Onyx, Modifier.align(Alignment.BottomEnd))
                         }
                     }
@@ -250,9 +257,8 @@ fun ProfileScreen(
             if (isMe) item(key = "level") {
                 com.anibiar.app.ui.engage.LevelCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onXp = { xp -> scope.launch { runCatching { social.setXp(xp) } } })
             }
-            if (isMe) item(key = "streak") { com.anibiar.app.ui.engage.StreakGoalCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            item(key = "showcase") {
-                com.anibiar.app.ui.engage.Showcase(profile, isMe, favs, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onOpen = onOpenAnime, onSave = { list -> scope.launch { runCatching { social.setShowcase(list) }.onFailure { toast(it.message ?: "Couldn't save") } } })
+            item(key = "highlights") {
+                com.anibiar.app.ui.engage.Highlights(profile?.showcase.orEmpty(), Modifier.padding(vertical = 8.dp), onOpen = onOpenAnime)
             }
             item(key = "lists") {
                 com.anibiar.app.ui.engage.ListsSection(targetUid, isMe, onOpenAnime, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))

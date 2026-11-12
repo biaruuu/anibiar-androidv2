@@ -45,7 +45,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /** One favourited anime. */
-data class Fav(val animeId: Int, val title: String, val cover: String?)
+data class Fav(val animeId: Int, val title: String, val cover: String?, val note: String? = null)
 
 /** One line of the friends' activity feed. */
 data class ActivityItem(
@@ -435,7 +435,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         shareActivity = o["share_activity"]?.jsonPrimitive?.booleanOrNull ?: true,
         xp = o["xp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L,
         showcase = runCatching {
-            o["showcase"]?.jsonArray?.map { e -> val x = e.jsonObject; Fav(x["id"]!!.jsonPrimitive.content.toInt(), x["title"]!!.jsonPrimitive.content, x["cover"]?.jsonPrimitive?.contentOrNull) }
+            o["showcase"]?.jsonArray?.map { e -> val x = e.jsonObject; Fav(x["id"]!!.jsonPrimitive.content.toInt(), x["title"]!!.jsonPrimitive.content, x["cover"]?.jsonPrimitive?.contentOrNull, x["note"]?.jsonPrimitive?.contentOrNull) }
         }.getOrNull().orEmpty(),
     )
 
@@ -964,7 +964,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
 
     suspend fun setShowcase(items: List<Fav>) = net {
         val me = session?.uid ?: return@net
-        val arr = kotlinx.serialization.json.JsonArray(items.take(5).map { f -> buildJsonObject { put("id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) } } })
+        val arr = kotlinx.serialization.json.JsonArray(items.take(5).map { f -> buildJsonObject { put("id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) }; f.note?.takeIf { it.isNotBlank() }?.let { put("note", it.take(24)) } } })
         val (c, t) = raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("showcase", arr) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
         if (c !in 200..299) fail(c, t)
         refreshSoon()

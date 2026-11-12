@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     val gateAuth by gateSocial.authState.collectAsStateWithLifecycle()
                     var guest by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.anibiar.app.ui.auth.isGuest(this@MainActivity)) }
                     if (!onboard && gateAuth == null && gateSocial.myId == null && !guest) {
-                        com.anibiar.app.ui.auth.WelcomeGate(onGuest = { com.anibiar.app.ui.auth.setGuest(this@MainActivity, true); guest = true })
+                        com.anibiar.app.ui.auth.AuthScreen(onClose = {}, onGuest = { com.anibiar.app.ui.auth.setGuest(this@MainActivity, true); guest = true })
                     }
                     if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
                 }

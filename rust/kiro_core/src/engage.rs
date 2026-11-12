@@ -5,12 +5,15 @@ pub fn xp_for(level: i64) -> i64 {
     if level <= 1 {
         return 0;
     }
-    (120.0 * ((level - 1) as f64).powf(1.5)).round() as i64
+    (100.0 * ((level - 1) as f64).powf(1.5)).round() as i64
 }
 
-/// XP: one per minute watched, 20 per title, 50 per day of best streak.
+/// XP is earned by watching: one per minute, plus a bonus (10 per title, 15 per day of best streak)
+/// that can never exceed half the minutes watched (+30), so it cannot be farmed without watching.
 pub fn xp(total_secs: i64, shows: i64, best_streak: i64) -> i64 {
-    total_secs.max(0) / 60 + shows.max(0) * 20 + best_streak.max(0) * 50
+    let mins = total_secs.max(0) / 60;
+    let bonus = (shows.max(0) * 10 + best_streak.max(0) * 15).min(mins / 2 + 30);
+    mins + bonus
 }
 
 /// (level, xp at this level, xp for the next level)

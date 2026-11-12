@@ -32,6 +32,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -116,6 +118,9 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                 profile, onBack = { page = "main" },
                 onSave = { d, e, th -> scope.launch { try { social.setLook(d, e, th) } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }; page = "main" },
             )
+            "highlights" -> HighlightsPage(profile, onBack = { page = "main" }) { list ->
+                scope.launch { try { social.setShowcase(list); page = "main" } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }
+            }
             "bio" -> FieldPage(
                 "Bio", "You can edit your bio anytime.", profile?.bio.orEmpty(), 200,
                 filter = { true }, allowEmpty = true, multiline = true, placeholder = "My account is all about…", onCancel = { page = "main" },
@@ -171,6 +176,11 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                         listOfNotNull(profile?.statusEmoji?.takeIf { it.isNotBlank() }, profile?.statusText?.takeIf { it.isNotBlank() }).joinToString(" ").ifBlank { com.anibiar.app.ui.profile.statusLabel(profile?.status) },
                         onClick = { showStatus = true },
                         trailing = { com.anibiar.app.ui.profile.StatusDot(profile?.status, 22.dp, Ani.Item) },
+                    )
+                    FormRow(
+                        "Highlights",
+                        profile?.showcase?.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.note?.takeIf { n -> n.isNotBlank() } ?: it.title } ?: "Pin up to 5 anime with a caption",
+                        muted = profile?.showcase.isNullOrEmpty(), onClick = { page = "highlights" },
                     )
                     FormRow(
                         "Avatar decoration & effect",
@@ -361,5 +371,49 @@ private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, lock
         }
         Spacer(Modifier.height(6.dp))
         Text(if (lockLevel != null) "Level $lockLevel" else label, style = inter(12f, FontWeight.Medium), color = if (lockLevel != null) Ani.Muted else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Pick up to five favourites as round highlights and give each a short caption. */
+@Composable
+private fun HighlightsPage(profile: UserProfile?, onBack: () -> Unit, onSave: (List<com.anibiar.app.social.Fav>) -> Unit) {
+    val social = (LocalContext.current.applicationContext as AniBiarApp).social
+    val uid = social.myId
+    val favs by remember(uid) { if (uid != null) social.favorites(uid) else kotlinx.coroutines.flow.flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    val chosen = remember { androidx.compose.runtime.mutableStateListOf<com.anibiar.app.social.Fav>().apply { addAll(profile?.showcase.orEmpty()) } }
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())) {
+        Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) { com.anibiar.app.ui.theme.GlassBack(onBack) }
+            Text("Highlights", style = inter(17f, FontWeight.Bold), color = Color.White)
+            Text("Save", style = inter(15f, FontWeight.Bold), color = Ani.Lavender, modifier = Modifier.align(Alignment.CenterEnd).clickable { onSave(chosen.toList()) }.padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        Text("Round covers on your profile, like story highlights. Add a short caption under each.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        chosen.forEachIndexed { i, f ->
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Ani.Panel).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(56.dp).clip(CircleShape).background(Ani.Item)) { com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 200) }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(f.title, style = inter(12f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    androidx.compose.foundation.text.BasicTextField(
+                        f.note.orEmpty(), { chosen[i] = f.copy(note = it.take(24)) }, singleLine = true,
+                        textStyle = inter(15f, FontWeight.SemiBold).copy(color = Color.White), cursorBrush = androidx.compose.ui.graphics.SolidColor(Ani.Lavender),
+                        decorationBox = { inner -> Box(Modifier.padding(top = 4.dp)) { if (f.note.isNullOrEmpty()) Text("Add a caption", style = inter(15f), color = Ani.Muted); inner() } },
+                    )
+                }
+                Icon(AniIcons.Close, "Remove", tint = Ani.Muted, modifier = Modifier.clip(CircleShape).clickable { chosen.removeAt(i) }.padding(8.dp).size(18.dp))
+            }
+        }
+        if (chosen.size < 5) {
+            Text("Add from your favorites (${chosen.size}/5)", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 10.dp))
+            if (favs.isEmpty()) Text("Favorite some anime first and they will show up here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
+            androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(favs.filter { f -> chosen.none { it.animeId == f.animeId } }, key = { it.animeId }) { f ->
+                    Box(Modifier.size(72.dp).clip(CircleShape).background(Ani.Item).clickable { if (chosen.size < 5) chosen.add(f.copy(note = null)) }) {
+                        com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 200)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(32.dp))
     }
 }

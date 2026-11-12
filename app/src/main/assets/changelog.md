@@ -547,3 +547,9 @@
 - Log in or continue as guest on first launch
 - Streak card moved to your profile, removed Home clutter
 - Removed reactions and comments on the watch page
+
+## 125 | Highlights and levels | 2026-11-13
+- Login screen right away, with Continue as guest
+- XP ring and level on profile avatars
+- Highlights: round covers with captions, edited in Edit profile
+- XP is now earned by watching only

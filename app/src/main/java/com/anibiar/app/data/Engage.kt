@@ -8,14 +8,15 @@ data class Engage(val xp: Long, val level: Int, val floor: Long, val next: Long,
 }
 
 object EngageCalc {
-    fun xpFor(level: Int): Long = if (level <= 1) 0 else Math.round(120.0 * Math.pow((level - 1).toDouble(), 1.5))
+    fun xpFor(level: Int): Long = if (level <= 1) 0 else Math.round(100.0 * Math.pow((level - 1).toDouble(), 1.5))
     fun levelOf(xp: Long): Int { var l = 1; while (xpFor(l + 1) <= xp && l < 200) l++; return l }
 
     fun compute(s: StatsSummary): Engage {
         Native.engage(s.total, s.bestStreak, s.shows, s.maxDay)?.split('\t')?.takeIf { it.size >= 4 }?.let { f ->
             return Engage(f[0].toLong(), f[1].toInt(), f[2].toLong(), f[3].toLong(), f.getOrNull(4).orEmpty().split(',').filter { it.isNotBlank() })
         }
-        val xp = s.total / 60 + s.shows * 20L + s.bestStreak * 50L
+        val mins = s.total / 60
+        val xp = mins + minOf(s.shows * 10L + s.bestStreak * 15L, mins / 2 + 30)
         val l = levelOf(xp)
         val h = s.total / 3600
         val b = buildList {
