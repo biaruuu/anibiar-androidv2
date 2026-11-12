@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import kotlinx.serialization.json.put
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -308,7 +309,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
     var deco by remember { mutableStateOf(profile?.avatarDeco) }
     var fx by remember { mutableStateOf(profile?.profileEffect) }
     val liveLevel = com.anibiar.app.ui.engage.rememberEngage().second?.level ?: 1
-    val dev = (context.applicationContext as AniBiarApp).social.authState.collectAsState().value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
+    val dev = (LocalContext.current.applicationContext as AniBiarApp).social.authState.collectAsState().value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
     val level = if (dev) 999 else maxOf(liveLevel, com.anibiar.app.data.EngageCalc.levelOf(profile?.xp ?: 0L))
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
