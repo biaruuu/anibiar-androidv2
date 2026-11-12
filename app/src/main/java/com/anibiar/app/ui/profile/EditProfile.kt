@@ -59,6 +59,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.anibiar.app.data.displayTitle
+import com.anibiar.app.data.posterUrl
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.social.ImageProc
 import com.anibiar.app.social.UserProfile
@@ -306,7 +308,8 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
     var deco by remember { mutableStateOf(profile?.avatarDeco) }
     var fx by remember { mutableStateOf(profile?.profileEffect) }
     val liveLevel = com.anibiar.app.ui.engage.rememberEngage().second?.level ?: 1
-    val level = maxOf(liveLevel, com.anibiar.app.data.EngageCalc.levelOf(profile?.xp ?: 0L))
+    val dev = (context.applicationContext as AniBiarApp).social.authState.collectAsState().value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
+    val level = if (dev) 999 else maxOf(liveLevel, com.anibiar.app.data.EngageCalc.levelOf(profile?.xp ?: 0L))
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
@@ -330,7 +333,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
                     }
                 }
             }
-            Text("Level $level. Decorations and effects unlock as you level up by watching.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 14.dp))
+            Text(if (dev) "Developer: everything is unlocked." else "Level $level. Decorations and effects unlock as you level up by watching.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 14.dp))
             Text("Avatar decoration", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 LookTile("None", deco == null, { deco = null }) { androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
@@ -424,6 +427,23 @@ private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack:
     var vis by remember { mutableStateOf(existing?.visibility ?: "everyone") }
     val chosen = remember { androidx.compose.runtime.mutableStateListOf<com.anibiar.app.social.Fav>().apply { addAll(existing?.items.orEmpty()) } }
     var busy by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<com.anibiar.app.social.Fav>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    val repo = (context.applicationContext as AniBiarApp).repository
+    LaunchedEffect(query) {
+        if (query.isBlank()) { results = emptyList(); searching = false; return@LaunchedEffect }
+        searching = true
+        kotlinx.coroutines.delay(350)
+        results = runCatching {
+            val vars = kotlinx.serialization.json.buildJsonObject {
+                put("page", 1); put("perPage", 24); put("search", query.trim())
+                put("sort", kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive("SEARCH_MATCH"))))
+            }
+            repo.search(vars).media.map { m -> com.anibiar.app.social.Fav(m.id, m.displayTitle, m.posterUrl) }
+        }.getOrDefault(emptyList())
+        searching = false
+    }
     fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
@@ -457,14 +477,29 @@ private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack:
                 }
             }
         }
-        Text("Add from your favorites", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
-        val pool = favs.filter { f -> chosen.none { it.animeId == f.animeId } }
-        if (favs.isEmpty()) Text("Favorite some anime first and they will show up here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
-        androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(pool, key = { it.animeId }) { f ->
-                Box(Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item).clickable { if (chosen.size < 40) chosen.add(f) }) {
-                    com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 240)
+        Text("Add anime", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+        androidx.compose.foundation.text.BasicTextField(query, { query = it.take(60) }, singleLine = true,
+            textStyle = inter(15f).copy(color = Color.White), cursorBrush = androidx.compose.ui.graphics.SolidColor(Ani.Lavender),
+            decorationBox = { inner -> Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Ani.Panel).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(AniIcons.Search, null, tint = Ani.Muted, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f)) { if (query.isEmpty()) Text("Search any anime", style = inter(15f), color = Ani.Muted); inner() }
+            } })
+        Text(if (query.isBlank()) "Your favorites" else if (searching) "Searching…" else "Results", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(start = 20.dp, top = 10.dp, bottom = 8.dp))
+        val shown = if (query.isBlank()) favs else results
+        if (!searching && shown.isEmpty()) Text(if (query.isBlank()) "Favorite some anime or search above." else "Nothing found.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
+        shown.chunked(3).forEach { row ->
+            Row(Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { f ->
+                    val on = chosen.any { it.animeId == f.animeId }
+                    Column(Modifier.weight(1f).clickable { if (on) chosen.removeAll { it.animeId == f.animeId } else if (chosen.size < 40) chosen.add(f) }) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(12.dp)).background(Ani.Item).border(if (on) 2.dp else 0.dp, Ani.Lavender, RoundedCornerShape(12.dp))) {
+                            com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), alpha = if (on) 0.55f else 1f, maxSide = 360)
+                            if (on) Icon(AniIcons.CheckCircle, null, tint = Ani.Lavender, modifier = Modifier.align(Alignment.Center).size(30.dp))
+                        }
+                        Text(f.title, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 5.dp))
+                    }
                 }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         if (existing != null) Text("Delete highlight", style = inter(14f, FontWeight.SemiBold), color = Color(0xFFFF6B6B), textAlign = androidx.compose.ui.text.style.TextAlign.Center,

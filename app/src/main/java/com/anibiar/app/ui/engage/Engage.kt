@@ -132,7 +132,7 @@ fun Modifier.levelRing(progress: Float, color: Color, width: androidx.compose.ui
     val r = size.minDimension / 2f + g + w / 2f
     val tl = androidx.compose.ui.geometry.Offset(size.width / 2f - r, size.height / 2f - r)
     val sz = androidx.compose.ui.geometry.Size(r * 2, r * 2)
-    drawArc(Color(0x2EFFFFFF), 0f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+    drawArc(Color(0x66FFFFFF), 0f, 360f, false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
     if (progress > 0.01f) drawArc(color, -90f, 360f * progress.coerceIn(0f, 1f), false, tl, sz, style = androidx.compose.ui.graphics.drawscope.Stroke(w, cap = androidx.compose.ui.graphics.StrokeCap.Round))
 }
 

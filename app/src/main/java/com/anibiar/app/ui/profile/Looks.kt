@@ -55,6 +55,8 @@ object Looks {
     /** Levels needed to use each decoration and effect. Level comes from watch time, shows and streaks, so these are earned by watching. */
     private val decoLevel = mapOf("cat" to 1, "bolt" to 5, "burst" to 10, "butterfly" to 15, "notes" to 20, "rage" to 25)
     private val fxLevel = mapOf("sparkle" to 1, "sakura" to 3, "snow" to 6, "rain" to 9, "hearts" to 12, "fireflies" to 15, "embers" to 19, "aura" to 23, "storm" to 28)
+    /** Names of the decorations and effects that become available exactly at this level. */
+    fun unlockedAt(level: Int): List<String> = decos.filter { decoReq(it.id) == level }.map { it.name } + effects.filter { fxReq(it.id) == level }.map { it.name }
     fun decoReq(id: String) = decoLevel[id] ?: 1
     fun fxReq(id: String) = fxLevel[id] ?: 1
     /** The nearest thing still locked at this level: its name and the level that unlocks it. */

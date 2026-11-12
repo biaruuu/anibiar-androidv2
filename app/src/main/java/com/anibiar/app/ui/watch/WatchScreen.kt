@@ -326,9 +326,12 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
             android.widget.Toast.makeText(context, "Request sent to the host", android.widget.Toast.LENGTH_SHORT).show()
             return
         }; ep = n; synopsisEpisode = false; episodesOpen = false; watch = null }
+    val levelCheck = remember { longArrayOf(0L) }
     fun saveProgress(t: Double, d: Double, episode: Int) {
         if (d <= 0) return
         app.stats.tick(id, episode, t)
+        val now = System.currentTimeMillis()
+        if (now - levelCheck[0] > 60_000L) { levelCheck[0] = now; scope.launch { runCatching { com.anibiar.app.data.LevelWatcher.check(app) } } }
         app.history.save(HistoryItem(id, name, anime?.bannerImage ?: anime?.posterUrl, episode, (t / d).toFloat().coerceIn(0f, 1f)))
         if (t / d >= 0.8) {
             val prefs = context.getSharedPreferences("engage", android.content.Context.MODE_PRIVATE)

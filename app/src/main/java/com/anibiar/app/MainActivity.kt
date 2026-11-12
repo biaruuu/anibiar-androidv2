@@ -231,6 +231,8 @@ private fun AppNavigation() {
     }
     var bannerTick by androidx.compose.runtime.remember { mutableStateOf(0) }
     // Invites arrive live over realtime; each one is checked against the database before it is shown.
+    val levelCtx = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(authState?.uid) { runCatching { com.anibiar.app.data.LevelWatcher.check(levelCtx.applicationContext as AniBiarApp) } }
     androidx.compose.runtime.LaunchedEffect(authState?.uid) {
         social.inviteStream().collect { b ->
             val rid = b.payload["room"]?.jsonPrimitive?.contentOrNull ?: return@collect

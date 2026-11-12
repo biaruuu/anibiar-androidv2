@@ -559,3 +559,10 @@
 - Choose who can view each highlight: everyone, friends or only you
 - Story-style viewer for highlights
 - Level ring hugs the avatar, level number sits at the bottom centre
+
+## 127 | Highlights search and level ups | 2026-11-13
+- Search any anime to add to a highlight, shown as a poster grid
+- Thinner level ring on profile avatars
+- Level up notification while you watch: Level N reached
+- Developer account has every decoration unlocked
+- Fixed highlights permission error

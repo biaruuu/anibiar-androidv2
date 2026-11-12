@@ -183,7 +183,7 @@ fun ProfileScreen(
                         val xp = maxOf(profile?.xp ?: 0L, live?.xp ?: 0L)
                         val lvl = maxOf(liveLevel ?: 1, com.anibiar.app.data.EngageCalc.levelOf(xp))
                         val prog = ((xp - com.anibiar.app.data.EngageCalc.xpFor(lvl)).toFloat() / (com.anibiar.app.data.EngageCalc.xpFor(lvl + 1) - com.anibiar.app.data.EngageCalc.xpFor(lvl)).coerceAtLeast(1)).coerceIn(0f, 1f)
-                        Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender, width = 3.5.dp, gap = 1.dp)) {
+                        Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender, width = 2.dp, gap = 0.dp)) {
                             Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
                             com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomCenter).offset(y = 9.dp))
                             StatusDot(profile?.status, 24.dp, Ani.Onyx, Modifier.align(Alignment.BottomEnd))
