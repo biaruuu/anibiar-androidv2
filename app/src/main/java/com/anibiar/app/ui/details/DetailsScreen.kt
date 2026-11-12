@@ -493,13 +493,6 @@ private fun Header(
             }
         }
 
-        var addList by remember { mutableStateOf(false) }
-        Spacer(Modifier.height(14.dp))
-        Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).border(1.dp, Ani.Border, androidx.compose.foundation.shape.CircleShape).clickable { addList = true }, contentAlignment = Alignment.Center) {
-            androidx.compose.material3.Icon(com.anibiar.app.ui.theme.EngageIcons.List, "Add to list", tint = Color.White, modifier = Modifier.size(20.dp))
-        }
-        if (addList) com.anibiar.app.ui.engage.AddToListDialog(media.id, media.displayTitle, media.posterUrl) { addList = false }
-
         val description = media.cleanDescription
         if (description.isNotBlank()) {
             Spacer(Modifier.height(16.dp))

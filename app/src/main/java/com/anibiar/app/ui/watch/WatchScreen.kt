@@ -625,7 +625,6 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 }
             }
 
-            com.anibiar.app.ui.engage.EpisodeSocial(id, ep, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (seasons.size > 1) com.anibiar.app.ui.watch.SeasonsCard(seasons, id) { sid -> onWatch(sid) }
             com.anibiar.app.ui.watch.RelatedSections(anime) { aid -> onOpenDetails(aid) }
             Spacer(Modifier.height(24.dp))

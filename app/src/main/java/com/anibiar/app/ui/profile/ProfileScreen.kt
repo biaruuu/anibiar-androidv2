@@ -250,6 +250,7 @@ fun ProfileScreen(
             if (isMe) item(key = "level") {
                 com.anibiar.app.ui.engage.LevelCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onXp = { xp -> scope.launch { runCatching { social.setXp(xp) } } })
             }
+            if (isMe) item(key = "streak") { com.anibiar.app.ui.engage.StreakGoalCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             item(key = "showcase") {
                 com.anibiar.app.ui.engage.Showcase(profile, isMe, favs, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onOpen = onOpenAnime, onSave = { list -> scope.launch { runCatching { social.setShowcase(list) }.onFailure { toast(it.message ?: "Couldn't save") } } })
             }

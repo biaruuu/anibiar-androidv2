@@ -542,3 +542,8 @@
 - New streak ring and level card with a badge wall
 - Profile decorations and effects now unlock by level
 - Removed the daily quiz, watch parties and the send button on Details
+
+## 124 | Welcome screen | 2026-11-12
+- Log in or continue as guest on first launch
+- Streak card moved to your profile, removed Home clutter
+- Removed reactions and comments on the watch page
