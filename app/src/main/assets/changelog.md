@@ -530,3 +530,9 @@
 - Friends are watching row in Inbox
 - Send an anime to a friend as a card in chat
 - Shareable weekly recap picture
+
+## 122 | Engagement stage 3 | 2026-11-12
+- Custom and shared lists with share links
+- Scheduled watch parties with reminders
+- Daily guess-the-anime quiz with friends leaderboard
+- Seasonal events banner, controlled from Admin

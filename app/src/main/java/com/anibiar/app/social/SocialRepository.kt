@@ -54,6 +54,10 @@ data class ActivityItem(
 )
 data class EpComment(val id: Long, val uid: String, val name: String, val avatar: String?, val deco: String?, val body: String, val spoiler: Boolean, val at: Long)
 data class Reaction(val emoji: String, val n: Int, val mine: Boolean)
+data class UserList(val id: String, val ownerId: String, val title: String, val description: String, val isPublic: Boolean, val collaborative: Boolean)
+data class Party(val id: String, val hostId: String, val hostName: String, val animeId: Int, val title: String, val cover: String?, val episode: Int, val startAt: Long, val invited: List<String>)
+data class QuizRow(val uid: String, val name: String, val avatar: String?, val deco: String?, val score: Int, val ms: Int)
+data class EventInfo(val id: Long, val title: String, val body: String, val image: String?, val startsAt: Long, val endsAt: Long)
 
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
@@ -699,6 +703,87 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         if (emoji == null) raw("DELETE", "/rest/v1/episode_reactions?anime_id=eq.$anime&episode=eq.$ep&user_id=eq.$me", null, extra = mapOf("Prefer" to "return=minimal"))
         else raw("POST", "/rest/v1/episode_reactions", buildJsonObject { put("anime_id", anime); put("episode", ep); put("emoji", emoji) }.toString().toByteArray(), extra = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal"))
         Unit
+    }
+
+    // ------------------------------------------------ engagement: lists, parties, quiz, events
+
+    private fun toList(o: kotlinx.serialization.json.JsonObject) = UserList(
+        o["id"]!!.jsonPrimitive.content, o["owner_id"]!!.jsonPrimitive.content, o["title"]!!.jsonPrimitive.content,
+        o["description"]?.jsonPrimitive?.contentOrNull.orEmpty(), o["is_public"]?.jsonPrimitive?.booleanOrNull ?: true, o["collaborative"]?.jsonPrimitive?.booleanOrNull ?: false,
+    )
+
+    suspend fun listsOf(uid: String): List<UserList> = net {
+        getRows("/rest/v1/lists?owner_id=eq.$uid&select=id,owner_id,title,description,is_public,collaborative&order=created_at.desc").map { toList(it.jsonObject) }
+    }
+
+    suspend fun listById(id: String): UserList? = net {
+        getRows("/rest/v1/lists?id=eq.${encode(id)}&select=id,owner_id,title,description,is_public,collaborative").firstOrNull()?.let { toList(it.jsonObject) }
+    }
+
+    suspend fun listItems(id: String): List<Fav> = net {
+        getRows("/rest/v1/list_items?list_id=eq.${encode(id)}&select=anime_id,title,cover&order=created_at.desc&limit=300").map {
+            val o = it.jsonObject
+            Fav(o["anime_id"]!!.jsonPrimitive.content.toInt(), o["title"]!!.jsonPrimitive.content, o["cover"]?.jsonPrimitive?.contentOrNull)
+        }
+    }
+
+    suspend fun createList(title: String, collaborative: Boolean, isPublic: Boolean = true): String = net {
+        val (c, t) = raw("POST", "/rest/v1/lists", buildJsonObject { put("title", title.trim().take(60)); put("collaborative", collaborative); put("is_public", isPublic) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=representation"))
+        if (c !in 200..299) fail(c, t)
+        kotlinx.serialization.json.Json.parseToJsonElement(t).jsonArray.first().jsonObject["id"]!!.jsonPrimitive.content
+    }
+
+    suspend fun addToList(listId: String, f: Fav) = net {
+        val (c, t) = raw("POST", "/rest/v1/list_items", buildJsonObject { put("list_id", listId); put("anime_id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) } }.toString().toByteArray(), extra = mapOf("Prefer" to "resolution=ignore-duplicates,return=minimal"))
+        if (c !in 200..299) fail(c, t)
+    }
+
+    suspend fun removeFromList(listId: String, animeId: Int) = net { raw("DELETE", "/rest/v1/list_items?list_id=eq.${encode(listId)}&anime_id=eq.$animeId", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+    suspend fun deleteList(listId: String) = net { raw("DELETE", "/rest/v1/lists?id=eq.${encode(listId)}", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+
+    suspend fun myParties(): List<Party> = net {
+        val since = java.time.Instant.now().minusSeconds(2 * 3600)
+        getRows("/rest/v1/parties?start_at=gte.${encode(since.toString())}&select=id,host_id,anime_id,title,cover,episode,start_at,invited,profiles(username,display_name,avatar_url,avatar_deco)&order=start_at.asc&limit=30").map {
+            val o = it.jsonObject
+            Party(
+                o["id"]!!.jsonPrimitive.content, o["host_id"]!!.jsonPrimitive.content, prof(o).first, o["anime_id"]!!.jsonPrimitive.content.toInt(), o["title"]!!.jsonPrimitive.content,
+                o["cover"]?.jsonPrimitive?.contentOrNull, o["episode"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 1, isoMs(o["start_at"]?.jsonPrimitive?.contentOrNull),
+                o["invited"]?.jsonArray?.map { x -> x.jsonPrimitive.content }.orEmpty(),
+            )
+        }
+    }
+
+    suspend fun createParty(animeId: Int, title: String, cover: String?, episode: Int, startAtMs: Long, invited: List<String>) = net {
+        val body = buildJsonObject {
+            put("anime_id", animeId); put("title", title); cover?.let { put("cover", it) }; put("episode", episode)
+            put("start_at", java.time.Instant.ofEpochMilli(startAtMs).toString()); put("invited", kotlinx.serialization.json.JsonArray(invited.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+        }
+        val (c, t) = raw("POST", "/rest/v1/parties", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (c !in 200..299) fail(c, t)
+    }
+
+    suspend fun deleteParty(id: String) = net { raw("DELETE", "/rest/v1/parties?id=eq.${encode(id)}", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+
+    suspend fun submitQuiz(day: Int, score: Int, ms: Int) = net {
+        raw("POST", "/rest/v1/quiz_scores", buildJsonObject { put("day", day); put("score", score.coerceIn(0, 5)); put("ms", ms) }.toString().toByteArray(), extra = mapOf("Prefer" to "resolution=ignore-duplicates,return=minimal"))
+        Unit
+    }
+
+    suspend fun quizBoard(day: Int, ids: List<String>): List<QuizRow> = net {
+        if (ids.isEmpty()) return@net emptyList()
+        getRows("/rest/v1/quiz_scores?day=eq.$day&user_id=in.(${ids.joinToString(",")})&select=user_id,score,ms,profiles(username,display_name,avatar_url,avatar_deco)&order=score.desc,ms.asc&limit=20").map {
+            val o = it.jsonObject
+            val (n, a, d) = prof(o)
+            QuizRow(o["user_id"]!!.jsonPrimitive.content, n, a, d, o["score"]!!.jsonPrimitive.content.toInt(), o["ms"]?.jsonPrimitive?.contentOrNull?.toIntOrNull() ?: 0)
+        }
+    }
+
+    suspend fun currentEvent(): EventInfo? = net {
+        val now = encode(java.time.Instant.now().toString())
+        getRows("/rest/v1/events?ends_at=gt.$now&starts_at=lte.$now&select=id,title,body,image,starts_at,ends_at&order=ends_at.asc&limit=1").firstOrNull()?.let {
+            val o = it.jsonObject
+            EventInfo(o["id"]!!.jsonPrimitive.content.toLong(), o["title"]!!.jsonPrimitive.content, o["body"]?.jsonPrimitive?.contentOrNull.orEmpty(), o["image"]?.jsonPrimitive?.contentOrNull, isoMs(o["starts_at"]?.jsonPrimitive?.contentOrNull), isoMs(o["ends_at"]?.jsonPrimitive?.contentOrNull))
+        }
     }
 
     suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {

@@ -155,6 +155,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                     if (notices > 0) Badge(notices)
                 }
             }
+            item(key = "parties") { com.anibiar.app.ui.engage.PartiesRow(onOpenAnime) }
             item(key = "friend-activity") { com.anibiar.app.ui.engage.FriendActivityRow(onOpenAnime, onOpenUser) }
             if (chats.isEmpty()) {
                 item {

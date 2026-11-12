@@ -87,14 +87,15 @@ fun AdminScreen(onBack: () -> Unit) {
             Text("Admin", style = inter(22f, FontWeight.ExtraBold), color = Color.White)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Stats", "Announce", "Updates").forEachIndexed { i, t -> Pill(t, tab == i) { tab = i } }
+            listOf("Stats", "Announce", "Updates", "Events").forEachIndexed { i, t -> Pill(t, tab == i) { tab = i } }
         }
         Spacer(Modifier.height(10.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 60.dp)) {
             when (tab) {
                 0 -> StatsTab()
                 1 -> AnnounceTab()
-                else -> UpdatesTab()
+                2 -> UpdatesTab()
+                else -> EventsTab()
             }
         }
     }
@@ -327,6 +328,46 @@ private data class Build(val build: Int, val apk: String, val size: Long, val no
                 }
                 if (st.isNotEmpty()) Btn("Remove", danger = true) { scope.launch { rest("DELETE", "/rest/v1/app_releases?build=eq.${b.build}", null); load() } }
             }
+        }
+    }
+}
+
+@Composable private fun EventsTab() {
+    val rest0 = rememberRest(); val rest: suspend (String, String, String?) -> Pair<Int, String> = { m, p, b -> rest0(m, p, b, "return=minimal") }; val scope = rememberCoroutineScope(); val ctx = LocalContext.current
+    var list by remember { mutableStateOf<List<JsonObject>>(emptyList()) }
+    var title by remember { mutableStateOf("") }; var body by remember { mutableStateOf("") }; var image by remember { mutableStateOf("") }; var days by remember { mutableStateOf("7") }
+    fun toast(m: String) = Toast.makeText(ctx, m, Toast.LENGTH_SHORT).show()
+    fun load() { scope.launch { val (c, t) = rest("GET", "/rest/v1/events?select=*&order=ends_at.desc&limit=30", null); if (c in 200..299) list = rows(t) else toast("Couldn't load ($c)") } }
+    LaunchedEffect(Unit) { load() }
+    Heading("New seasonal event")
+    Card {
+        Field("Title", title, { title = it.take(80) })
+        Field("Message", body, { body = it.take(300) }, lines = 3)
+        Field("Banner image link (optional)", image, { image = it.take(300) })
+        Field("Runs for how many days", days, { days = it.filter { c -> c.isDigit() }.take(3) })
+        Spacer(Modifier.height(10.dp))
+        Note("It shows as a banner at the top of Home for everyone, right away, and disappears by itself when the days run out.")
+        Spacer(Modifier.height(10.dp))
+        Btn("Start event", primary = true) {
+            val d = days.toIntOrNull() ?: 0
+            if (title.isBlank() || d < 1) { toast("Add a title and 1+ days"); return@Btn }
+            val now = java.time.Instant.now()
+            val json = buildJsonObject {
+                put("title", title.trim()); put("body", body.trim()); if (image.isNotBlank()) put("image", image.trim())
+                put("starts_at", now.toString()); put("ends_at", now.plusSeconds(d * 86400L).toString())
+            }.toString()
+            scope.launch { val (c, _) = rest("POST", "/rest/v1/events", json); if (c in 200..299) { toast("Event started"); title = ""; body = ""; image = ""; load() } else toast("Failed ($c)") }
+        }
+    }
+    Heading("Events (${list.size})")
+    if (list.isEmpty()) Note("Nothing yet.")
+    list.forEach { e ->
+        val live = runCatching { java.time.Instant.parse(e.s("ends_at")).toEpochMilli() > System.currentTimeMillis() }.getOrDefault(false)
+        Card {
+            Text(e.s("title"), style = inter(15f, FontWeight.SemiBold), color = Color.White)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) { if (live) Badge("Live", Color(0xFF6FE39A)) else Badge("Ended", Color(0xFF8E8E93)) }
+            Spacer(Modifier.height(8.dp))
+            Btn("Delete", danger = true) { scope.launch { rest("DELETE", "/rest/v1/events?id=eq.${e.l("id")}", null); load() } }
         }
     }
 }

@@ -105,6 +105,7 @@ class MainActivity : ComponentActivity() {
         val uri = intent?.data ?: return
         if (uri.scheme != "kiro") return
         val app = application as AniBiarApp
+        if (uri.host == "list") { uri.pathSegments.firstOrNull()?.let { com.anibiar.app.ui.engage.ListLink.pending.value = it }; return }
         if (uri.host == "u") {
             val slug = uri.pathSegments.firstOrNull() ?: return
             lifecycleScope.launch {
@@ -157,6 +158,8 @@ private fun AppNavigation() {
     androidx.compose.runtime.LaunchedEffect(pendingUser) {
         pendingUser?.let { searchOpen = false; settingsOpen = false; userStack.add(it); social.consumePendingUser() }
     }
+    val pendingList by com.anibiar.app.ui.engage.ListLink.pending.collectAsStateWithLifecycle()
+    pendingList?.let { lid -> com.anibiar.app.ui.engage.ListDialog(lid, onOpenAnime = { id -> com.anibiar.app.ui.engage.ListLink.pending.value = null; stack.add(id) }, onClose = { com.anibiar.app.ui.engage.ListLink.pending.value = null }) }
     BackHandler(enabled = inboxTab && chatUid == null && userStack.isEmpty() && !inboxOpen) { inboxTab = false }
     BackHandler(enabled = settingsOpen) { settingsOpen = false }
     BackHandler(enabled = profileOpen) { profileOpen = false }
@@ -249,7 +252,6 @@ private fun AppNavigation() {
                     mode = searchMode,
                     onModeChange = { searchMode = it },
                     onOpenUser = { userStack.add(it) },
-                    onOpenAnime = { stack.add(it); inboxTab = false },
                 )
             }
         }

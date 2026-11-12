@@ -316,8 +316,10 @@ private fun HomeContent(
     
                         item(key = "engage") {
                             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                com.anibiar.app.ui.engage.EventBanner()
                                 com.anibiar.app.ui.engage.StreakGoalCard()
                                 com.anibiar.app.ui.engage.MoodCard(onOpen)
+                                com.anibiar.app.ui.engage.QuizCard()
                             }
                         }
 
