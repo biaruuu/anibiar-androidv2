@@ -173,7 +173,7 @@ fun ProfileScreen(
                             profile?.let {
                                 Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                                    val isDevMe = isMe && social.authState.collectAsState().value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
+                                    val isDevMe = isMe && me?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
                                     val ids = if (isDevMe) com.anibiar.app.ui.engage.BADGES.keys.toList() else if (isMe) (live?.badges ?: it.badges) else it.badges
                                     Spacer(Modifier.width(8.dp))
                                     com.anibiar.app.ui.engage.BadgePill(ids, isMe) { com.anibiar.app.ui.engage.EngageOverlay.badges.value = com.anibiar.app.ui.engage.BadgesRequest(ids, isMe, it.shownName) }
