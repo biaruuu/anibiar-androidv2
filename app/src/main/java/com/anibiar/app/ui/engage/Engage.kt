@@ -46,6 +46,8 @@ import com.anibiar.app.AniBiarApp
 import com.anibiar.app.data.Engage
 import com.anibiar.app.data.EngageCalc
 import com.anibiar.app.data.Media
+import com.anibiar.app.data.displayTitle
+import com.anibiar.app.data.posterUrl
 import com.anibiar.app.data.StatsSummary
 import com.anibiar.app.nativecore.Native
 import com.anibiar.app.ui.home.PosterImage
