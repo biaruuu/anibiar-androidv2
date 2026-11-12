@@ -553,3 +553,9 @@
 - XP ring and level on profile avatars
 - Highlights: round covers with captions, edited in Edit profile
 - XP is now earned by watching only
+
+## 126 | Highlights collections | 2026-11-13
+- Highlights are now collections (Best Isekai) with many anime each
+- Choose who can view each highlight: everyone, friends or only you
+- Story-style viewer for highlights
+- Level ring hugs the avatar, level number sits at the bottom centre

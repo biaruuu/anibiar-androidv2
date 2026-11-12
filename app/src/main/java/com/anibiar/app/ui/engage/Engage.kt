@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -192,17 +194,69 @@ fun LevelCard(modifier: Modifier = Modifier, onXp: (Long) -> Unit = {}) {
     }
 }
 
-/** Instagram-style highlights: round covers with a caption. Edited in Edit profile. */
+/** Collections of anime on a profile: round covers with a title. Tap one to play it like a story. Edited in Edit profile. */
 @Composable
-fun Highlights(items: List<com.anibiar.app.social.Fav>, modifier: Modifier = Modifier, onOpen: (Int) -> Unit) {
+fun Highlights(items: List<com.anibiar.app.social.Highlight>, isMe: Boolean, modifier: Modifier = Modifier, onOpen: (Int) -> Unit) {
     if (items.isEmpty()) return
+    var open by remember { mutableStateOf<com.anibiar.app.social.Highlight?>(null) }
     androidx.compose.foundation.lazy.LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
-        items(items.take(5), key = { it.animeId }) { f ->
-            Column(Modifier.width(76.dp).clickable { onOpen(f.animeId) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(72.dp).border(2.dp, Brush.sweepGradient(listOf(Ani.Lavender, Color(0xFFFF6B9A), Ani.Lavender)), CircleShape).padding(4.dp).clip(CircleShape).background(Ani.Item)) {
-                    PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 220)
+        items(items, key = { it.id }) { h ->
+            Column(Modifier.width(76.dp).clickable(enabled = h.items.isNotEmpty()) { open = h }, horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(Modifier.size(72.dp).border(2.dp, Ani.Lavender, CircleShape).padding(4.dp).clip(CircleShape).background(Ani.Item)) {
+                    PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 220)
                 }
-                Text(f.note?.takeIf { it.isNotBlank() } ?: f.title, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 6.dp))
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (isMe && h.visibility != "everyone") { androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(11.dp)); Spacer(Modifier.width(3.dp)) }
+                    Text(h.title, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                }
+            }
+        }
+    }
+    open?.let { h -> HighlightViewer(h, onOpen = { id -> open = null; onOpen(id) }, onClose = { open = null }) }
+}
+
+/** Full-screen story-style viewer: one anime at a time, segment bar on top, tap the sides to move. */
+@Composable
+fun HighlightViewer(h: com.anibiar.app.social.Highlight, onOpen: (Int) -> Unit, onClose: () -> Unit) {
+    var i by remember { mutableStateOf(0) }
+    val prog = remember(i) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(i) {
+        prog.snapTo(0f)
+        prog.animateTo(1f, androidx.compose.animation.core.tween(4500, easing = androidx.compose.animation.core.LinearEasing))
+        if (i < h.items.lastIndex) i++ else onClose()
+    }
+    val f = h.items[i.coerceIn(0, h.items.lastIndex)]
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0C))) {
+            PosterImage(f.cover, null, Modifier.fillMaxSize(), alpha = 0.16f, maxSide = 500)
+            val none = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxHeight().clickable(none, null) { if (i > 0) i-- })
+                Box(Modifier.weight(1f).fillMaxHeight().clickable(none, null) { if (i < h.items.lastIndex) i++ else onClose() })
+            }
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    h.items.forEachIndexed { n, _ ->
+                        Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF))) {
+                            Box(Modifier.fillMaxHeight().fillMaxWidth(if (n < i) 1f else if (n == i) prog.value else 0f).background(Ani.Lavender))
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(h.title, style = inter(16f, FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
+                    Text("${i + 1}/${h.items.size}", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(end = 8.dp))
+                    androidx.compose.material3.Icon(AniIcons.Close, "Close", tint = Color.White, modifier = Modifier.clip(CircleShape).clickable(onClick = onClose).padding(8.dp).size(20.dp))
+                }
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.fillMaxWidth(0.72f).aspectRatio(2f / 3f).clip(RoundedCornerShape(20.dp)).background(Ani.Item)) {
+                    PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 900)
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(f.title, style = inter(19f, FontWeight.Bold), color = Color.White, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(14.dp))
+                Text("View details", style = inter(14.5f, FontWeight.Bold), color = Color.Black,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { onOpen(f.animeId) }.padding(horizontal = 28.dp, vertical = 12.dp))
+                Spacer(Modifier.weight(1f))
             }
         }
     }

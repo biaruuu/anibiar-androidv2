@@ -118,9 +118,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                 profile, onBack = { page = "main" },
                 onSave = { d, e, th -> scope.launch { try { social.setLook(d, e, th) } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }; page = "main" },
             )
-            "highlights" -> HighlightsPage(profile, onBack = { page = "main" }) { list ->
-                scope.launch { try { social.setShowcase(list); page = "main" } catch (x: Exception) { toast(x.message ?: "Couldn't save") } }
-            }
+            "highlights" -> HighlightsPage(onBack = { page = "main" })
             "bio" -> FieldPage(
                 "Bio", "You can edit your bio anytime.", profile?.bio.orEmpty(), 200,
                 filter = { true }, allowEmpty = true, multiline = true, placeholder = "My account is all about…", onCancel = { page = "main" },
@@ -179,8 +177,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                     )
                     FormRow(
                         "Highlights",
-                        profile?.showcase?.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.note?.takeIf { n -> n.isNotBlank() } ?: it.title } ?: "Pin up to 5 anime with a caption",
-                        muted = profile?.showcase.isNullOrEmpty(), onClick = { page = "highlights" },
+                        "Collections like Best Isekai, with who can view them", onClick = { page = "highlights" },
                     )
                     FormRow(
                         "Avatar decoration & effect",
@@ -374,46 +371,105 @@ private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, lock
     }
 }
 
-/** Pick up to five favourites as round highlights and give each a short caption. */
+private val AUDIENCES = listOf("everyone" to "Everyone", "friends" to "Friends only", "me" to "Only me")
+
+/** Highlights: collections of anime (Best Isekai, Comfort shows...) each with its own audience. */
 @Composable
-private fun HighlightsPage(profile: UserProfile?, onBack: () -> Unit, onSave: (List<com.anibiar.app.social.Fav>) -> Unit) {
-    val social = (LocalContext.current.applicationContext as AniBiarApp).social
+private fun HighlightsPage(onBack: () -> Unit) {
+    val context = LocalContext.current
+    val social = (context.applicationContext as AniBiarApp).social
+    val scope = rememberCoroutineScope()
     val uid = social.myId
-    val favs by remember(uid) { if (uid != null) social.favorites(uid) else kotlinx.coroutines.flow.flowOf(emptyList()) }.collectAsState(initial = emptyList())
-    val chosen = remember { androidx.compose.runtime.mutableStateListOf<com.anibiar.app.social.Fav>().apply { addAll(profile?.showcase.orEmpty()) } }
-    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())) {
+    var list by remember { mutableStateOf<List<com.anibiar.app.social.Highlight>?>(null) }
+    var editing by remember { mutableStateOf<com.anibiar.app.social.Highlight?>(null) }
+    var creating by remember { mutableStateOf(false) }
+    fun reload() { scope.launch { list = if (uid == null) emptyList() else runCatching { social.highlightsOf(uid) }.getOrDefault(emptyList()) } }
+    LaunchedEffect(uid) { reload() }
+    BackHandler(enabled = editing != null || creating) { editing = null; creating = false }
+    if (editing != null || creating) {
+        HighlightEditor(editing, onBack = { editing = null; creating = false }) { editing = null; creating = false; reload() }
+        return
+    }
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
         Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) { com.anibiar.app.ui.theme.GlassBack(onBack) }
             Text("Highlights", style = inter(17f, FontWeight.Bold), color = Color.White)
-            Text("Save", style = inter(15f, FontWeight.Bold), color = Ani.Lavender, modifier = Modifier.align(Alignment.CenterEnd).clickable { onSave(chosen.toList()) }.padding(horizontal = 18.dp, vertical = 10.dp))
         }
-        Text("Round covers on your profile, like story highlights. Add a short caption under each.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-        chosen.forEachIndexed { i, f ->
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Ani.Panel).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(56.dp).clip(CircleShape).background(Ani.Item)) { com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 200) }
+        Text("Group anime into collections that show on your profile as round covers. Each one has its own audience.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+        list?.forEach { h ->
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 5.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Ani.Panel).clickable { editing = h }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(52.dp).border(2.dp, Ani.Lavender, CircleShape).padding(3.dp).clip(CircleShape).background(Ani.Item)) { com.anibiar.app.ui.home.PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 200) }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(f.title, style = inter(12f), color = Ani.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    androidx.compose.foundation.text.BasicTextField(
-                        f.note.orEmpty(), { chosen[i] = f.copy(note = it.take(24)) }, singleLine = true,
-                        textStyle = inter(15f, FontWeight.SemiBold).copy(color = Color.White), cursorBrush = androidx.compose.ui.graphics.SolidColor(Ani.Lavender),
-                        decorationBox = { inner -> Box(Modifier.padding(top = 4.dp)) { if (f.note.isNullOrEmpty()) Text("Add a caption", style = inter(15f), color = Ani.Muted); inner() } },
-                    )
-                }
-                Icon(AniIcons.Close, "Remove", tint = Ani.Muted, modifier = Modifier.clip(CircleShape).clickable { chosen.removeAt(i) }.padding(8.dp).size(18.dp))
-            }
-        }
-        if (chosen.size < 5) {
-            Text("Add from your favorites (${chosen.size}/5)", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 10.dp))
-            if (favs.isEmpty()) Text("Favorite some anime first and they will show up here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
-            androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(favs.filter { f -> chosen.none { it.animeId == f.animeId } }, key = { it.animeId }) { f ->
-                    Box(Modifier.size(72.dp).clip(CircleShape).background(Ani.Item).clickable { if (chosen.size < 5) chosen.add(f.copy(note = null)) }) {
-                        com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 200)
-                    }
+                    Text(h.title, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${h.items.size} anime · ${AUDIENCES.firstOrNull { it.first == h.visibility }?.second ?: "Everyone"}", style = inter(12f), color = Ani.Muted)
                 }
             }
         }
+        if (list == null) Text("Loading…", style = inter(13.5f), color = Ani.Muted, modifier = Modifier.padding(20.dp))
+        Text("New highlight", style = inter(14.5f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { creating = true }.padding(vertical = 13.dp))
+    }
+}
+
+@Composable
+private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack: () -> Unit, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val social = (context.applicationContext as AniBiarApp).social
+    val scope = rememberCoroutineScope()
+    val uid = social.myId
+    val favs by remember(uid) { if (uid != null) social.favorites(uid) else kotlinx.coroutines.flow.flowOf(emptyList()) }.collectAsState(initial = emptyList())
+    var title by remember { mutableStateOf(existing?.title.orEmpty()) }
+    var vis by remember { mutableStateOf(existing?.visibility ?: "everyone") }
+    val chosen = remember { androidx.compose.runtime.mutableStateListOf<com.anibiar.app.social.Fav>().apply { addAll(existing?.items.orEmpty()) } }
+    var busy by remember { mutableStateOf(false) }
+    fun toast(m: String) = Toast.makeText(context, m, Toast.LENGTH_SHORT).show()
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState())) {
+        Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.align(Alignment.CenterStart).padding(start = 14.dp)) { com.anibiar.app.ui.theme.GlassBack(onBack) }
+            Text(if (existing == null) "New highlight" else "Edit highlight", style = inter(17f, FontWeight.Bold), color = Color.White)
+            Text(if (busy) "Saving…" else "Save", style = inter(15f, FontWeight.Bold), color = Ani.Lavender, modifier = Modifier.align(Alignment.CenterEnd).clickable(enabled = !busy) {
+                if (title.isBlank()) { toast("Give it a title"); return@clickable }
+                if (chosen.isEmpty()) { toast("Add at least one anime"); return@clickable }
+                busy = true
+                scope.launch { try { social.saveHighlight(existing?.id, title, vis, chosen.toList()); onDone() } catch (x: Exception) { toast(x.message ?: "Couldn't save"); busy = false } }
+            }.padding(horizontal = 18.dp, vertical = 10.dp))
+        }
+        Text("Title", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 6.dp))
+        androidx.compose.foundation.text.BasicTextField(title, { title = it.take(24) }, singleLine = true,
+            textStyle = inter(16f, FontWeight.SemiBold).copy(color = Color.White), cursorBrush = androidx.compose.ui.graphics.SolidColor(Ani.Lavender),
+            decorationBox = { inner -> Box(Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Ani.Panel).padding(14.dp)) { if (title.isEmpty()) Text("Best Isekai", style = inter(16f), color = Ani.Muted); inner() } })
+        Text("Who can view", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AUDIENCES.forEach { (id, label) ->
+                val on = vis == id
+                Text(label, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { vis = id }.padding(horizontal = 16.dp, vertical = 9.dp))
+            }
+        }
+        Text("Anime in this highlight (${chosen.size})", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+        if (chosen.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(chosen.toList(), key = { it.animeId }) { f ->
+                Box(Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item).clickable { chosen.removeAll { it.animeId == f.animeId } }) {
+                    com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 240)
+                    Icon(AniIcons.Close, "Remove", tint = Color.White, modifier = Modifier.align(Alignment.TopEnd).padding(3.dp).clip(CircleShape).background(Color(0xB3000000)).padding(3.dp).size(14.dp))
+                }
+            }
+        }
+        Text("Add from your favorites", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+        val pool = favs.filter { f -> chosen.none { it.animeId == f.animeId } }
+        if (favs.isEmpty()) Text("Favorite some anime first and they will show up here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp))
+        androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(pool, key = { it.animeId }) { f ->
+                Box(Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item).clickable { if (chosen.size < 40) chosen.add(f) }) {
+                    com.anibiar.app.ui.home.PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 240)
+                }
+            }
+        }
+        if (existing != null) Text("Delete highlight", style = inter(14f, FontWeight.SemiBold), color = Color(0xFFFF6B6B), textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(16.dp).padding(top = 20.dp).fillMaxWidth().clip(RoundedCornerShape(50)).border(1.dp, Color(0x55FF6B6B), RoundedCornerShape(50)).clickable {
+                scope.launch { runCatching { social.deleteHighlight(existing.id) }; onDone() }
+            }.padding(vertical = 13.dp))
         Spacer(Modifier.height(32.dp))
     }
 }

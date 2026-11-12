@@ -183,9 +183,9 @@ fun ProfileScreen(
                         val xp = maxOf(profile?.xp ?: 0L, live?.xp ?: 0L)
                         val lvl = maxOf(liveLevel ?: 1, com.anibiar.app.data.EngageCalc.levelOf(xp))
                         val prog = ((xp - com.anibiar.app.data.EngageCalc.xpFor(lvl)).toFloat() / (com.anibiar.app.data.EngageCalc.xpFor(lvl + 1) - com.anibiar.app.data.EngageCalc.xpFor(lvl)).coerceAtLeast(1)).coerceIn(0f, 1f)
-                        Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender)) {
+                        Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender, width = 3.5.dp, gap = 1.dp)) {
                             Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
-                            com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomStart))
+                            com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomCenter).offset(y = 9.dp))
                             StatusDot(profile?.status, 24.dp, Ani.Onyx, Modifier.align(Alignment.BottomEnd))
                         }
                     }
@@ -258,7 +258,9 @@ fun ProfileScreen(
                 com.anibiar.app.ui.engage.LevelCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onXp = { xp -> scope.launch { runCatching { social.setXp(xp) } } })
             }
             item(key = "highlights") {
-                com.anibiar.app.ui.engage.Highlights(profile?.showcase.orEmpty(), Modifier.padding(vertical = 8.dp), onOpen = onOpenAnime)
+                var hl by remember(targetUid) { mutableStateOf<List<com.anibiar.app.social.Highlight>>(emptyList()) }
+                androidx.compose.runtime.LaunchedEffect(targetUid, editing) { hl = runCatching { social.highlightsOf(targetUid) }.getOrDefault(emptyList()) }
+                com.anibiar.app.ui.engage.Highlights(hl, isMe, Modifier.padding(vertical = 8.dp), onOpen = onOpenAnime)
             }
             item(key = "lists") {
                 com.anibiar.app.ui.engage.ListsSection(targetUid, isMe, onOpenAnime, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
