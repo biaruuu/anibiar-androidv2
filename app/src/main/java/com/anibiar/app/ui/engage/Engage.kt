@@ -70,25 +70,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Badge id to icon, colour and name. The ids come from the Rust core (engage.rs). */
-class BadgeDef(val icon: ImageVector, val tint: Color, val name: String)
-val BADGES: Map<String, BadgeDef> = linkedMapOf(
-    "first" to BadgeDef(AniIcons.Play, Color(0xFF64D2FF), "First episode"),
-    "streak3" to BadgeDef(EngageIcons.Flame, Color(0xFFFF9F0A), "3-day streak"),
-    "streak7" to BadgeDef(EngageIcons.Flame, Color(0xFFFF6B35), "7-day streak"),
-    "streak30" to BadgeDef(EngageIcons.Flame, Color(0xFFFF375F), "30-day streak"),
-    "shows10" to BadgeDef(EngageIcons.Book, Color(0xFF30D158), "10 anime"),
-    "shows25" to BadgeDef(EngageIcons.Book, Color(0xFF32ADE6), "25 anime"),
-    "shows100" to BadgeDef(EngageIcons.Mountain, Color(0xFFBF5AF2), "100 anime"),
-    "hours24" to BadgeDef(AniIcons.Schedule, Color(0xFF64D2FF), "24 hours"),
-    "hours100" to BadgeDef(EngageIcons.Trophy, Color(0xFFFFD60A), "100 hours"),
-    "hours500" to BadgeDef(EngageIcons.Crown, Color(0xFFFFD60A), "500 hours"),
-    "binge" to BadgeDef(EngageIcons.Bolt, Color(0xFFFF9F0A), "Binge day"),
-    "marathon" to BadgeDef(EngageIcons.Medal, Color(0xFFFF453A), "Marathon day"),
-    "lv10" to BadgeDef(AniIcons.Star, Color(0xFFFFD60A), "Level 10"),
-    "lv25" to BadgeDef(EngageIcons.Diamond, Color(0xFF64D2FF), "Level 25"),
-)
-
 private fun fmtMin(sec: Long) = "${sec / 60}"
 
 /** Stats and level, computed off the main thread (the maths runs in Rust). */
@@ -144,120 +125,71 @@ fun LevelBadge(level: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** Profile (own): the XP bar, what unlocks next, and the badge wall (earned ones lit, the rest locked). */
-@OptIn(ExperimentalLayoutApi::class)
+/** Collections of anime on a profile: round covers with a title. Tap one to play it full screen like a story. */
 @Composable
-fun LevelCard(modifier: Modifier = Modifier, onXp: (Long) -> Unit = {}) {
-    val (s, e) = rememberEngage()
-    LaunchedEffect(e?.xp) { e?.let { onXp(it.xp) } }
-    if (s == null || e == null) return
-    val shape = RoundedCornerShape(16.dp)
-    val next = com.anibiar.app.ui.profile.Looks.nextUnlock(e.level)
-    Column(modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text("Level ${e.level}", style = inter(18f, FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
-            Text("${e.xp - e.floor} / ${e.next - e.floor} XP", style = inter(12.5f, FontWeight.SemiBold), color = Ani.Muted)
+fun Highlights(
+    items: List<com.anibiar.app.social.Highlight>, isMe: Boolean, owner: com.anibiar.app.social.UserProfile?,
+    modifier: Modifier = Modifier, onOpen: (Int) -> Unit,
+) {
+    if (items.isEmpty()) return
+    var privacy by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Highlights", style = inter(15f, FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
+            if (isMe) Row(Modifier.clip(RoundedCornerShape(50)).background(Ani.Chip).clickable { privacy = true }.padding(horizontal = 11.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(5.dp))
+                Text("Who can view", style = inter(12f, FontWeight.SemiBold), color = Ani.Soft)
+            }
         }
         Spacer(Modifier.height(8.dp))
-        Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Chip)) {
-            Box(Modifier.fillMaxWidth(e.progress.coerceAtLeast(0.02f)).height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Lavender))
-        }
-        Text("XP comes only from watching. Every minute counts.", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 8.dp))
-        if (next != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp))
-            Spacer(Modifier.width(5.dp))
-            Text("${next.first} unlocks at Lv ${next.second}", style = inter(12f, FontWeight.Medium), color = Ani.Soft, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        val ctx = LocalContext.current
-        val scope = rememberCoroutineScope()
-        Spacer(Modifier.height(14.dp))
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { scope.launch { RecapCard.share(ctx, "My week", s, e) } }.padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Icon(AniIcons.Upload, null, tint = Color.White, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Share weekly recap", style = inter(13.5f, FontWeight.SemiBold), color = Color.White)
-        }
-        Spacer(Modifier.height(16.dp))
-        Text("Badges  ${e.badges.size}/${BADGES.size}", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)
-        Spacer(Modifier.height(10.dp))
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            BADGES.forEach { (id, b) ->
-                val got = id in e.badges
-                Column(Modifier.width(72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.size(48.dp).clip(CircleShape).background(if (got) b.tint.copy(alpha = 0.18f) else Ani.Chip), contentAlignment = Alignment.Center) {
-                        androidx.compose.material3.Icon(if (got) b.icon else EngageIcons.Lock, null, tint = if (got) b.tint else Ani.Muted.copy(alpha = 0.6f), modifier = Modifier.size(if (got) 24.dp else 18.dp))
+        androidx.compose.foundation.lazy.LazyRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
+            items(items, key = { it.id }) { h ->
+                Column(Modifier.width(76.dp).clickable(enabled = h.items.isNotEmpty()) {
+                    EngageOverlay.highlight.value = HlRequest(h, owner?.shownName.orEmpty(), owner?.avatarUrl, owner?.avatarDeco, onOpen)
+                }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(72.dp).border(2.dp, Ani.Lavender, CircleShape).padding(4.dp).clip(CircleShape).background(Ani.Item)) {
+                        PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 360)
                     }
-                    Text(b.name, style = inter(10.5f, FontWeight.Medium), color = if (got) Color.White else Ani.Muted, maxLines = 2, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
-                }
-            }
-        }
-    }
-}
-
-/** Collections of anime on a profile: round covers with a title. Tap one to play it like a story. Edited in Edit profile. */
-@Composable
-fun Highlights(items: List<com.anibiar.app.social.Highlight>, isMe: Boolean, modifier: Modifier = Modifier, onOpen: (Int) -> Unit) {
-    if (items.isEmpty()) return
-    var open by remember { mutableStateOf<com.anibiar.app.social.Highlight?>(null) }
-    androidx.compose.foundation.lazy.LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)) {
-        items(items, key = { it.id }) { h ->
-            Column(Modifier.width(76.dp).clickable(enabled = h.items.isNotEmpty()) { open = h }, horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(72.dp).border(2.dp, Ani.Lavender, CircleShape).padding(4.dp).clip(CircleShape).background(Ani.Item)) {
-                    PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 220)
-                }
-                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (isMe && h.visibility != "everyone") { androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(11.dp)); Spacer(Modifier.width(3.dp)) }
-                    Text(h.title, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                }
-            }
-        }
-    }
-    open?.let { h -> HighlightViewer(h, onOpen = { id -> open = null; onOpen(id) }, onClose = { open = null }) }
-}
-
-/** Full-screen story-style viewer: one anime at a time, segment bar on top, tap the sides to move. */
-@Composable
-fun HighlightViewer(h: com.anibiar.app.social.Highlight, onOpen: (Int) -> Unit, onClose: () -> Unit) {
-    var i by remember { mutableStateOf(0) }
-    val prog = remember(i) { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(i) {
-        prog.snapTo(0f)
-        prog.animateTo(1f, androidx.compose.animation.core.tween(4500, easing = androidx.compose.animation.core.LinearEasing))
-        if (i < h.items.lastIndex) i++ else onClose()
-    }
-    val f = h.items[i.coerceIn(0, h.items.lastIndex)]
-    androidx.compose.ui.window.Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
-        Box(Modifier.fillMaxSize().background(Color(0xFF0A0A0C))) {
-            PosterImage(f.cover, null, Modifier.fillMaxSize(), alpha = 0.16f, maxSide = 500)
-            val none = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            Row(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxHeight().clickable(none, null) { if (i > 0) i-- })
-                Box(Modifier.weight(1f).fillMaxHeight().clickable(none, null) { if (i < h.items.lastIndex) i++ else onClose() })
-            }
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    h.items.forEachIndexed { n, _ ->
-                        Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF))) {
-                            Box(Modifier.fillMaxHeight().fillMaxWidth(if (n < i) 1f else if (n == i) prog.value else 0f).background(Ani.Lavender))
-                        }
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (h.visibility != "everyone") { androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(11.dp)); Spacer(Modifier.width(3.dp)) }
+                        Text(h.title, style = inter(11.5f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(h.title, style = inter(16f, FontWeight.Bold), color = Color.White, modifier = Modifier.weight(1f))
-                    Text("${i + 1}/${h.items.size}", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(end = 8.dp))
-                    androidx.compose.material3.Icon(AniIcons.Close, "Close", tint = Color.White, modifier = Modifier.clip(CircleShape).clickable(onClick = onClose).padding(8.dp).size(20.dp))
-                }
-                Spacer(Modifier.weight(1f))
-                Box(Modifier.fillMaxWidth(0.72f).aspectRatio(2f / 3f).clip(RoundedCornerShape(20.dp)).background(Ani.Item)) {
-                    PosterImage(f.cover, f.title, Modifier.fillMaxSize(), maxSide = 900)
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(f.title, style = inter(19f, FontWeight.Bold), color = Color.White, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(14.dp))
-                Text("View details", style = inter(14.5f, FontWeight.Bold), color = Color.Black,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { onOpen(f.animeId) }.padding(horizontal = 28.dp, vertical = 12.dp))
-                Spacer(Modifier.weight(1f))
             }
+        }
+    }
+    if (privacy) HighlightPrivacyDialog(items) { privacy = false }
+}
+
+private val AUD = listOf("everyone" to "Everyone", "friends" to "Friends", "me" to "Only me")
+
+/** Change who can view each highlight without leaving the profile. */
+@Composable
+private fun HighlightPrivacyDialog(items: List<com.anibiar.app.social.Highlight>, onClose: () -> Unit) {
+    val app = LocalContext.current.applicationContext as AniBiarApp
+    val scope = rememberCoroutineScope()
+    val vis = remember { androidx.compose.runtime.mutableStateMapOf<String, String>().apply { items.forEach { put(it.id, it.visibility) } } }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onClose) {
+        val shape = RoundedCornerShape(22.dp)
+        Column(Modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape).padding(18.dp)) {
+            Text("Who can view your highlights", style = inter(17f, FontWeight.Bold), color = Color.White)
+            Text("Friends only and Only me are enforced by the server, not just the app.", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+            items.forEach { h ->
+                Text(h.title, style = inter(14f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.padding(top = 6.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AUD.forEach { (id, label) ->
+                        val on = vis[h.id] == id
+                        Text(label, style = inter(12.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
+                            modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable {
+                                vis[h.id] = id
+                                scope.launch { runCatching { app.social.saveHighlight(h.id, h.title, id, h.items) } }
+                            }.padding(horizontal = 14.dp, vertical = 7.dp))
+                    }
+                }
+            }
+            Text("Done", style = inter(14f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onClose).padding(vertical = 12.dp))
         }
     }
 }

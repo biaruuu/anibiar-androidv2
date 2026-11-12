@@ -566,3 +566,9 @@
 - Level up notification while you watch: Level N reached
 - Developer account has every decoration unlocked
 - Fixed highlights permission error
+
+## 128 | Badges and highlight viewer | 2026-11-13
+- New vector badges, shown beside your username with a Badges page
+- Highlight viewer is full screen with owner avatar and name, HD covers, hold to pause
+- Who can view highlights is now on the profile
+- Removed the big level card from the profile (level lives on the Badges page)

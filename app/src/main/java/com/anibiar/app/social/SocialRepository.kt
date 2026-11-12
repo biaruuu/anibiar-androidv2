@@ -93,6 +93,7 @@ data class UserProfile(
     val profileTheme: String? = null,
     val shareActivity: Boolean = true,
     val xp: Long = 0L,
+    val badges: List<String> = emptyList(),
     val showcase: List<Fav> = emptyList(),
 ) {
     /** The name people see: the display name if set, otherwise the username. */
@@ -435,6 +436,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         profileTheme = o["profile_theme"]?.jsonPrimitive?.contentOrNull,
         shareActivity = o["share_activity"]?.jsonPrimitive?.booleanOrNull ?: true,
         xp = o["xp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L,
+        badges = o["badges"]?.jsonPrimitive?.contentOrNull.orEmpty().split(',').filter { it.isNotBlank() },
         showcase = runCatching {
             o["showcase"]?.jsonArray?.map { e -> val x = e.jsonObject; Fav(x["id"]!!.jsonPrimitive.content.toInt(), x["title"]!!.jsonPrimitive.content, x["cover"]?.jsonPrimitive?.contentOrNull, x["note"]?.jsonPrimitive?.contentOrNull) }
         }.getOrNull().orEmpty(),
@@ -461,7 +463,7 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             }
         }.distinctUntilChanged()
 
-    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme,share_activity,xp,showcase"
+    private val cols = "id,username,bio,avatar_url,banner_url,created_at,link_slug,friend_requests,lists_visibility,display_name,status,status_text,status_emoji,favorites_visibility,avatar_deco,profile_effect,profile_theme,share_activity,xp,showcase,badges"
     private val cardCols = "$cols,followers:follows!follows_following_id_fkey(count),following:follows!follows_follower_id_fkey(count)"
 
     suspend fun fetchProfile(uid: String): UserProfile? = getRows("/rest/v1/profiles?id=eq.$uid&select=$cols").firstOrNull()?.let { parseProfile(it.jsonObject) }
@@ -979,9 +981,9 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     }
 
     /** Level and showcase are stored on the profile so friends can see them. */
-    suspend fun setXp(xp: Long) = net {
+    suspend fun setXp(xp: Long, badges: List<String>? = null) = net {
         val me = session?.uid ?: return@net
-        raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("xp", xp) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        raw("PATCH", "/rest/v1/profiles?id=eq.$me", buildJsonObject { put("xp", xp); badges?.let { put("badges", it.joinToString(",")) } }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
         Unit
     }
 

@@ -93,6 +93,10 @@ class MainActivity : ComponentActivity() {
                     if (!onboard && gateAuth == null && gateSocial.myId == null && !guest) {
                         com.anibiar.app.ui.auth.AuthScreen(onClose = {}, onGuest = { com.anibiar.app.ui.auth.setGuest(this@MainActivity, true); guest = true })
                     }
+                    val hlReq by com.anibiar.app.ui.engage.EngageOverlay.highlight.collectAsStateWithLifecycle()
+                    hlReq?.let { r -> com.anibiar.app.ui.engage.HighlightViewer(r) { com.anibiar.app.ui.engage.EngageOverlay.highlight.value = null } }
+                    val badgesReq by com.anibiar.app.ui.engage.EngageOverlay.badges.collectAsStateWithLifecycle()
+                    badgesReq?.let { r -> com.anibiar.app.ui.engage.BadgesScreen(r) { com.anibiar.app.ui.engage.EngageOverlay.badges.value = null } }
                     if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
                 }
             }

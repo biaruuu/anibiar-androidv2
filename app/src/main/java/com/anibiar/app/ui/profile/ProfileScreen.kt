@@ -124,6 +124,7 @@ fun ProfileScreen(
     val favs by remember(targetUid) { social.favorites(targetUid) }.collectAsStateWithLifecycle(emptyList())
     val canSeeFavs = isMe || when (profile?.favoritesVisibility) { "me" -> false; "friends" -> (me?.uid ?: "") in friendIds; else -> true }
     val favCols = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.let { if (it >= 900) 6 else if (it >= 600) 4 else 3 }
+    val live = if (isMe) com.anibiar.app.ui.engage.rememberEngage().second else null
     var busy by remember { mutableStateOf(false) }
     val coverPage = editing || listTab != null
     androidx.compose.runtime.DisposableEffect(coverPage) {
@@ -169,7 +170,14 @@ fun ProfileScreen(
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
                             Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 6f)), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            profile?.let { Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp)) }
+                            profile?.let {
+                                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("@${it.username}", style = inter(13.5f, FontWeight.Medium), color = Color(0xFFB4B1BA), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                                    val ids = if (isMe) (live?.badges ?: it.badges) else it.badges
+                                    Spacer(Modifier.width(8.dp))
+                                    com.anibiar.app.ui.engage.BadgePill(ids, isMe) { com.anibiar.app.ui.engage.EngageOverlay.badges.value = com.anibiar.app.ui.engage.BadgesRequest(ids, isMe, it.shownName) }
+                                }
+                            }
                             Spacer(Modifier.height(10.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                                 val open = { t: String -> if (canSeeLists) listTab = t else toast("This list is private") }
@@ -178,8 +186,7 @@ fun ProfileScreen(
                                 BigStat("Friends", friendIds.size) { open("friends") }
                             }
                         }
-                        val live = if (isMe) com.anibiar.app.ui.engage.rememberEngage().second else null
-                        val liveLevel = live?.level
+                                                val liveLevel = live?.level
                         val xp = maxOf(profile?.xp ?: 0L, live?.xp ?: 0L)
                         val lvl = maxOf(liveLevel ?: 1, com.anibiar.app.data.EngageCalc.levelOf(xp))
                         val prog = ((xp - com.anibiar.app.data.EngageCalc.xpFor(lvl)).toFloat() / (com.anibiar.app.data.EngageCalc.xpFor(lvl + 1) - com.anibiar.app.data.EngageCalc.xpFor(lvl)).coerceAtLeast(1)).coerceIn(0f, 1f)
@@ -254,13 +261,10 @@ fun ProfileScreen(
                     Spacer(Modifier.height(8.dp))
                 }
             }
-            if (isMe) item(key = "level") {
-                com.anibiar.app.ui.engage.LevelCard(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), onXp = { xp -> scope.launch { runCatching { social.setXp(xp) } } })
-            }
             item(key = "highlights") {
                 var hl by remember(targetUid) { mutableStateOf<List<com.anibiar.app.social.Highlight>>(emptyList()) }
                 androidx.compose.runtime.LaunchedEffect(targetUid, editing) { hl = runCatching { social.highlightsOf(targetUid) }.getOrDefault(emptyList()) }
-                com.anibiar.app.ui.engage.Highlights(hl, isMe, Modifier.padding(vertical = 8.dp), onOpen = onOpenAnime)
+                com.anibiar.app.ui.engage.Highlights(hl, isMe, profile, Modifier.padding(vertical = 8.dp), onOpen = onOpenAnime)
             }
             item(key = "lists") {
                 com.anibiar.app.ui.engage.ListsSection(targetUid, isMe, onOpenAnime, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
