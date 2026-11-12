@@ -115,7 +115,7 @@ private val Int.sp get() = androidx.compose.ui.unit.TextUnit(this.toFloat(), and
 
 /** The Inbox tab: Activity entry on top, then chats with unread badges and streaks. */
 @Composable
-fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUser: (String) -> Unit) {
+fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String) -> Unit, onOpenUser: (String) -> Unit, onOpenAnime: (Int) -> Unit = {}) {
     val app = LocalContext.current.applicationContext as AniBiarApp
     val social = app.social
     val chats by remember { social.conversations() }.collectAsStateWithLifecycle(emptyList())
@@ -155,6 +155,7 @@ fun InboxTab(onBack: () -> Unit, onOpenActivity: () -> Unit, onOpenChat: (String
                     if (notices > 0) Badge(notices)
                 }
             }
+            item(key = "friend-activity") { com.anibiar.app.ui.engage.FriendActivityRow(onOpenAnime, onOpenUser) }
             if (chats.isEmpty()) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -221,7 +222,7 @@ private fun ChatRow(c: DmConversation, p: UserProfile?, pinned: Boolean, onClick
 /** One conversation: bubbles, a streak banner and a "Message…" bar. */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
+fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit, onOpenAnime: (Int) -> Unit = {}) {
     BackHandler(onBack = onBack)
     DisposableEffect(Unit) { NavState.hidden = true; onDispose { NavState.hidden = false } }
     val context = LocalContext.current
@@ -449,6 +450,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit) {
                             Box {
                                 val longPress = { menuOpen = true }
                                 if (m.kind == "voice") VoiceBubble(m, longPress)
+                                else if (m.body.startsWith("[[anime:")) com.anibiar.app.ui.engage.AnimeCardBubble(m.body, m.mine, onOpenAnime, longPress)
                                 else if (m.kind == "image") coil.compose.AsyncImage(
                                     model = m.mediaUrl, contentDescription = "Photo", contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
                                     modifier = Modifier.width(224.dp).heightIn(min = 100.dp, max = 340.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF1C1C1E))

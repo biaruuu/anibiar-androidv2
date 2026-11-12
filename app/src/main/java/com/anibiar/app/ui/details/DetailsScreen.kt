@@ -493,6 +493,12 @@ private fun Header(
             }
         }
 
+        var recommend by remember { mutableStateOf(false) }
+        Spacer(Modifier.height(14.dp))
+        Text("Send to a friend", style = inter(13f, FontWeight.SemiBold), color = Color.White,
+            modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { recommend = true }.padding(horizontal = 16.dp, vertical = 8.dp))
+        if (recommend) com.anibiar.app.ui.engage.RecommendDialog(media.id, media.displayTitle, media.posterUrl) { recommend = false }
+
         val description = media.cleanDescription
         if (description.isNotBlank()) {
             Spacer(Modifier.height(16.dp))

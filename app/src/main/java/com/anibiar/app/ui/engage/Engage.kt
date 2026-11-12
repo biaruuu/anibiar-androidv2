@@ -154,6 +154,12 @@ fun LevelCard(modifier: Modifier = Modifier, onXp: (Long) -> Unit = {}) {
                 Column(Modifier.weight(1f)) { Text(v, style = inter(16f, FontWeight.Bold), color = Color.White); Text(l, style = inter(11.5f), color = Ani.Muted) }
             }
         }
+        val ctx = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val myName = (ctx.applicationContext as AniBiarApp).social.let { sr -> "My week" }
+        Spacer(Modifier.height(12.dp))
+        Text("Share weekly recap", style = inter(13.5f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).clickable { scope.launch { RecapCard.share(ctx, myName, s, e) } }.padding(vertical = 10.dp))
         if (e.badges.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
             Text("Badges · ${e.badges.size}/${BADGES.size}", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)

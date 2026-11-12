@@ -330,6 +330,14 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
         if (d <= 0) return
         app.stats.tick(id, episode, t)
         app.history.save(HistoryItem(id, name, anime?.bannerImage ?: anime?.posterUrl, episode, (t / d).toFloat().coerceIn(0f, 1f)))
+        if (t / d >= 0.8) {
+            val prefs = context.getSharedPreferences("engage", android.content.Context.MODE_PRIVATE)
+            val key = "act_${id}_$episode"
+            if (!prefs.getBoolean(key, false)) {
+                prefs.edit().putBoolean(key, true).apply()
+                scope.launch { runCatching { social.postActivity("watched", id, name, anime?.posterUrl, episode) } }
+            }
+        }
     }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
@@ -617,6 +625,7 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                 }
             }
 
+            com.anibiar.app.ui.engage.EpisodeSocial(id, ep, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (seasons.size > 1) com.anibiar.app.ui.watch.SeasonsCard(seasons, id) { sid -> onWatch(sid) }
             com.anibiar.app.ui.watch.RelatedSections(anime) { aid -> onOpenDetails(aid) }
             Spacer(Modifier.height(24.dp))

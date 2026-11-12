@@ -524,3 +524,9 @@
 - Daily streak goal and mood picker on Home
 - Profile showcase of 5 pinned favorites
 - Episode alerts check every 30 minutes
+
+## 121 | Engagement stage 2 | 2026-11-12
+- Episode reactions and comments with spoiler blur
+- Friends are watching row in Inbox
+- Send an anime to a friend as a card in chat
+- Shareable weekly recap picture

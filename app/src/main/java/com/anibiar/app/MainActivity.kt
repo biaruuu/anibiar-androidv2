@@ -249,6 +249,7 @@ private fun AppNavigation() {
                     mode = searchMode,
                     onModeChange = { searchMode = it },
                     onOpenUser = { userStack.add(it) },
+                    onOpenAnime = { stack.add(it); inboxTab = false },
                 )
             }
         }
@@ -260,6 +261,7 @@ private fun AppNavigation() {
                     onOpenActivity = { inboxOpen = true },
                     onOpenChat = { chatUid = it },
                     onOpenUser = { userStack.add(it) },
+                    onOpenAnime = { stack.add(it) },
                 )
             }
         }
@@ -327,6 +329,7 @@ private fun AppNavigation() {
                     com.anibiar.app.ui.inbox.ChatScreen(
                         uid = cu, onBack = { chatUid = null },
                         onOpenUser = { chatUid = null; userStack.add(it) },
+                        onOpenAnime = { chatUid = null; stack.add(it) },
                     )
                 }
             }

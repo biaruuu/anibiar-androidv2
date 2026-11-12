@@ -47,6 +47,14 @@ import java.util.TimeZone
 /** One favourited anime. */
 data class Fav(val animeId: Int, val title: String, val cover: String?)
 
+/** One line of the friends' activity feed. */
+data class ActivityItem(
+    val id: Long, val uid: String, val name: String, val avatar: String?, val deco: String?,
+    val kind: String, val animeId: Int?, val title: String?, val cover: String?, val episode: Int?, val at: Long,
+)
+data class EpComment(val id: Long, val uid: String, val name: String, val avatar: String?, val deco: String?, val body: String, val spoiler: Boolean, val at: Long)
+data class Reaction(val emoji: String, val n: Int, val mine: Boolean)
+
 data class AuthState(val uid: String, val email: String, val verified: Boolean)
 
 data class DmConversation(val otherId: String, val lastBody: String, val lastAt: Long, val lastMine: Boolean, val unread: Int, val streak: Int)
@@ -625,6 +633,72 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
             put("id", id); put("body", body.take(1500)); put("kind", kind); put("media", mediaUrl.orEmpty()); put("style", style.orEmpty())
             put("at", isoMs(row["created_at"]?.jsonPrimitive?.contentOrNull).toString()); if (replyTo != null) put("rt", replyTo.toString())
         })
+    }
+
+    // ------------------------------------------------ engagement: feed, reactions, comments
+
+    private fun prof(o: kotlinx.serialization.json.JsonObject): Triple<String, String?, String?> {
+        val p = (o["profiles"] as? kotlinx.serialization.json.JsonObject)
+        return Triple(
+            p?.get("display_name")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: p?.get("username")?.jsonPrimitive?.contentOrNull ?: "someone",
+            p?.get("avatar_url")?.jsonPrimitive?.contentOrNull, p?.get("avatar_deco")?.jsonPrimitive?.contentOrNull,
+        )
+    }
+
+    suspend fun postActivity(kind: String, animeId: Int?, title: String?, cover: String?, episode: Int?) = net {
+        if (session == null) return@net
+        val body = buildJsonObject {
+            put("kind", kind); animeId?.let { put("anime_id", it) }; title?.let { put("title", it) }; cover?.let { put("cover", it) }; episode?.let { put("episode", it) }
+        }
+        raw("POST", "/rest/v1/activity", body.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        Unit
+    }
+
+    /** Recent activity from people I follow (the server filters by follows and their sharing setting). */
+    suspend fun feed(limit: Int = 30): List<ActivityItem> = net {
+        getRows("/rest/v1/activity?select=id,user_id,kind,anime_id,title,cover,episode,created_at,profiles(username,display_name,avatar_url,avatar_deco)&order=created_at.desc&limit=$limit").mapNotNull {
+            val o = it.jsonObject
+            val (n, a, d) = prof(o)
+            ActivityItem(
+                o["id"]!!.jsonPrimitive.content.toLong(), o["user_id"]!!.jsonPrimitive.content, n, a, d, o["kind"]!!.jsonPrimitive.content,
+                o["anime_id"]?.jsonPrimitive?.contentOrNull?.toIntOrNull(), o["title"]?.jsonPrimitive?.contentOrNull, o["cover"]?.jsonPrimitive?.contentOrNull,
+                o["episode"]?.jsonPrimitive?.contentOrNull?.toIntOrNull(), isoMs(o["created_at"]?.jsonPrimitive?.contentOrNull),
+            )
+        }
+    }
+
+    suspend fun comments(anime: Int, ep: Int): List<EpComment> = net {
+        getRows("/rest/v1/episode_comments?anime_id=eq.$anime&episode=eq.$ep&select=id,user_id,body,spoiler,created_at,profiles(username,display_name,avatar_url,avatar_deco)&order=created_at.desc&limit=40").map {
+            val o = it.jsonObject
+            val (n, a, d) = prof(o)
+            EpComment(o["id"]!!.jsonPrimitive.content.toLong(), o["user_id"]!!.jsonPrimitive.content, n, a, d, o["body"]!!.jsonPrimitive.content, o["spoiler"]?.jsonPrimitive?.booleanOrNull ?: false, isoMs(o["created_at"]?.jsonPrimitive?.contentOrNull))
+        }
+    }
+
+    suspend fun addComment(anime: Int, ep: Int, text: String, spoiler: Boolean) = net {
+        val t = text.trim().take(280)
+        if (t.isEmpty()) return@net
+        val (c, r) = raw("POST", "/rest/v1/episode_comments", buildJsonObject { put("anime_id", anime); put("episode", ep); put("body", t); put("spoiler", spoiler) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=minimal"))
+        if (c !in 200..299) fail(c, r)
+    }
+
+    suspend fun deleteComment(id: Long) = net { raw("DELETE", "/rest/v1/episode_comments?id=eq.$id", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+
+    suspend fun reactions(anime: Int, ep: Int): List<Reaction> = net {
+        val (c, t) = raw("POST", "/rest/v1/rpc/episode_reaction_counts", buildJsonObject { put("a", anime); put("e", ep) }.toString().toByteArray())
+        if (c !in 200..299) fail(c, t)
+        kotlinx.serialization.json.Json.parseToJsonElement(t).jsonArray.map {
+            val o = it.jsonObject
+            Reaction(o["emoji"]!!.jsonPrimitive.content, o["n"]!!.jsonPrimitive.content.toInt(), o["mine"]?.jsonPrimitive?.booleanOrNull ?: false)
+        }
+    }
+
+    /** Sets my reaction to [emoji], or clears it when [emoji] is null. */
+    suspend fun react(anime: Int, ep: Int, emoji: String?) = net {
+        val me = session?.uid ?: throw IllegalStateException("Log in to react.")
+        if (emoji == null) raw("DELETE", "/rest/v1/episode_reactions?anime_id=eq.$anime&episode=eq.$ep&user_id=eq.$me", null, extra = mapOf("Prefer" to "return=minimal"))
+        else raw("POST", "/rest/v1/episode_reactions", buildJsonObject { put("anime_id", anime); put("episode", ep); put("emoji", emoji) }.toString().toByteArray(), extra = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal"))
+        Unit
     }
 
     suspend fun sendMessage(to: String, body: String, replyTo: Long? = null) = net {
