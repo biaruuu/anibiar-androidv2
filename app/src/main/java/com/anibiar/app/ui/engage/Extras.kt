@@ -116,7 +116,7 @@ fun AddToListDialog(animeId: Int, title: String, cover: String?, onClose: () -> 
                         Text(if (done) "Added" else "Add", style = inter(13f, FontWeight.Bold), color = if (done) Ani.Soft else Color.Black,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(if (done) Ani.ButtonDark else Ani.Lavender).clickable(enabled = !done) {
                                 added = added + x.id
-                                scope.launch { runCatching { app.social.addToList(x.id, Fav(animeId, title, cover)) }.onFailure { added = added - x.id; msg = it.message } }
+                                scope.launch { runCatching { app.social.addToUList(x.id, Fav(animeId, title, cover)) }.onFailure { added = added - x.id; msg = it.message } }
                             }.padding(horizontal = 16.dp, vertical = 7.dp))
                     }
                 }
@@ -131,7 +131,7 @@ fun AddToListDialog(animeId: Int, title: String, cover: String?, onClose: () -> 
                     if (name.isBlank()) return@Pill
                     val n = name; name = ""
                     scope.launch {
-                        runCatching { val id = app.social.createList(n, collab); app.social.addToList(id, Fav(animeId, title, cover)); added = added + id }.onFailure { msg = it.message }
+                        runCatching { val id = app.social.createUList(n, collab); app.social.addToUList(id, Fav(animeId, title, cover)); added = added + id }.onFailure { msg = it.message }
                         reload()
                     }
                 }
@@ -170,7 +170,7 @@ fun ListDialog(listId: String, onOpenAnime: (Int) -> Unit, onClose: () -> Unit) 
     var items by remember { mutableStateOf<List<Fav>>(emptyList()) }
     LaunchedEffect(listId) {
         list = runCatching { app.social.listById(listId) }.getOrNull()
-        items = runCatching { app.social.listItems(listId) }.getOrDefault(emptyList())
+        items = runCatching { app.social.uListItems(listId) }.getOrDefault(emptyList())
     }
     val mine = list?.ownerId == app.social.myId
     Dialog(onDismissRequest = onClose) {
@@ -185,7 +185,7 @@ fun ListDialog(listId: String, onOpenAnime: (Int) -> Unit, onClose: () -> Unit) 
                         Spacer(Modifier.width(12.dp))
                         Text(f.title, style = inter(14f, FontWeight.SemiBold), color = Color.White, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         if (mine) Text("Remove", style = inter(12f), color = Ani.Muted, modifier = Modifier.clickable {
-                            items = items - f; scope.launch { runCatching { app.social.removeFromList(listId, f.animeId) } }
+                            items = items - f; scope.launch { runCatching { app.social.removeFromUList(listId, f.animeId) } }
                         }.padding(8.dp))
                     }
                 }
@@ -196,7 +196,7 @@ fun ListDialog(listId: String, onOpenAnime: (Int) -> Unit, onClose: () -> Unit) 
                         .putExtra(android.content.Intent.EXTRA_TEXT, "${list?.title ?: "My list"} on Kiro: kiro://list/$listId")
                     ctx.startActivity(android.content.Intent.createChooser(i, "Share list").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
-                if (mine) Pill("Delete list") { scope.launch { runCatching { app.social.deleteList(listId) }; onClose() } }
+                if (mine) Pill("Delete list") { scope.launch { runCatching { app.social.deleteUList(listId) }; onClose() } }
             }
         }
     }

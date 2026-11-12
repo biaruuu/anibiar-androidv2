@@ -720,26 +720,26 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
         getRows("/rest/v1/lists?id=eq.${encode(id)}&select=id,owner_id,title,description,is_public,collaborative").firstOrNull()?.let { toList(it.jsonObject) }
     }
 
-    suspend fun listItems(id: String): List<Fav> = net {
+    suspend fun uListItems(id: String): List<Fav> = net {
         getRows("/rest/v1/list_items?list_id=eq.${encode(id)}&select=anime_id,title,cover&order=created_at.desc&limit=300").map {
             val o = it.jsonObject
             Fav(o["anime_id"]!!.jsonPrimitive.content.toInt(), o["title"]!!.jsonPrimitive.content, o["cover"]?.jsonPrimitive?.contentOrNull)
         }
     }
 
-    suspend fun createList(title: String, collaborative: Boolean, isPublic: Boolean = true): String = net {
+    suspend fun createUList(title: String, collaborative: Boolean, isPublic: Boolean = true): String = net {
         val (c, t) = raw("POST", "/rest/v1/lists", buildJsonObject { put("title", title.trim().take(60)); put("collaborative", collaborative); put("is_public", isPublic) }.toString().toByteArray(), extra = mapOf("Prefer" to "return=representation"))
         if (c !in 200..299) fail(c, t)
         kotlinx.serialization.json.Json.parseToJsonElement(t).jsonArray.first().jsonObject["id"]!!.jsonPrimitive.content
     }
 
-    suspend fun addToList(listId: String, f: Fav) = net {
+    suspend fun addToUList(listId: String, f: Fav) = net {
         val (c, t) = raw("POST", "/rest/v1/list_items", buildJsonObject { put("list_id", listId); put("anime_id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) } }.toString().toByteArray(), extra = mapOf("Prefer" to "resolution=ignore-duplicates,return=minimal"))
         if (c !in 200..299) fail(c, t)
     }
 
-    suspend fun removeFromList(listId: String, animeId: Int) = net { raw("DELETE", "/rest/v1/list_items?list_id=eq.${encode(listId)}&anime_id=eq.$animeId", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
-    suspend fun deleteList(listId: String) = net { raw("DELETE", "/rest/v1/lists?id=eq.${encode(listId)}", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+    suspend fun removeFromUList(listId: String, animeId: Int) = net { raw("DELETE", "/rest/v1/list_items?list_id=eq.${encode(listId)}&anime_id=eq.$animeId", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
+    suspend fun deleteUList(listId: String) = net { raw("DELETE", "/rest/v1/lists?id=eq.${encode(listId)}", null, extra = mapOf("Prefer" to "return=minimal")); Unit }
 
     suspend fun myParties(): List<Party> = net {
         val since = java.time.Instant.now().minusSeconds(2 * 3600)
