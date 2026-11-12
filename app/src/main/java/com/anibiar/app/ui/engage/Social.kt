@@ -65,7 +65,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val EMOJIS = listOf("🔥", "😂", "😭", "😮", "❤️", "👏")
+private class Rx(val id: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val tint: Color)
+private val REACTS = listOf(
+    Rx("fire", com.anibiar.app.ui.theme.EngageIcons.Flame, Color(0xFFFF9F0A)), Rx("laugh", com.anibiar.app.ui.theme.AniIcons.Sticker, Color(0xFFFFD60A)),
+    Rx("sad", com.anibiar.app.ui.theme.EngageIcons.Drop, Color(0xFF64D2FF)), Rx("wow", com.anibiar.app.ui.theme.EngageIcons.Bolt, Color(0xFFBF5AF2)),
+    Rx("love", com.anibiar.app.ui.theme.EngageIcons.Heart, Color(0xFFFF375F)), Rx("clap", com.anibiar.app.ui.theme.AniIcons.Star, Color(0xFF30D158)),
+)
 
 private fun agoText(at: Long): String {
     val s = (System.currentTimeMillis() - at) / 1000
@@ -97,16 +102,18 @@ fun EpisodeSocial(animeId: Int, episode: Int, modifier: Modifier = Modifier) {
         Text("Episode $episode reactions", style = inter(14f, FontWeight.Bold), color = Color.White)
         Spacer(Modifier.height(10.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(EMOJIS) { e ->
-                val r = reactions.firstOrNull { it.emoji == e }
+            items(REACTS) { x ->
+                val r = reactions.firstOrNull { it.emoji == x.id }
                 val mine = r?.mine == true
-                Text("$e ${r?.n ?: ""}".trim(), style = inter(14f, FontWeight.SemiBold), color = Color.White,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(if (mine) Ani.Lavender.copy(alpha = 0.28f) else Ani.ButtonDark)
-                        .border(1.dp, if (mine) Ani.Lavender else Color.Transparent, RoundedCornerShape(50))
+                Row(Modifier.clip(RoundedCornerShape(50)).background(if (mine) x.tint.copy(alpha = 0.22f) else Ani.ButtonDark)
+                        .border(1.dp, if (mine) x.tint else Color.Transparent, RoundedCornerShape(50))
                         .clickable {
                             if (myId == null) { error = "Log in to react"; return@clickable }
-                            scope.launch { runCatching { social.react(animeId, episode, if (mine) null else e) }.onFailure { error = it.message }; reload() }
-                        }.padding(horizontal = 14.dp, vertical = 8.dp))
+                            scope.launch { runCatching { social.react(animeId, episode, if (mine) null else x.id) }.onFailure { error = it.message }; reload() }
+                        }.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Icon(x.icon, null, tint = x.tint, modifier = Modifier.size(17.dp))
+                    if ((r?.n ?: 0) > 0) { Spacer(Modifier.width(6.dp)); Text("${r?.n}", style = inter(13.5f, FontWeight.SemiBold), color = Color.White) }
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -129,7 +136,7 @@ fun EpisodeSocial(animeId: Int, episode: Int, modifier: Modifier = Modifier) {
                     }.padding(horizontal = 16.dp, vertical = 10.dp))
             }
             Row(Modifier.padding(top = 8.dp).clip(RoundedCornerShape(8.dp)).clickable { spoiler = !spoiler }.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (spoiler) "☑" else "☐", style = inter(16f), color = Color.White)
+                androidx.compose.material3.Icon(if (spoiler) com.anibiar.app.ui.theme.AniIcons.CheckCircle else com.anibiar.app.ui.theme.AniIcons.Info, null, tint = if (spoiler) Ani.Lavender else Ani.Muted, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text("Contains spoilers", style = inter(12.5f), color = Ani.Soft)
             }
@@ -150,7 +157,7 @@ fun EpisodeSocial(animeId: Int, episode: Int, modifier: Modifier = Modifier) {
                             modifier = Modifier.then(if (shown) Modifier else Modifier.blur(8.dp)).clickable(enabled = !shown) { shown = true })
                         if (!shown) Text("Spoiler. Tap to reveal", style = inter(11.5f), color = Ani.Muted)
                     }
-                    if (c.uid == myId) Text("✕", style = inter(14f), color = Ani.Muted, modifier = Modifier.clickable { scope.launch { runCatching { social.deleteComment(c.id) }; reload() } }.padding(6.dp))
+                    if (c.uid == myId) androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.clickable { scope.launch { runCatching { social.deleteComment(c.id) }; reload() } }.padding(6.dp).size(16.dp))
                 }
             }
         }
@@ -233,7 +240,11 @@ fun AnimeCardBubble(body: String, mine: Boolean, onOpen: (Int) -> Unit, onLong: 
         PosterImage(cover, title, Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Panel), maxSide = 240)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text("🎬 Recommended", style = inter(11f, FontWeight.SemiBold), color = Ani.Lavender)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Play, null, tint = Ani.Lavender, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Recommended", style = inter(11f, FontWeight.SemiBold), color = Ani.Lavender)
+            }
             Text(title, style = inter(14.5f, FontWeight.Bold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (note.isNotBlank()) Text(note, style = inter(12f), color = Ani.Soft, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("Tap to open", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
@@ -269,8 +280,8 @@ object RecapCard {
         c.drawText(if (h2 > 0) "${h2}h ${m2}m" else "${m2}m", w / 2f, 560f, p)
         p.typeface = reg; p.textSize = 46f; p.color = 0xFFD1D1D6.toInt()
         c.drawText("watched this week", w / 2f, 630f, p)
-        val rows = listOf("🔥 Streak" to "${s.streak} days", "⭐ Level" to "${e.level}", "📚 Anime watched" to "${s.shows}", "🏆 Best day" to "${s.maxDay / 3600}h ${s.maxDay % 3600 / 60}m") +
-            (s.genres.firstOrNull()?.let { listOf("🎭 Top genre" to it.first) } ?: emptyList())
+        val rows = listOf("Streak" to "${s.streak} days", "Level" to "${e.level}", "Anime watched" to "${s.shows}", "Best day" to "${s.maxDay / 3600}h ${s.maxDay % 3600 / 60}m") +
+            (s.genres.firstOrNull()?.let { listOf("Top genre" to it.first) } ?: emptyList())
         var y = 770f
         p.textAlign = Paint.Align.LEFT
         rows.forEach { (k, v) ->

@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -296,6 +297,8 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
     var theme by remember { mutableStateOf(profile?.profileTheme) }
     var deco by remember { mutableStateOf(profile?.avatarDeco) }
     var fx by remember { mutableStateOf(profile?.profileEffect) }
+    val liveLevel = com.anibiar.app.ui.engage.rememberEngage().second?.level ?: 1
+    val level = maxOf(liveLevel, com.anibiar.app.data.EngageCalc.levelOf(profile?.xp ?: 0L))
     BackHandler(onBack = onBack)
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
@@ -319,19 +322,20 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
                     }
                 }
             }
+            Text("Level $level. Decorations and effects unlock as you level up by watching.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 14.dp))
             Text("Avatar decoration", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                LookTile("None", deco == null, { deco = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
-                Looks.decos.forEach { d -> LookTile(d.name, deco == d.id, { deco = d.id }) { Avatar(null, profile?.shownName, 44.dp, deco = d.id) } }
+                LookTile("None", deco == null, { deco = null }) { androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
+                Looks.decos.forEach { d -> LookTile(d.name, deco == d.id, { deco = d.id }, lockLevel = Looks.decoReq(d.id).takeIf { it > level }) { Avatar(null, profile?.shownName, 44.dp, deco = d.id) } }
             }
             Text("Namecard effect", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                LookTile("None", fx == null, { fx = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
-                Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize()) } } }
+                LookTile("None", fx == null, { fx = null }) { androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
+                Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }, lockLevel = Looks.fxReq(e.id).takeIf { it > level }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize()) } } }
             }
             Text("Profile theme", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                LookTile("None", theme == null, { theme = null }) { Text("∅", style = inter(22f), color = Ani.Muted) }
+                LookTile("None", theme == null, { theme = null }) { androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
                 Looks.themes.forEach { th -> LookTile(th.name, theme == th.id, { theme = th.id }) { Box(Modifier.size(44.dp).clip(CircleShape).background(th.color)) } }
             }
             Spacer(Modifier.height(20.dp))
@@ -344,15 +348,18 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
 }
 
 @Composable
-private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
+private fun LookTile(label: String, selected: Boolean, onClick: () -> Unit, lockLevel: Int? = null, content: @Composable () -> Unit) {
     val shape = RoundedCornerShape(16.dp)
     Column(
         Modifier.width(92.dp).clip(shape).background(if (selected) SolidColor(Color(0xFF2A2A2E)) else com.anibiar.app.ui.theme.GlassFill)
-            .border(1.dp, if (selected) Color(0x99FFFFFF) else Color(0x1AFFFFFF), shape).clickable(onClick = onClick).padding(vertical = 12.dp),
+            .border(1.dp, if (selected) Color(0x99FFFFFF) else Color(0x1AFFFFFF), shape).clickable(enabled = lockLevel == null, onClick = onClick).padding(vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.height(66.dp), contentAlignment = Alignment.Center) { content() }
+        Box(Modifier.height(66.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.then(if (lockLevel != null) Modifier.alpha(0.35f) else Modifier)) { content() }
+            if (lockLevel != null) androidx.compose.material3.Icon(com.anibiar.app.ui.theme.EngageIcons.Lock, null, tint = Color.White, modifier = Modifier.size(22.dp))
+        }
         Spacer(Modifier.height(6.dp))
-        Text(label, style = inter(12f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(if (lockLevel != null) "Level $lockLevel" else label, style = inter(12f, FontWeight.Medium), color = if (lockLevel != null) Ani.Muted else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

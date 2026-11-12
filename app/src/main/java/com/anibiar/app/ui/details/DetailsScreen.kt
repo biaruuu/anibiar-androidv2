@@ -493,19 +493,12 @@ private fun Header(
             }
         }
 
-        var recommend by remember { mutableStateOf(false) }
         var addList by remember { mutableStateOf(false) }
-        var party by remember { mutableStateOf(false) }
         Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Send to a friend" to { recommend = true }, "Add to list" to { addList = true }, "Watch party" to { party = true }).forEach { (t, a) ->
-                Text(t, style = inter(13f, FontWeight.SemiBold), color = Color.White,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, Ani.Border, RoundedCornerShape(50)).clickable { a() }.padding(horizontal = 14.dp, vertical = 8.dp))
-            }
+        Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).border(1.dp, Ani.Border, androidx.compose.foundation.shape.CircleShape).clickable { addList = true }, contentAlignment = Alignment.Center) {
+            androidx.compose.material3.Icon(com.anibiar.app.ui.theme.EngageIcons.List, "Add to list", tint = Color.White, modifier = Modifier.size(20.dp))
         }
         if (addList) com.anibiar.app.ui.engage.AddToListDialog(media.id, media.displayTitle, media.posterUrl) { addList = false }
-        if (party) com.anibiar.app.ui.engage.PartyCreateDialog(media.id, media.displayTitle, media.posterUrl) { party = false }
-        if (recommend) com.anibiar.app.ui.engage.RecommendDialog(media.id, media.displayTitle, media.posterUrl) { recommend = false }
 
         val description = media.cleanDescription
         if (description.isNotBlank()) {

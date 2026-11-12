@@ -52,6 +52,14 @@ object Looks {
         Theme("ocean", "Ocean", Color(0xFF2B7FFF)), Theme("rose", "Rose", Color(0xFFFF4D8D)), Theme("forest", "Forest", Color(0xFF2FBF71)),
         Theme("sunset", "Sunset", Color(0xFFFF8A3D)), Theme("gold", "Gold", Color(0xFFFFC83D)), Theme("crimson", "Crimson", Color(0xFFE5383B)),
     )
+    /** Levels needed to use each decoration and effect. Level comes from watch time, shows and streaks, so these are earned by watching. */
+    private val decoLevel = mapOf("cat" to 1, "bolt" to 5, "burst" to 10, "butterfly" to 15, "notes" to 20, "rage" to 25)
+    private val fxLevel = mapOf("sparkle" to 1, "sakura" to 3, "snow" to 6, "rain" to 9, "hearts" to 12, "fireflies" to 15, "embers" to 19, "aura" to 23, "storm" to 28)
+    fun decoReq(id: String) = decoLevel[id] ?: 1
+    fun fxReq(id: String) = fxLevel[id] ?: 1
+    /** The nearest thing still locked at this level: its name and the level that unlocks it. */
+    fun nextUnlock(level: Int): Pair<String, Int>? =
+        (decos.map { it.name to decoReq(it.id) } + effects.map { it.name to fxReq(it.id) }).filter { it.second > level }.minByOrNull { it.second }
     fun theme(id: String?) = themes.firstOrNull { it.id == id }
     fun deco(id: String?) = decos.firstOrNull { it.id == id }
 }

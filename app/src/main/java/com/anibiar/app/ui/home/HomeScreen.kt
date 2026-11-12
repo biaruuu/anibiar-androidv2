@@ -319,7 +319,6 @@ private fun HomeContent(
                                 com.anibiar.app.ui.engage.EventBanner()
                                 com.anibiar.app.ui.engage.StreakGoalCard()
                                 com.anibiar.app.ui.engage.MoodCard(onOpen)
-                                com.anibiar.app.ui.engage.QuizCard()
                             }
                         }
 

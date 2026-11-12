@@ -39,6 +39,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.anibiar.app.ui.theme.AniIcons
+import com.anibiar.app.ui.theme.EngageIcons
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -61,14 +64,23 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Badge id to emoji and name. The ids come from the Rust core (engage.rs). */
-val BADGES: Map<String, Pair<String, String>> = linkedMapOf(
-    "first" to ("🎬" to "First episode"),
-    "streak3" to ("🔥" to "3-day streak"), "streak7" to ("🔥" to "7-day streak"), "streak30" to ("🌋" to "30-day streak"),
-    "shows10" to ("📚" to "10 anime"), "shows25" to ("📚" to "25 anime"), "shows100" to ("🏛" to "100 anime"),
-    "hours24" to ("⏱" to "24 hours"), "hours100" to ("🏆" to "100 hours"), "hours500" to ("👑" to "500 hours"),
-    "binge" to ("🍿" to "Binge day"), "marathon" to ("🏃" to "Marathon day"),
-    "lv10" to ("⭐" to "Level 10"), "lv25" to ("💎" to "Level 25"),
+/** Badge id to icon, colour and name. The ids come from the Rust core (engage.rs). */
+class BadgeDef(val icon: ImageVector, val tint: Color, val name: String)
+val BADGES: Map<String, BadgeDef> = linkedMapOf(
+    "first" to BadgeDef(AniIcons.Play, Color(0xFF64D2FF), "First episode"),
+    "streak3" to BadgeDef(EngageIcons.Flame, Color(0xFFFF9F0A), "3-day streak"),
+    "streak7" to BadgeDef(EngageIcons.Flame, Color(0xFFFF6B35), "7-day streak"),
+    "streak30" to BadgeDef(EngageIcons.Flame, Color(0xFFFF375F), "30-day streak"),
+    "shows10" to BadgeDef(EngageIcons.Book, Color(0xFF30D158), "10 anime"),
+    "shows25" to BadgeDef(EngageIcons.Book, Color(0xFF32ADE6), "25 anime"),
+    "shows100" to BadgeDef(EngageIcons.Mountain, Color(0xFFBF5AF2), "100 anime"),
+    "hours24" to BadgeDef(AniIcons.Schedule, Color(0xFF64D2FF), "24 hours"),
+    "hours100" to BadgeDef(EngageIcons.Trophy, Color(0xFFFFD60A), "100 hours"),
+    "hours500" to BadgeDef(EngageIcons.Crown, Color(0xFFFFD60A), "500 hours"),
+    "binge" to BadgeDef(EngageIcons.Bolt, Color(0xFFFF9F0A), "Binge day"),
+    "marathon" to BadgeDef(EngageIcons.Medal, Color(0xFFFF453A), "Marathon day"),
+    "lv10" to BadgeDef(AniIcons.Star, Color(0xFFFFD60A), "Level 10"),
+    "lv25" to BadgeDef(EngageIcons.Diamond, Color(0xFF64D2FF), "Level 25"),
 )
 
 private fun fmtMin(sec: Long) = "${sec / 60}"
@@ -90,7 +102,26 @@ fun rememberEngage(refresh: Int = 0): Pair<StatsSummary?, Engage?> {
 private fun goalMin(c: Context) = c.getSharedPreferences("engage", Context.MODE_PRIVATE).getInt("goal_min", 20)
 private fun setGoal(c: Context, m: Int) = c.getSharedPreferences("engage", Context.MODE_PRIVATE).edit().putInt("goal_min", m).apply()
 
-/** Home: streak, today's progress toward the daily goal and the level chip. */
+
+/** A circular progress ring with something centred in it. */
+@Composable
+private fun Ring(progress: Float, size: androidx.compose.ui.unit.Dp, color: Color, stroke: androidx.compose.ui.unit.Dp = 5.dp, content: @Composable () -> Unit) {
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(size)) {
+            val w = stroke.toPx()
+            val inset = w / 2
+            val arcSize = androidx.compose.ui.geometry.Size(this.size.width - w, this.size.height - w)
+            val tl = androidx.compose.ui.geometry.Offset(inset, inset)
+            drawArc(Color(0x22FFFFFF), 0f, 360f, false, tl, arcSize, style = androidx.compose.ui.graphics.drawscope.Stroke(w))
+            if (progress > 0f) drawArc(color, -90f, 360f * progress.coerceIn(0f, 1f), false, tl, arcSize, style = androidx.compose.ui.graphics.drawscope.Stroke(w, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+        }
+        content()
+    }
+}
+
+private val FLAME = Color(0xFFFF9F0A)
+
+/** Home: streak flame inside a ring that fills as you reach today's goal. */
 @Composable
 fun StreakGoalCard(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -102,84 +133,107 @@ fun StreakGoalCard(modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(16.dp)
     Column(modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape).padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (streak > 0) "🔥" else "✨", style = inter(26f))
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (streak > 0) "$streak-day streak" else "Start your streak", style = inter(16f, FontWeight.Bold), color = Color.White)
-                Text(if (done) "Goal done today. Nice!" else "$todayMin / $goal min watched today", style = inter(12.5f), color = if (done) Ani.Lavender else Ani.Muted)
+            Ring(todayMin.toFloat() / goal, 60.dp, if (done) Color(0xFF30D158) else FLAME) {
+                androidx.compose.material3.Icon(if (done) AniIcons.Check else EngageIcons.Flame, null, tint = if (done) Color(0xFF30D158) else if (streak > 0) FLAME else Ani.Muted, modifier = Modifier.size(26.dp))
             }
-            if (e != null) Text("Lv ${e.level}", style = inter(12.5f, FontWeight.Bold), color = Ani.Lavender, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Ani.Lavender.copy(alpha = 0.16f)).padding(horizontal = 9.dp, vertical = 4.dp))
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(if (streak > 0) "$streak day streak" else "Start your streak", style = inter(16.5f, FontWeight.Bold), color = Color.White)
+                Text(if (done) "Daily goal reached" else "$todayMin of $goal min today", style = inter(12.5f), color = if (done) Color(0xFF30D158) else Ani.Muted)
+            }
+            if (e != null) Row(Modifier.clip(RoundedCornerShape(50)).background(Ani.Chip).padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(AniIcons.Star, null, tint = Color(0xFFFFD60A), modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Lv ${e.level}", style = inter(12.5f, FontWeight.Bold), color = Color.White)
+            }
         }
-        Spacer(Modifier.height(10.dp))
-        Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Ani.Chip)) {
-            Box(Modifier.fillMaxWidth((todayMin.toFloat() / goal).coerceIn(0f, 1f)).fillMaxHeight().background(Ani.Lavender))
-        }
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Daily goal", style = inter(11.5f), color = Ani.Muted)
-            Spacer(Modifier.width(8.dp))
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Daily goal", style = inter(12f), color = Ani.Muted)
+            Spacer(Modifier.width(10.dp))
             listOf(10, 20, 30, 60).forEach { m ->
                 val on = goal == m
-                Text("${m}m", style = inter(11.5f, FontWeight.SemiBold), color = if (on) Color.Black else Ani.Soft,
-                    modifier = Modifier.padding(end = 6.dp).clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { goal = m; setGoal(ctx, m) }.padding(horizontal = 10.dp, vertical = 4.dp))
+                Text("${m}m", style = inter(12f, FontWeight.SemiBold), color = if (on) Color.Black else Ani.Soft,
+                    modifier = Modifier.padding(end = 6.dp).clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { goal = m; setGoal(ctx, m) }.padding(horizontal = 11.dp, vertical = 5.dp))
             }
         }
     }
 }
 
-/** Profile: level ring, XP bar, stats and every badge earned (own profile). */
+/** Profile: XP ring, what unlocks next, stats and the full badge wall (earned ones lit, the rest locked). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LevelCard(modifier: Modifier = Modifier, onXp: (Long) -> Unit = {}) {
     val (s, e) = rememberEngage()
     LaunchedEffect(e?.xp) { e?.let { onXp(it.xp) } }
     if (s == null || e == null) return
     val shape = RoundedCornerShape(16.dp)
+    val next = com.anibiar.app.ui.profile.Looks.nextUnlock(e.level)
     Column(modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(54.dp).clip(CircleShape).background(Ani.Lavender.copy(alpha = 0.16f)).border(2.dp, Ani.Lavender, CircleShape), contentAlignment = Alignment.Center) {
-                Text("${e.level}", style = inter(20f, FontWeight.ExtraBold), color = Ani.Lavender)
+            Ring(e.progress, 72.dp, Ani.Lavender, 6.dp) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("LV", style = inter(9.5f, FontWeight.Bold), color = Ani.Muted)
+                    Text("${e.level}", style = inter(22f, FontWeight.ExtraBold), color = Color.White)
+                }
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text("Level ${e.level}", style = inter(17f, FontWeight.Bold), color = Color.White)
-                Text("${e.xp} XP · ${e.next - e.xp} to level ${e.level + 1}", style = inter(12.5f), color = Ani.Muted)
-                Spacer(Modifier.height(8.dp))
-                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Ani.Chip)) {
-                    Box(Modifier.fillMaxWidth(e.progress).fillMaxHeight().background(Ani.Lavender))
+                Text("${e.xp} XP", style = inter(18f, FontWeight.Bold), color = Color.White)
+                Text("${e.next - e.xp} XP to level ${e.level + 1}", style = inter(12.5f), color = Ani.Muted)
+                if (next != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("${next.first} unlocks at Lv ${next.second}", style = inter(12f, FontWeight.Medium), color = Ani.Soft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth()) {
-            listOf("${s.total / 3600}h ${s.total % 3600 / 60}m" to "Watched", "${s.streak}d" to "Streak", "${s.bestStreak}d" to "Best", "${s.shows}" to "Anime").forEach { (v, l) ->
-                Column(Modifier.weight(1f)) { Text(v, style = inter(16f, FontWeight.Bold), color = Color.White); Text(l, style = inter(11.5f), color = Ani.Muted) }
+            listOf(
+                Triple(AniIcons.Schedule, "${s.total / 3600}h ${s.total % 3600 / 60}m", "Watched"),
+                Triple(EngageIcons.Flame, "${s.streak}d", "Streak"),
+                Triple(EngageIcons.Trophy, "${s.bestStreak}d", "Best"),
+                Triple(EngageIcons.Book, "${s.shows}", "Anime"),
+            ).forEach { (ic, v, l) ->
+                Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Icon(ic, null, tint = Ani.Muted, modifier = Modifier.size(16.dp))
+                    Text(v, style = inter(16f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(top = 4.dp))
+                    Text(l, style = inter(11.5f), color = Ani.Muted)
+                }
             }
         }
         val ctx = LocalContext.current
         val scope = rememberCoroutineScope()
-        val myName = (ctx.applicationContext as AniBiarApp).social.let { sr -> "My week" }
-        Spacer(Modifier.height(12.dp))
-        Text("Share weekly recap", style = inter(13.5f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).clickable { scope.launch { RecapCard.share(ctx, myName, s, e) } }.padding(vertical = 10.dp))
-        if (e.badges.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            Text("Badges · ${e.badges.size}/${BADGES.size}", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)
-            Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BADGES.filterKeys { it in e.badges }.forEach { (_, v) ->
-                    Text("${v.first} ${v.second}", style = inter(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1, softWrap = false,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Ani.Chip).padding(horizontal = 10.dp, vertical = 6.dp))
+        Spacer(Modifier.height(14.dp))
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { scope.launch { RecapCard.share(ctx, "My week", s, e) } }.padding(vertical = 11.dp),
+            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Icon(AniIcons.Upload, null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Share weekly recap", style = inter(13.5f, FontWeight.SemiBold), color = Color.White)
+        }
+        Spacer(Modifier.height(16.dp))
+        Text("Badges  ${e.badges.size}/${BADGES.size}", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft)
+        Spacer(Modifier.height(10.dp))
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            BADGES.forEach { (id, b) ->
+                val got = id in e.badges
+                Column(Modifier.width(72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.size(48.dp).clip(CircleShape).background(if (got) b.tint.copy(alpha = 0.18f) else Ani.Chip), contentAlignment = Alignment.Center) {
+                        androidx.compose.material3.Icon(if (got) b.icon else EngageIcons.Lock, null, tint = if (got) b.tint else Ani.Muted.copy(alpha = 0.6f), modifier = Modifier.size(if (got) 24.dp else 18.dp))
+                    }
+                    Text(b.name, style = inter(10.5f, FontWeight.Medium), color = if (got) Color.White else Ani.Muted, maxLines = 2, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
     }
 }
 
-private class Mood(val emoji: String, val name: String, val genres: List<String>)
+private class Mood(val icon: ImageVector, val name: String, val genres: List<String>)
 private val MOODS = listOf(
-    Mood("⚡", "Hype", listOf("Action", "Adventure")), Mood("☕", "Chill", listOf("Slice of Life")),
-    Mood("😭", "Emotional", listOf("Drama")), Mood("😂", "Funny", listOf("Comedy")),
-    Mood("🌑", "Dark", listOf("Psychological", "Horror", "Thriller")), Mood("💕", "Romantic", listOf("Romance")),
-    Mood("🧠", "Mind-bending", listOf("Mystery", "Sci-Fi", "Psychological")), Mood("✨", "Magical", listOf("Fantasy", "Supernatural")),
+    Mood(EngageIcons.Bolt, "Hype", listOf("Action", "Adventure")), Mood(EngageIcons.Cup, "Chill", listOf("Slice of Life")),
+    Mood(EngageIcons.Drop, "Emotional", listOf("Drama")), Mood(AniIcons.Sticker, "Funny", listOf("Comedy")),
+    Mood(EngageIcons.Moon, "Dark", listOf("Psychological", "Horror", "Thriller")), Mood(EngageIcons.Heart, "Romantic", listOf("Romance")),
+    Mood(EngageIcons.Eye, "Mind-bending", listOf("Mystery", "Sci-Fi", "Psychological")), Mood(EngageIcons.Sparkle, "Magical", listOf("Fantasy", "Supernatural")),
 )
 
 /** Home: "What should I watch?" opens the mood picker. */
@@ -188,7 +242,7 @@ fun MoodCard(onOpen: (Int) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(16.dp)
     Row(modifier.fillMaxWidth().clip(shape).background(Ani.Panel).border(1.dp, Ani.Border, shape).clickable { open = true }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("🎲", style = inter(26f))
+        androidx.compose.material3.Icon(EngageIcons.Dice, null, tint = Ani.Lavender, modifier = Modifier.size(28.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("What should I watch?", style = inter(16f, FontWeight.Bold), color = Color.White)
@@ -245,8 +299,11 @@ private fun MoodDialog(onOpen: (Int) -> Unit, onClose: () -> Unit) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 MOODS.forEach { m ->
                     val on = mood == m
-                    Text("${m.emoji} ${m.name}", style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { mood = m; roll(m) }.padding(horizontal = 14.dp, vertical = 8.dp))
+                    Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { mood = m; roll(m) }.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.Icon(m.icon, null, tint = if (on) Color.Black else Color.White, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(m.name, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White)
+                    }
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -272,8 +329,11 @@ private fun MoodDialog(onOpen: (Int) -> Unit, onClose: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("🎲 Surprise me", style = inter(14f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White).clickable { mood = null; roll(null) }.padding(vertical = 12.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White).clickable { mood = null; roll(null) }.padding(vertical = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(EngageIcons.Dice, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Surprise me", style = inter(14f, FontWeight.Bold), color = Color.Black)
+            }
         }
     }
 }

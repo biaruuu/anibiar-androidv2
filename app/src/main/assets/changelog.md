@@ -536,3 +536,9 @@
 - Scheduled watch parties with reminders
 - Daily guess-the-anime quiz with friends leaderboard
 - Seasonal events banner, controlled from Admin
+
+## 123 | Cleaner engagement | 2026-11-12
+- Icons instead of emoji across streaks, badges, moods and reactions
+- New streak ring and level card with a badge wall
+- Profile decorations and effects now unlock by level
+- Removed the daily quiz, watch parties and the send button on Details
