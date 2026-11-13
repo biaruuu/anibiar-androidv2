@@ -373,7 +373,12 @@ private fun DetailsBackdrop(media: Media, hdArt: String?, scrollPx: () -> Float)
         )
         Box(
             Modifier.fillMaxSize().background(
-                Ani.Onyx.copy(alpha = 0.30f),
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.55f to Color.Transparent,
+                    0.82f to Ani.Onyx.copy(alpha = 0.85f),
+                    1f to Ani.Onyx,
+                ),
             ),
         )
     }
@@ -1666,7 +1671,7 @@ private fun ArtImage(
         if (fade) {
             Box(
                 Modifier.fillMaxWidth().height(80.dp).align(Alignment.BottomCenter).background(
-                    Ani.Onyx.copy(alpha = 0.4f),
+                    Brush.verticalGradient(0f to Color.Transparent, 1f to Ani.Onyx.copy(alpha = 0.6f)),
                 ),
             )
         }

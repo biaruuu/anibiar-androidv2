@@ -128,8 +128,8 @@ fun SplashScreen(onFinished: () -> Unit) {
                     }
                     .drawBehind {
                         drawCircle(
-                            Color(0xFF0A84FF).copy(alpha = glow * 0.22f),
-                            radius = size.minDimension * 0.42f,
+                            Brush.radialGradient(listOf(Color(0xFF0A84FF).copy(alpha = glow), Color.Transparent)),
+                            radius = size.minDimension * 0.75f,
                         )
                     },
             ) {
@@ -170,9 +170,11 @@ private fun DrawScope.drawLogo(l: LogoLayers, ms: Float) {
         val band = size.width * 0.55f
         val x0 = -band + (size.width + band * 1.6f) * ease(sweep)
         drawRect(
-            color = Color(0xFF0A84FF),
-            topLeft = Offset(x0, 0f),
-            size = androidx.compose.ui.geometry.Size(band * 0.3f, size.height),
+            brush = Brush.linearGradient(
+                colorStops = arrayOf(0f to Color.Transparent, 0.5f to Color(0xFF0A84FF), 1f to Color.Transparent),
+                start = Offset(x0, 0f),
+                end = Offset(x0 + band, band * 0.45f),
+            ),
             blendMode = BlendMode.SrcAtop,
         )
     }

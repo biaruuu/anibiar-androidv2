@@ -249,11 +249,15 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
             when {
                 state.loading && state.results.isEmpty() -> item(key = "loading") { com.anibiar.app.ui.theme.GridSkeleton(Modifier.padding(top = 12.dp)) }
                 state.error != null && state.results.isEmpty() -> item(key = "error") {
-                    com.anibiar.app.ui.theme.ArtState(com.anibiar.app.ui.theme.Art.Offline, "Can't reach the server", state.error.orEmpty().ifBlank { "Check your connection and try again." }, action = "Retry", onAction = viewModel::retry)
+                    Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.error.orEmpty(), style = inter(15f), color = Ani.Muted)
+                        Spacer(Modifier.height(12.dp))
+                        OutlineButton("Retry", true, viewModel::retry)
+                    }
                 }
                 state.results.isEmpty() -> item(key = "empty") {
-                    com.anibiar.app.ui.theme.ArtState(
-                        com.anibiar.app.ui.theme.Art.Search,
+                    com.anibiar.app.ui.theme.EmptyState(
+                        com.anibiar.app.ui.theme.AniIcons.Search,
                         if (filters.language == "DUB") "No dubs yet" else "No anime found",
                         if (filters.language == "DUB") "Dubbed releases aren't available yet." else "Try another spelling or clear a filter.",
                     )

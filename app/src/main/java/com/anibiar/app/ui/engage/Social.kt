@@ -266,10 +266,8 @@ object RecapCard {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.color = 0xFF101114.toInt()
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-        p.color = 0xFF0A84FF.toInt()
-        c.drawRect(0f, 0f, w.toFloat(), h * 0.1f, p)
+        p.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), intArrayOf(0xFF0A84FF.toInt(), 0xFF101114.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
         val bold = androidx.core.content.res.ResourcesCompat.getFont(context, com.anibiar.app.R.font.inter_bold) ?: Typeface.DEFAULT_BOLD
         val reg = androidx.core.content.res.ResourcesCompat.getFont(context, com.anibiar.app.R.font.inter_regular) ?: Typeface.DEFAULT
         p.textAlign = Paint.Align.CENTER

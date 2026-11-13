@@ -117,20 +117,14 @@ internal fun FollowListScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (list.isEmpty()) item {
-                com.anibiar.app.ui.theme.ArtState(
-                    if (query.isNotBlank()) com.anibiar.app.ui.theme.Art.Search else com.anibiar.app.ui.theme.Art.Friends,
+                Text(
                     when {
-                        query.isNotBlank() -> "No results"
-                        tab == "following" -> "Not following anyone"
-                        tab == "friends" -> "No friends yet"
-                        else -> "No followers yet"
+                        query.isNotBlank() -> "No results for \"${query.trim()}\"."
+                        tab == "following" -> "Not following anyone yet."
+                        tab == "friends" -> "No friends yet. Follow back to become friends."
+                        else -> "No followers yet."
                     },
-                    when {
-                        query.isNotBlank() -> "Nothing matches \"${query.trim()}\"."
-                        tab == "following" -> "People you follow will show up here."
-                        tab == "friends" -> "Follow back to become friends."
-                        else -> "When someone follows you, they appear here."
-                    },
+                    style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(16.dp),
                 )
             }
             items(list, key = { "$tab-${it.uid}" }) { u ->

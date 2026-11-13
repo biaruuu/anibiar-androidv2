@@ -611,7 +611,14 @@ private fun HeroBackdrop(
                 Modifier
                     .fillMaxSize()
                     .background(
-                        Ani.Onyx.copy(alpha = 0.32f),
+                        Brush.verticalGradient(
+                            0f to Ani.Onyx.copy(alpha = 0.40f),
+                            0.16f to Color.Transparent,
+                            0.58f to Color.Transparent,
+                            0.80f to Ani.Onyx.copy(alpha = 0.45f),
+                            0.93f to Ani.Onyx.copy(alpha = 0.88f),
+                            1f to Ani.Onyx,
+                        ),
                     ),
             )
         }
@@ -1077,7 +1084,7 @@ internal fun MediaGridCard(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(72.dp)
-                        .background(Color(0x99000000)),
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))),
                 )
                 if (overlay) Row(
                     modifier = Modifier
@@ -1300,7 +1307,7 @@ private fun RankRow(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(tint),
+                .background(Brush.horizontalGradient(listOf(tint, Ani.Item.copy(alpha = 0.45f)))),
         )
 
         Row(Modifier.fillMaxSize()) {
@@ -1402,14 +1409,28 @@ internal fun PosterImage(
 
 @Composable
 internal fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    val missing = message.contains("not found", true) || message.contains("404")
-    val offline = message.contains("resolve", true) || message.contains("connect", true) || message.contains("timeout", true) || message.contains("network", true)
-    com.anibiar.app.ui.theme.ArtState(
-        if (offline) com.anibiar.app.ui.theme.Art.Offline else if (missing) com.anibiar.app.ui.theme.Art.NotFound else com.anibiar.app.ui.theme.Art.Error,
-        if (offline) "You're offline" else if (missing) "Not found" else "Something went wrong",
-        message, modifier, action = "Try again", onAction = onRetry,
-    )
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text("Something went wrong", style = inter(20f, FontWeight.SemiBold))
+        Spacer(Modifier.height(8.dp))
+        Text(message, style = inter(15f, lineHeight = 22f), color = Ani.Muted)
+        Spacer(Modifier.height(20.dp))
+        Box(
+            modifier = Modifier
+                .height(42.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Ani.Lavender)
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Try again", style = inter(15f, FontWeight.SemiBold), color = Color.White)
+        }
+    }
 }
+
 
 /** Opens on a long press: a larger look at an anime with its score, genres and synopsis, and one tap to open it. */
 @Composable
@@ -1423,6 +1444,7 @@ private fun QuickPreview(m: Media, onClose: () -> Unit, onOpen: () -> Unit) {
                     url = m.bannerImage ?: m.posterUrl, contentDescription = m.displayTitle, maxSide = 800,
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 10f).background(Ani.Item),
                 )
+                Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Ani.Panel))))
             }
             Column(Modifier.padding(horizontal = 18.dp).padding(bottom = 18.dp)) {
                 Text(m.displayTitle, style = inter(20f, FontWeight.Bold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)

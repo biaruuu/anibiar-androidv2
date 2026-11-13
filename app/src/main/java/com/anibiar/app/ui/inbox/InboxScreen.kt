@@ -79,7 +79,7 @@ fun InboxScreen(onBack: () -> Unit, onOpenUser: (String) -> Unit, onJoinRoom: (S
         } else if (list.isEmpty()) {
             Column(Modifier.fillMaxSize().padding(top = 16.dp)) {
                 anns.forEach { com.anibiar.app.ui.home.AnnouncementCard(it, Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) }
-                com.anibiar.app.ui.theme.ArtState(com.anibiar.app.ui.theme.Art.Friends, "Nothing here yet", "New followers and friend requests show up here.")
+                com.anibiar.app.ui.theme.EmptyState(AniIcons.Bell, "Nothing here yet", "New followers and friend requests show up here.")
             }
         } else {
             LazyColumn(

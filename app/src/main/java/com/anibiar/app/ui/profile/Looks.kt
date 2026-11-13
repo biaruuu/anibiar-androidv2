@@ -159,8 +159,8 @@ fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
             }
             "aura" -> {
                 val a = 0.16f + 0.12f * (0.5f + 0.5f * sin(p * 2f * PI.toFloat() * 3f))
-                drawRect(Color(0xFF4BA3FF).copy(alpha = a * 0.5f))
-                drawRect(Color(0xFFFFB454).copy(alpha = a * 0.25f), size = androidx.compose.ui.geometry.Size(w * 0.5f, h))
+                drawRect(Brush.radialGradient(listOf(Color(0xFF4BA3FF).copy(alpha = a), Color.Transparent), Offset(w * 0.8f, h), w * 0.9f))
+                drawRect(Brush.radialGradient(listOf(Color(0xFFFFB454).copy(alpha = a * 0.8f), Color.Transparent), Offset(w * 0.05f, 0f), w * 0.6f))
             }
         }
     }
@@ -171,7 +171,7 @@ fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
 @Composable
 fun ThemeTint(id: String?, modifier: Modifier = Modifier) {
     val t = Looks.theme(id) ?: return
-    Box(modifier.background(t.color.copy(alpha = 0.16f)))
+    Box(modifier.background(Brush.verticalGradient(listOf(t.color.copy(alpha = 0.38f), t.color.copy(alpha = 0.10f), Color.Transparent))))
 }
 
 

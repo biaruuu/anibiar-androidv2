@@ -54,7 +54,7 @@ data class ActivityItem(
 )
 data class EpComment(val id: Long, val uid: String, val name: String, val avatar: String?, val deco: String?, val body: String, val spoiler: Boolean, val at: Long)
 data class Reaction(val emoji: String, val n: Int, val mine: Boolean)
-data class Highlight(val id: String, val title: String, val visibility: String, val items: List<Fav>, val tpl: String? = null)
+data class Highlight(val id: String, val title: String, val visibility: String, val items: List<Fav>)
 data class UserList(val id: String, val ownerId: String, val title: String, val description: String, val isPublic: Boolean, val collaborative: Boolean)
 data class Party(val id: String, val hostId: String, val hostName: String, val animeId: Int, val title: String, val cover: String?, val episode: Int, val startAt: Long, val invited: List<String>)
 data class QuizRow(val uid: String, val name: String, val avatar: String?, val deco: String?, val score: Int, val ms: Int)
@@ -711,19 +711,18 @@ class SocialRepository(context: Context, private val scope: CoroutineScope) {
     // ------------------------------------------------ highlights (collections of anime with a viewer audience)
 
     suspend fun highlightsOf(uid: String): List<Highlight> = net {
-        getRows("/rest/v1/highlights?owner_id=eq.$uid&select=id,title,visibility,items,cover_tpl&order=position.asc,created_at.asc&limit=30").map {
+        getRows("/rest/v1/highlights?owner_id=eq.$uid&select=id,title,visibility,items&order=position.asc,created_at.asc&limit=30").map {
             val o = it.jsonObject
             Highlight(
                 o["id"]!!.jsonPrimitive.content, o["title"]!!.jsonPrimitive.content, o["visibility"]?.jsonPrimitive?.contentOrNull ?: "everyone",
                 o["items"]?.jsonArray?.map { e -> val x = e.jsonObject; Fav(x["id"]!!.jsonPrimitive.content.toInt(), x["title"]!!.jsonPrimitive.content, x["cover"]?.jsonPrimitive?.contentOrNull) }.orEmpty(),
-                o["cover_tpl"]?.jsonPrimitive?.contentOrNull,
             )
         }
     }
 
-    suspend fun saveHighlight(id: String?, title: String, visibility: String, items: List<Fav>, tpl: String? = null) = net {
+    suspend fun saveHighlight(id: String?, title: String, visibility: String, items: List<Fav>) = net {
         val arr = kotlinx.serialization.json.JsonArray(items.take(40).map { f -> buildJsonObject { put("id", f.animeId); put("title", f.title); f.cover?.let { put("cover", it) } } })
-        val body = buildJsonObject { put("title", title.trim().take(24)); put("visibility", visibility); put("items", arr); if (tpl != null) put("cover_tpl", tpl) else put("cover_tpl", kotlinx.serialization.json.JsonNull) }.toString().toByteArray()
+        val body = buildJsonObject { put("title", title.trim().take(24)); put("visibility", visibility); put("items", arr) }.toString().toByteArray()
         val (c, t) = if (id == null) raw("POST", "/rest/v1/highlights", body, extra = mapOf("Prefer" to "return=minimal"))
         else raw("PATCH", "/rest/v1/highlights?id=eq.${encode(id)}", body, extra = mapOf("Prefer" to "return=minimal"))
         if (c !in 200..299) fail(c, t)

@@ -102,7 +102,7 @@ fun SeasonsCard(seasons: List<SeasonEntry>, currentId: Int, onOpen: (Int) -> Uni
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (se.image != null) AsyncImage(se.image, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
-                                Box(Modifier.matchParentSize().background(Color(0xA60A0A0E)))
+                                Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color(0x8C0A0A0E), Color(0xB30A0A0E)))))
                                 Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(se.label, style = inter(16.8f, FontWeight.SemiBold).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 8f)), color = Color.White, textAlign = TextAlign.Center)
                                     if (se.part.isNotEmpty()) Text(se.part, style = inter(13f), color = Color(0xB3FFFFFF))
@@ -144,7 +144,7 @@ fun MiniRow(m: Media, relation: String?, onClick: () -> Unit) {
     val s = RoundedCornerShape(13.dp)
     Box(Modifier.fillMaxWidth().heightIn(min = 90.dp).height(IntrinsicSize.Min).clip(s).background(Color(0xFF18181C)).clickable(onClick = onClick)) {
         m.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }
-        Box(Modifier.matchParentSize().background(Color(0xF218181C)))
+        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(0f to Color(0xFA18181C), 0.38f to Color(0xFA18181C), 1f to Color(0xD118181C))))
         Row(Modifier.fillMaxWidth()) {
             Box(Modifier.width(66.dp).fillMaxHeight().background(Color(0xFF2A2A2E))) {
                 m.posterUrl?.let { AsyncImage(it, null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize()) }

@@ -583,6 +583,3 @@ Badges now use layered, glossy art designed in Figma (rim, bevel, gloss, soft sh
 
 ## 131 | Badges removed | 2026-11-13
 Badge system removed. Level and XP stay: tap the level on your avatar to open your Level page. The level chip on avatars is smaller.
-
-## 132 | Flat design refresh | 2026-11-13
-No more gradients anywhere. New flat artwork designed in Figma: empty and error screens (favorites, friends, search, offline, error, not found), onboarding hero, a level-up screen, six highlight cover templates and a default banner. New shared buttons, chips and cards with a press animation, flat loading placeholders, flat share cards, and a themed (monochrome) app icon.

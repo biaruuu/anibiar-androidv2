@@ -45,8 +45,8 @@ fun Onboarding(onDone: () -> Unit) {
             Modifier.widthIn(max = 460.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.anibiar.app.R.drawable.art_hero), null, Modifier.size(190.dp))
-            Spacer(Modifier.height(8.dp))
+            KiroLogo(96.dp)
+            Spacer(Modifier.height(18.dp))
             Text("Make Kiro yours", style = inter(26f, FontWeight.ExtraBold), color = Color.White, textAlign = TextAlign.Center)
             Spacer(Modifier.height(8.dp))
             Text("Pick a color and text size. You can change these any time in Settings.", style = inter(14.5f, lineHeight = 21f), color = Ani.Muted, textAlign = TextAlign.Center)

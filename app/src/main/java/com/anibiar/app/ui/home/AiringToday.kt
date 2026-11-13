@@ -79,7 +79,7 @@ fun AiringToday(onOpen: (Int) -> Unit) {
                         Column(Modifier.weight(1f).clickable { onOpen(a.mediaId) }) {
                             Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).clip(RoundedCornerShape(16.dp)).background(Ani.Item)) {
                                 PosterImage(url = a.cover, contentDescription = a.title, maxSide = 400, modifier = Modifier.fillMaxSize())
-                                Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(Color(0x99000000)))
+                                Box(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().height(72.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000)))))
                                 Row(Modifier.align(androidx.compose.ui.Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                     Text("EP ${a.episode}", style = inter(11f, FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
                                     Text(if (done) "Aired" else "in ${countdown(left)}", style = inter(10.5f, FontWeight.SemiBold), color = if (soon) Ani.Lavender else Color.White.copy(alpha = 0.92f), maxLines = 1, softWrap = false)
