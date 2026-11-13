@@ -177,8 +177,8 @@ private fun HighlightPrivacyDialog(items: List<com.anibiar.app.social.Highlight>
                     }
                 }
             }
-            Text("Done", style = inter(14f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onClose).padding(vertical = 12.dp))
+            Text("Done", style = inter(14f, FontWeight.Bold), color = Color.White, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onClose).padding(vertical = 12.dp))
         }
     }
 }
@@ -195,7 +195,7 @@ fun HighlightPrivacySettings(onClose: () -> Unit) {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Ani.Panel).padding(20.dp)) {
                 Text("No highlights yet", style = inter(17f, FontWeight.Bold), color = Color.White)
                 Text("Create one in Edit profile, then choose who can view it here.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(top = 6.dp, bottom = 14.dp))
-                Text("OK", style = inter(14f, FontWeight.Bold), color = Color.Black, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onClose).padding(vertical = 12.dp))
+                Text("OK", style = inter(14f, FontWeight.Bold), color = Color.White, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(Ani.Lavender).clickable(onClick = onClose).padding(vertical = 12.dp))
             }
         }
     } else HighlightPrivacyDialog(list, onClose)

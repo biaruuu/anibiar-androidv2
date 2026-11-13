@@ -186,8 +186,8 @@ fun EmptyState(icon: ImageVector, title: String, hint: String, modifier: Modifie
         Text(hint, style = inter(14f, lineHeight = 20f), color = Ani.Muted, textAlign = TextAlign.Center)
         if (action != null) {
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onAction).padding(horizontal = 22.dp, vertical = 11.dp)) {
-                Text(action, style = inter(14f, FontWeight.SemiBold), color = Color.Black)
+            Box(Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onAction).padding(horizontal = 22.dp, vertical = 11.dp)) {
+                Text(action, style = inter(14f, FontWeight.SemiBold), color = Color.White)
             }
         }
     }

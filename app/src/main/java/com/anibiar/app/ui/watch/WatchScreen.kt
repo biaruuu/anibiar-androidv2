@@ -409,8 +409,8 @@ fun WatchScreen(id: Int, startEp: Int, onBack: () -> Unit, onOpenDetails: (Int) 
                                     android.widget.Toast.makeText(ctx, "Report copied", android.widget.Toast.LENGTH_SHORT).show()
                                 }.padding(horizontal = 18.dp, vertical = 8.dp))
                             Spacer(Modifier.height(8.dp))
-                            Text("Try again", style = inter(12.5f, FontWeight.SemiBold), color = Color.Black,
-                                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { if (epsError != null) epsTry++ else watchTry++ }.padding(horizontal = 18.dp, vertical = 8.dp))
+                            Text("Try again", style = inter(12.5f, FontWeight.SemiBold), color = Color.White,
+                                modifier = Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable { if (epsError != null) epsTry++ else watchTry++ }.padding(horizontal = 18.dp, vertical = 8.dp))
                         } else {
                             CircularProgressIndicator(Modifier.size(28.dp), color = Color.White, strokeWidth = 2.5.dp)
                             Spacer(Modifier.height(8.dp))

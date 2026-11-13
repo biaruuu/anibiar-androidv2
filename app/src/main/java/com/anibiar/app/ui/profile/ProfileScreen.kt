@@ -189,7 +189,7 @@ fun ProfileScreen(
                         val prog = ((xp - com.anibiar.app.data.EngageCalc.xpFor(lvl)).toFloat() / (com.anibiar.app.data.EngageCalc.xpFor(lvl + 1) - com.anibiar.app.data.EngageCalc.xpFor(lvl)).coerceAtLeast(1)).coerceIn(0f, 1f)
                         Box(Modifier.requiredSize(96.dp).levelRing(prog, Ani.Lavender, width = 2.dp, gap = 0.dp)) {
                             Avatar(profile?.avatarUrl, profile?.shownName, 96.dp, Modifier.requiredSize(96.dp), deco = profile?.avatarDeco)
-                            com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomCenter).offset(y = 7.dp).then(if (isMe) Modifier.clickable { com.anibiar.app.ui.engage.EngageOverlay.badges.value = com.anibiar.app.ui.engage.BadgesRequest(true, profile?.shownName.orEmpty()) } else Modifier))
+                            com.anibiar.app.ui.engage.LevelBadge(lvl, Modifier.align(Alignment.BottomCenter).offset(y = 7.dp).clickable { com.anibiar.app.ui.engage.EngageOverlay.badges.value = com.anibiar.app.ui.engage.BadgesRequest(isMe, profile?.shownName.orEmpty(), if (isMe) social.myId else targetUid) })
                             StatusDot(profile?.status, 24.dp, Ani.Onyx, Modifier.align(Alignment.BottomEnd))
                         }
                     }
@@ -475,9 +475,9 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Brush.linearGradient(listOf(Color.White, Color.White)) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Color.White else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) androidx.compose.ui.graphics.SolidColor(Ani.Lavender) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Ani.Lavender else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
+    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = Color.White, maxLines = 1) }
 }
 
 @Composable

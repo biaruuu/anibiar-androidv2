@@ -76,7 +76,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 class HlRequest(val highlight: Highlight, val ownerName: String, val ownerAvatar: String?, val ownerDeco: String?, val onOpen: (Int) -> Unit)
-class BadgesRequest(val isMe: Boolean, val name: String)
+class BadgesRequest(val isMe: Boolean, val name: String, val uid: String? = null)
 
 /** Full-screen things opened from inside the profile but drawn above the whole app (see MainActivity). */
 object EngageOverlay {
@@ -84,41 +84,50 @@ object EngageOverlay {
     val badges = MutableStateFlow<BadgesRequest?>(null)
 }
 
-/** Level page: your level, XP progress, what unlocks next, and the weekly recap. */
+/** Level page for you or anyone else: level, XP progress that updates live, what unlocks next, and the weekly recap (yours only). */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LevelScreen(req: BadgesRequest, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    val (stats, eng) = if (req.isMe) rememberEngage() else (null to null)
+    val app = ctx.applicationContext as com.anibiar.app.AniBiarApp
+    var tick by remember { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(4000); tick++ } }
+    val (stats, eng) = if (req.isMe) rememberEngage(tick) else (null to null)
+    val remote by remember(req.uid) { req.uid?.let { app.social.profile(it) } ?: kotlinx.coroutines.flow.flowOf(null) }.collectAsState(null)
+    val xp = if (req.isMe) maxOf(eng?.xp ?: 0L, remote?.xp ?: 0L) else (remote?.xp ?: 0L)
+    val level = com.anibiar.app.data.EngageCalc.levelOf(xp)
+    val floor = com.anibiar.app.data.EngageCalc.xpFor(level)
+    val nextXp = com.anibiar.app.data.EngageCalc.xpFor(level + 1)
+    val target = ((xp - floor).toFloat() / (nextXp - floor).coerceAtLeast(1)).coerceIn(0f, 1f)
+    val prog by androidx.compose.animation.core.animateFloatAsState(target, androidx.compose.animation.core.tween(600), label = "lvl")
     Box(Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } }) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().verticalScroll(rememberScrollState())) {
             Box(Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
                 Icon(AniIcons.Close, "Close", tint = Color.White, modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp).clip(CircleShape).clickable(onClick = onClose).padding(10.dp).size(24.dp))
-                Text("Level", style = inter(17f, FontWeight.Bold), color = Color.White)
+                Text(if (req.isMe) "Level" else "${req.name}'s level", style = inter(17f, FontWeight.Bold), color = Color.White)
             }
-            if (eng != null && stats != null) {
-                val next = Looks.nextUnlock(eng.level)
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF131316)).padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("Level ${eng.level}", style = inter(20f, FontWeight.ExtraBold), color = Color.White, modifier = Modifier.weight(1f))
-                        Text("${eng.xp - eng.floor} / ${eng.next - eng.floor} XP", style = inter(12.5f, FontWeight.SemiBold), color = Ani.Muted)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Chip)) {
-                        Box(Modifier.fillMaxWidth(eng.progress.coerceAtLeast(0.02f)).height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Lavender))
-                    }
-                    Text("XP comes only from watching. Every minute counts.", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 8.dp))
-                    if (next != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp)); Spacer(Modifier.width(5.dp))
-                        Text("${next.first} unlocks at Lv ${next.second}", style = inter(12f, FontWeight.Medium), color = Ani.Soft)
-                    }
-                    Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.ButtonDark).clickable { scope.launch { RecapCard.share(ctx, "My week", stats, eng) } }.padding(vertical = 11.dp),
-                        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Icon(AniIcons.Upload, null, tint = Color.White, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
-                        Text("Share weekly recap", style = inter(13.5f, FontWeight.SemiBold), color = Color.White)
-                    }
+            val next = Looks.nextUnlock(level)
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF131316)).padding(16.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("Level $level", style = inter(20f, FontWeight.ExtraBold), color = Color.White, modifier = Modifier.weight(1f))
+                    Text("${xp - floor} / ${nextXp - floor} XP", style = inter(12.5f, FontWeight.SemiBold), color = Ani.Muted)
+                }
+                Spacer(Modifier.height(8.dp))
+                Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Chip)) {
+                    Box(Modifier.fillMaxWidth(prog.coerceAtLeast(0.02f)).height(8.dp).clip(RoundedCornerShape(50)).background(Ani.Lavender))
+                }
+                Text("${nextXp - xp} XP to level ${level + 1}", style = inter(12f, FontWeight.Medium), color = Ani.Soft, modifier = Modifier.padding(top = 8.dp))
+                Text("XP comes only from watching. Updates live.", style = inter(11.5f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
+                if (next != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(EngageIcons.Lock, null, tint = Ani.Soft, modifier = Modifier.size(13.dp)); Spacer(Modifier.width(5.dp))
+                    Text("${next.first} unlocks at Lv ${next.second}", style = inter(12f, FontWeight.Medium), color = Ani.Soft)
+                }
+                if (req.isMe && eng != null && stats != null) Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Ani.Lavender).clickable { scope.launch { RecapCard.share(ctx, "My week", stats, eng) } }.padding(vertical = 11.dp),
+                    horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                    Icon(AniIcons.Upload, null, tint = Color.White, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+                    Text("Share weekly recap", style = inter(13.5f, FontWeight.SemiBold), color = Color.White)
                 }
             }
             Spacer(Modifier.height(40.dp))

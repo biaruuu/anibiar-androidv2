@@ -1458,8 +1458,8 @@ private fun QuickPreview(m: Media, onClose: () -> Unit, onOpen: () -> Unit) {
                 val d = m.cleanDescription
                 if (d.isNotBlank()) Text(d, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
                 Spacer(Modifier.height(16.dp))
-                Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
-                    Text("Open", style = inter(15f, FontWeight.Bold), color = Color.Black)
+                Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+                    Text("Open", style = inter(15f, FontWeight.Bold), color = Color.White)
                 }
             }
         }

@@ -583,3 +583,6 @@ Badges now use layered, glossy art designed in Figma (rim, bevel, gloss, soft sh
 
 ## 131 | Badges removed | 2026-11-13
 Badge system removed. Level and XP stay: tap the level on your avatar to open your Level page. The level chip on avatars is smaller.
+
+## 132 | Blue buttons, live levels | 2026-11-13
+Reverted the flat/Figma refresh (hero and scrolling are back to how they were). Main buttons and selected chips use your accent color again instead of white. Tap the level chip on anyone profile to see their level and XP progress, updating live.
