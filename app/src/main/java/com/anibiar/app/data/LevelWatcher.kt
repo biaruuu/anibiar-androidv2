@@ -27,7 +27,7 @@ object LevelWatcher {
         if (e.level > last) prefs.edit().putInt("last_level", e.level).apply()
         runCatching {
             val dev = app.social.authState.value?.email.equals(com.anibiar.app.ui.admin.ADMIN_EMAIL, ignoreCase = true)
-            app.social.setXp(e.xp, if (dev) com.anibiar.app.ui.engage.BADGES.keys.toList() else e.badges)
+            app.social.setXp(e.xp, emptyList())
         }
         if (last in 1 until e.level) announce(app, e.level)
     }

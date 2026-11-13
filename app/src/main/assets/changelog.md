@@ -580,3 +580,6 @@
 
 ## 130 | Realistic badges | 2026-11-13
 Badges now use layered, glossy art designed in Figma (rim, bevel, gloss, soft shadow), like Discord. Locked ones are dimmed; the complete set keeps its glow and shine.
+
+## 131 | Badges removed | 2026-11-13
+Badge system removed. Level and XP stay: tap the level on your avatar to open your Level page. The level chip on avatars is smaller.

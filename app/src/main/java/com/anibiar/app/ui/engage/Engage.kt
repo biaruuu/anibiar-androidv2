@@ -120,8 +120,8 @@ fun Modifier.levelRing(progress: Float, color: Color, width: androidx.compose.ui
 /** Small round level number that sits on the corner of an avatar. */
 @Composable
 fun LevelBadge(level: Int, modifier: Modifier = Modifier) {
-    Box(modifier.clip(CircleShape).background(Ani.Onyx).padding(2.dp).clip(CircleShape).background(Ani.Lavender).padding(horizontal = 7.dp, vertical = 3.dp), contentAlignment = Alignment.Center) {
-        Text("$level", style = inter(11.5f, FontWeight.ExtraBold), color = Color.Black)
+    Box(modifier.clip(CircleShape).background(Ani.Onyx).padding(1.5.dp).clip(CircleShape).background(Ani.Lavender).padding(horizontal = 5.dp, vertical = 1.dp), contentAlignment = Alignment.Center) {
+        Text("$level", style = inter(9.5f, FontWeight.ExtraBold), color = Color.Black)
     }
 }
 
