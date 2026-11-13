@@ -57,27 +57,22 @@ import kotlin.math.roundToInt
 enum class NavTab(val label: String, val icon: ImageVector) {
     Home("Home", AniIcons.Home),
     Search("Search", AniIcons.Search),
+    Schedule("Schedule", AniIcons.Calendar),
     Inbox("Inbox", AniIcons.Chat),
     Profile("Profile", AniIcons.Person),
     Settings("Settings", AniIcons.Settings),
 }
 
-/** Clean flat tab bar: dark panel, accent colour on the selected tab, no lens, no shine. */
+/** Flat full-width tab bar: near-black strip with a hairline on top, small icons and tiny labels (CornCastle style). */
 @Composable
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier, inboxBadge: Int = 0) {
     val tabs = NavTab.entries
     val tick = com.anibiar.app.ui.theme.rememberTick()
-    val shape = RoundedCornerShape(24.dp)
-    Box(modifier.fillMaxWidth().navigationBarsPadding().padding(start = 20.dp, end = 20.dp, bottom = 8.dp, top = 4.dp), contentAlignment = Alignment.BottomCenter) {
-        Row(
-            Modifier.widthIn(max = 400.dp).fillMaxWidth().height(56.dp).clip(shape)
-                .background(Color(0xF2161618))
-                .border(1.dp, Color(0x1FFFFFFF), shape)
-                .padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    Column(modifier.fillMaxWidth().background(Color(0xFF08080C)).navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+        Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
             tabs.forEach { tab ->
-                NavItem(tab, tab == selected, Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).clickable { if (tab != selected) tick(); onSelect(tab) }, if (tab == NavTab.Inbox) inboxBadge else 0)
+                NavItem(tab, tab == selected, Modifier.weight(1f).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { if (tab != selected) tick(); onSelect(tab) }, if (tab == NavTab.Inbox) inboxBadge else 0)
             }
         }
     }
@@ -85,19 +80,19 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 @Composable
 private fun NavItem(tab: NavTab, lit: Boolean, modifier: Modifier, badge: Int) {
-    val tint by animateColorAsState(if (lit) com.anibiar.app.ui.theme.Ani.Lavender else Color(0xFF8E8E93), tween(140), label = "navTint")
+    val tint by animateColorAsState(if (lit) Color.White else Color.White.copy(alpha = 0.45f), tween(140), label = "navTint")
     Column(
         modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
         Box {
-            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(19.dp))
             if (badge > 0) Box(
                 Modifier.align(Alignment.TopEnd).offset(x = 7.dp, y = (-3).dp).clip(RoundedCornerShape(50)).background(Color(0xFFFF4D6A)).padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(if (badge > 99) "99+" else "$badge", style = inter(9f, FontWeight.Bold), color = Color.White, maxLines = 1) }
         }
         Spacer(Modifier.height(2.dp))
-        Text(tab.label, style = inter(10f, if (lit) FontWeight.Bold else FontWeight.Medium), color = tint, maxLines = 1)
+        Text(tab.label, style = inter(9f, if (lit) FontWeight.Bold else FontWeight.Medium), color = tint, maxLines = 1)
     }
 }

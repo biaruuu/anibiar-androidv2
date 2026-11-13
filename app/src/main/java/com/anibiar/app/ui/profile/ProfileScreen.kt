@@ -475,9 +475,9 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) androidx.compose.ui.graphics.SolidColor(Ani.Lavender) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Ani.Lavender else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) androidx.compose.ui.graphics.SolidColor(Color.White) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Color.White else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = Color.White, maxLines = 1) }
+    ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
 }
 
 @Composable

@@ -341,8 +341,8 @@ fun DetailsScreen(
                 ) {
                     Text(m.displayTitle, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(12.dp))
-                    Text("Play", style = inter(14f, FontWeight.Bold), color = Color.White,
-                        modifier = Modifier.clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable { onWatch(m.id, app.history.resumeEpisode(m.id)) }.padding(horizontal = 18.dp, vertical = 8.dp))
+                    Text("Play", style = inter(14f, FontWeight.Bold), color = Color.Black,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable { onWatch(m.id, app.history.resumeEpisode(m.id)) }.padding(horizontal = 18.dp, vertical = 8.dp))
                 }
             }
         }
@@ -435,13 +435,13 @@ private fun Header(
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth().widthIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
-                Modifier.weight(1f).height(46.dp).clip(btnShape).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onWatch),
+                Modifier.weight(1f).height(46.dp).clip(btnShape).background(Color.White).clickable(onClick = onWatch),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(AniIcons.Play, null, tint = Color.White, modifier = Modifier.size(22.dp))
+                Icon(AniIcons.Play, null, tint = Color.Black, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(playLabel, style = inter(16f, FontWeight.Bold), color = Color.White, maxLines = 1, softWrap = false)
+                Text(playLabel, style = inter(16f, FontWeight.Bold), color = Color.Black, maxLines = 1, softWrap = false)
             }
             Box(
                 Modifier.size(46.dp).clip(btnShape).background(Ani.Panel)
@@ -525,11 +525,11 @@ private fun ActionButton(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(50)
-    val content = Color.White
+    val content = if (filled) Color.Black else Color.White
     Row(
         modifier = modifier
             .height(42.dp)
-            .then(if (filled) Modifier.clip(shape).background(com.anibiar.app.ui.theme.Ani.Lavender) else Modifier.glass(shape))
+            .then(if (filled) Modifier.clip(shape).background(Color.White) else Modifier.glass(shape))
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -948,10 +948,10 @@ private fun Trailer(
                         Text(
                             "Watch on ${if (kind == "youtube") "YouTube" else "Dailymotion"}",
                             style = inter(14f, FontWeight.SemiBold),
-                            color = Color.White,
+                            color = Color.Black,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(com.anibiar.app.ui.theme.Ani.Lavender)
+                                .background(Color.White)
                                 .clickable { openUrl(context, watchUrl(kind, videoId)) }
                                 .padding(horizontal = 18.dp, vertical = 10.dp),
                         )
@@ -1061,10 +1061,10 @@ private fun TrailerFullscreen(trailer: FsTrailer, onClose: () -> Unit) {
                 Text(
                     "Watch on ${if (trailer.kind == "youtube") "YouTube" else "Dailymotion"}",
                     style = inter(14f, FontWeight.SemiBold),
-                    color = Color.White,
+                    color = Color.Black,
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
-                        .background(com.anibiar.app.ui.theme.Ani.Lavender)
+                        .background(Color.White)
                         .clickable { openUrl(context, watchUrl(trailer.kind, trailer.videoId)) }
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 )

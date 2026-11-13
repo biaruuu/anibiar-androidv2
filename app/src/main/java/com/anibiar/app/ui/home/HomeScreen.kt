@@ -215,7 +215,6 @@ private fun HomeContent(
             else -> 3
         }
 
-        HeroBackdrop(url = backdrop, heroHeight = heroHeight, scrollPx = { scrollPx }, modifier = Modifier.fillMaxSize())
 
         var refreshing by remember { mutableStateOf(false) }
         val refreshScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -284,24 +283,12 @@ private fun HomeContent(
     
                         if (state.hero.isNotEmpty()) {
                             item(key = "hero") {
-                              Box(
-                                Modifier.graphicsLayer {
-                                    val off = if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else 99999f
-                                    translationY = off * 0.45f
-                                    alpha = (1f - off / (size.height.coerceAtLeast(1f) * 1.15f)).coerceIn(0f, 1f)
-                                },
-                              ) {
-                                HeroPager(
+                                CompactHero(
                                     items = state.hero,
-                                    art = state.art,
-                                    height = heroHeight,
-                                    onPageChanged = { heroIndex = it },
-                                    saved = saved,
                                     onWatch = onWatch,
                                     onDetails = onOpen,
-                                    onAdd = onToggleSaved,
+                                    modifier = Modifier.statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
                                 )
-                              }
                             }
                         }
     
@@ -1458,10 +1445,84 @@ private fun QuickPreview(m: Media, onClose: () -> Unit, onOpen: () -> Unit) {
                 val d = m.cleanDescription
                 if (d.isNotBlank()) Text(d, style = inter(13.5f, lineHeight = 19f), color = Ani.Soft, maxLines = 5, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
                 Spacer(Modifier.height(16.dp))
-                Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
-                    Text("Open", style = inter(15f, FontWeight.Bold), color = Color.White)
+                Box(Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onOpen), contentAlignment = Alignment.Center) {
+                    Text("Open", style = inter(15f, FontWeight.Bold), color = Color.Black)
                 }
             }
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------- compact hero (pager card)
+
+/** Compact hero: a swipeable glass card with the banner behind, title, genres, a Watch Now button and the poster, plus tick dots. */
+@Composable
+private fun CompactHero(items: List<Media>, onWatch: (Int) -> Unit, onDetails: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val pager = rememberPagerState(pageCount = { items.size })
+    LaunchedEffect(items.size) {
+        while (items.size > 1) {
+            delay(5_000)
+            if (!pager.isScrollInProgress) pager.animateScrollToPage((pager.currentPage + 1) % items.size, animationSpec = tween(700))
+        }
+    }
+    Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        HorizontalPager(pager, Modifier.fillMaxWidth().height(210.dp)) { i ->
+            HeroCard(items[i], { onWatch(items[i].id) }, { onDetails(items[i].id) })
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            repeat(items.size) { i ->
+                val on = pager.currentPage == i
+                val w by androidx.compose.animation.core.animateDpAsState(if (on) 24.dp else 6.dp, tween(400), label = "tick")
+                Box(Modifier.height(4.dp).width(w).clip(RoundedCornerShape(50)).background(if (on) Color.White else Color.White.copy(alpha = 0.2f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCard(m: Media, onWatch: () -> Unit, onDetails: () -> Unit) {
+    val shape = RoundedCornerShape(18.dp)
+    val score = m.averageScore?.takeIf { it > 0 }?.let { String.format(java.util.Locale.US, "%.1f", it / 10.0) }
+    Box(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp).clip(shape).background(Color(0xFF0F0F14))
+            .border(1.dp, Color.White.copy(alpha = 0.1f), shape).clickable(onClick = onDetails),
+    ) {
+        AsyncImage(
+            model = m.bannerImage ?: m.posterUrl, contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.35f },
+        )
+        Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.9f), Color.Black.copy(alpha = 0.4f), Color.Transparent), endX = 700f)))
+        Row(Modifier.fillMaxSize().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Row(Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.1f)).padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text((m.format ?: "TV").uppercase(), style = inter(9f, FontWeight.Black), color = Color.White)
+                        if (score != null) {
+                            Box(Modifier.size(2.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.4f)))
+                            Icon(AniIcons.Star, null, tint = Color(0xFFFFC107), modifier = Modifier.size(10.dp))
+                            Text(score, style = inter(9f, FontWeight.Bold), color = Color.White)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Text(m.displayTitle, style = inter(19f, FontWeight.ExtraBold, lineHeight = 24f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(6.dp))
+                    Text(m.genres.orEmpty().take(2).joinToString(" • "), style = inter(11f), color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Row(
+                    Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White).clickable(onClick = onWatch).padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(AniIcons.Play, null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                    Text("Watch Now", style = inter(12f, FontWeight.Black), color = Color.Black)
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            AsyncImage(
+                model = m.posterUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                modifier = Modifier.width(115.dp).fillMaxHeight().clip(RoundedCornerShape(14.dp)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+            )
         }
     }
 }

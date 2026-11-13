@@ -103,15 +103,15 @@ fun AdminScreen(onBack: () -> Unit) {
 
 @Composable private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp),
-    ) { Text(text, style = inter(14f, FontWeight.SemiBold), color = if (on) Color.White else Color.White) }
+        Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp),
+    ) { Text(text, style = inter(14f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
 }
 
 @Composable private fun Btn(text: String, primary: Boolean = false, danger: Boolean = false, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(50)).background(if (primary) Ani.Lavender else Ani.ButtonDark).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp),
+        Modifier.clip(RoundedCornerShape(50)).background(if (primary) Color.White else Ani.ButtonDark).clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, style = inter(13.5f, FontWeight.SemiBold), color = if (primary) Color.White else if (danger) Color(0xFFFF8A80) else Color.White) }
+    ) { Text(text, style = inter(13.5f, FontWeight.SemiBold), color = if (primary) Color.Black else if (danger) Color(0xFFFF8A80) else Color.White) }
 }
 
 @Composable private fun Card(content: @Composable () -> Unit) {

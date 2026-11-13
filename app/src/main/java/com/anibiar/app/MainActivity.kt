@@ -142,6 +142,7 @@ private fun AppNavigation() {
     ) { mutableStateListOf() }
 
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var scheduleOpen by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     var adminOpen by rememberSaveable { mutableStateOf(false) }
@@ -175,6 +176,7 @@ private fun AppNavigation() {
     BackHandler(enabled = profileOpen) { profileOpen = false }
     BackHandler(enabled = inboxOpen) { inboxOpen = false }
     BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = scheduleOpen) { scheduleOpen = false }
     BackHandler(enabled = userStack.isNotEmpty()) { userStack.removeAt(userStack.lastIndex) }
     BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
     var update by androidx.compose.runtime.remember { mutableStateOf<com.anibiar.app.update.UpdateInfo?>(null) }
@@ -250,7 +252,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; scheduleOpen = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
 
         androidx.compose.animation.AnimatedVisibility(
             visible = searchOpen,
@@ -265,6 +267,16 @@ private fun AppNavigation() {
                     onModeChange = { searchMode = it },
                     onOpenUser = { userStack.add(it) },
                 )
+            }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = scheduleOpen,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(300)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(200)),
+        ) {
+            Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
+                com.anibiar.app.ui.home.ScheduleScreen(onOpen = { id -> stack.add(id) })
             }
         }
 
@@ -449,14 +461,16 @@ private fun AppNavigation() {
                     settingsOpen -> com.anibiar.app.ui.nav.NavTab.Settings
                     inboxTab -> com.anibiar.app.ui.nav.NavTab.Inbox
                     searchOpen -> com.anibiar.app.ui.nav.NavTab.Search
+                    scheduleOpen -> com.anibiar.app.ui.nav.NavTab.Schedule
                     else -> com.anibiar.app.ui.nav.NavTab.Home
                 },
                 onSelect = { tab ->
                     inboxOpen = false; chatUid = null; userStack.clear()
-                    searchOpen = false; profileOpen = false; settingsOpen = false; inboxTab = false
+                    searchOpen = false; scheduleOpen = false; profileOpen = false; settingsOpen = false; inboxTab = false
                     when (tab) {
                         com.anibiar.app.ui.nav.NavTab.Home -> {}
                         com.anibiar.app.ui.nav.NavTab.Search -> searchOpen = true
+                        com.anibiar.app.ui.nav.NavTab.Schedule -> scheduleOpen = true
                         com.anibiar.app.ui.nav.NavTab.Inbox -> if (authState != null) inboxTab = true else profileOpen = true
                         com.anibiar.app.ui.nav.NavTab.Profile -> profileOpen = true
                         com.anibiar.app.ui.nav.NavTab.Settings -> settingsOpen = true

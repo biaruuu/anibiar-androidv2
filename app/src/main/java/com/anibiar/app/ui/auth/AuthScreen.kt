@@ -172,11 +172,11 @@ private fun EmailStep(email: String, onEmail: (String) -> Unit, onClose: () -> U
                 val shape = RoundedCornerShape(50)
                 Box(
                     Modifier.fillMaxWidth().height(44.dp).clip(shape)
-                        .background(if (ok) Ani.Lavender else Ani.ButtonDark)
+                        .background(if (ok) Color.White else Ani.ButtonDark)
                         .clickable(enabled = ok && !busy, onClick = ::submit),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (busy) "Sending…" else if (wait > 0) "Try again in ${wait}s" else "Continue", style = inter(14f, FontWeight.Medium), color = if (ok) Color.White else Ani.Muted, maxLines = 1)
+                    Text(if (busy) "Sending…" else if (wait > 0) "Try again in ${wait}s" else "Continue", style = inter(14f, FontWeight.Medium), color = if (ok) Color.Black else Ani.Muted, maxLines = 1)
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -268,7 +268,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Box(
-                    Modifier.fillMaxWidth().height(44.dp).clip(pill).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable {
+                    Modifier.fillMaxWidth().height(44.dp).clip(pill).background(Color.White).clickable {
                         try {
                             context.startActivity(
                                 Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -278,7 +278,7 @@ private fun SentStep(email: String, onBack: () -> Unit) {
                         }
                     },
                     contentAlignment = Alignment.Center,
-                ) { Text("Open Email", style = inter(14f, FontWeight.Medium), color = Color.White, maxLines = 1) }
+                ) { Text("Open Email", style = inter(14f, FontWeight.Medium), color = Color.Black, maxLines = 1) }
                 Spacer(Modifier.height(18.dp))
             }
         }

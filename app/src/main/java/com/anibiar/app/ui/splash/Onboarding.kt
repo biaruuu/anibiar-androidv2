@@ -65,8 +65,8 @@ fun Onboarding(onDone: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Appearance.textSizes.forEach { (name, v) ->
                     val on = Appearance.textScale == v
-                    Box(Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { tick(); Appearance.setTextScale(context, v) }.padding(horizontal = 16.dp, vertical = 9.dp)) {
-                        Text(name, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.White else Color.White)
+                    Box(Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); Appearance.setTextScale(context, v) }.padding(horizontal = 16.dp, vertical = 9.dp)) {
+                        Text(name, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White)
                     }
                 }
             }

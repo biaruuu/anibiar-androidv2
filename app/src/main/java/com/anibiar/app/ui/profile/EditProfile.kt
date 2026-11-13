@@ -353,8 +353,8 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
             Spacer(Modifier.height(20.dp))
         }
         Text(
-            "Save", style = inter(15f, FontWeight.Bold), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable { onSave(deco, fx, theme) }.padding(vertical = 13.dp),
+            "Save", style = inter(15f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { onSave(deco, fx, theme) }.padding(vertical = 13.dp),
         )
     }
 }
@@ -412,8 +412,8 @@ private fun HighlightsPage(onBack: () -> Unit) {
             }
         }
         if (list == null) Text("Loading…", style = inter(13.5f), color = Ani.Muted, modifier = Modifier.padding(20.dp))
-        Text("New highlight", style = inter(14.5f, FontWeight.Bold), color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            modifier = Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable { creating = true }.padding(vertical = 13.dp))
+        Text("New highlight", style = inter(14.5f, FontWeight.Bold), color = Color.Black, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(16.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(Color.White).clickable { creating = true }.padding(vertical = 13.dp))
     }
 }
 

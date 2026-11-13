@@ -115,9 +115,9 @@ fun SettingsScreen(onAdmin: () -> Unit = {}, onLogin: () -> Unit, onOpenInbox: (
                     Text("Log in to manage your account, profile link and privacy.", style = inter(14f, lineHeight = 20f), color = Ani.Muted, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(16.dp))
                     Box(
-                        Modifier.widthIn(min = 160.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(com.anibiar.app.ui.theme.Ani.Lavender).clickable(onClick = onLogin),
+                        Modifier.widthIn(min = 160.dp).height(40.dp).clip(RoundedCornerShape(14.dp)).background(Color.White).clickable(onClick = onLogin),
                         contentAlignment = Alignment.Center,
-                    ) { Text("Log in", style = inter(14f, FontWeight.Medium), color = Color.White) }
+                    ) { Text("Log in", style = inter(14f, FontWeight.Medium), color = Color.Black) }
                 }
             }
             Section("Appearance") { AppearanceRows(context) }
@@ -389,8 +389,8 @@ private fun AppearanceRows(context: Context) {
             com.anibiar.app.ui.theme.Appearance.textSizes.forEach { (name, v) ->
                 val on = com.anibiar.app.ui.theme.Appearance.textScale == v
                 Box(
-                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setTextScale(context, v) }.padding(horizontal = 16.dp, vertical = 8.dp),
-                ) { Text(name, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.White else Color.White) }
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setTextScale(context, v) }.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) { Text(name, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
             }
         }
     }
@@ -402,8 +402,8 @@ private fun AppearanceRows(context: Context) {
             com.anibiar.app.ui.theme.Appearance.cardStyles.forEachIndexed { i, name ->
                 val on = com.anibiar.app.ui.theme.Appearance.cardStyle == i
                 Box(
-                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setCardStyle(context, i) }.padding(horizontal = 14.dp, vertical = 8.dp),
-                ) { Text(name, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.White else Color.White) }
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setCardStyle(context, i) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Text(name, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
             }
         }
     }

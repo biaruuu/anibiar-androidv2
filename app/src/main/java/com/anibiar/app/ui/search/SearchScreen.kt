@@ -269,8 +269,8 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                             listOf(false to "Grid", true to "List").forEach { (isList, label) ->
                                 val on = com.anibiar.app.ui.theme.Appearance.listView == isList
-                                Text(label, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.White else Color.White,
-                                    modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, isList) }.padding(horizontal = 14.dp, vertical = 7.dp))
+                                Text(label, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
+                                    modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, isList) }.padding(horizontal = 14.dp, vertical = 7.dp))
                             }
                         }
                     }

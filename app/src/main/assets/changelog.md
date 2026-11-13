@@ -586,3 +586,6 @@ Badge system removed. Level and XP stay: tap the level on your avatar to open yo
 
 ## 132 | Blue buttons, live levels | 2026-11-13
 Reverted the flat/Figma refresh (hero and scrolling are back to how they were). Main buttons and selected chips use your accent color again instead of white. Tap the level chip on anyone profile to see their level and XP progress, updating live.
+
+## 134 | CornCastle-style UI | 2026-11-13
+New look inspired by CornCastle: pure black background, white main buttons, a flat bottom bar with small icons and a new Schedule tab (next 7 days, pick a day), and a compact swipeable hero card with Watch Now and tick dots.
