@@ -577,3 +577,6 @@
 - Highlight viewer loads covers again, white View details button
 - Highlights privacy moved to Settings → Privacy
 - Animated badges when you unlock them all, developer has every badge
+
+## 130 | Realistic badges | 2026-11-13
+Badges now use layered, glossy art designed in Figma (rim, bevel, gloss, soft shadow), like Discord. Locked ones are dimmed; the complete set keeps its glow and shine.

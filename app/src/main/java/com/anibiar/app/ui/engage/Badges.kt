@@ -40,6 +40,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -142,6 +146,35 @@ fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolea
     val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "badge")
     val sweep by t.animateFloat(-0.4f, 1.4f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2200, easing = androidx.compose.animation.core.LinearEasing)), label = "sweep")
     val glow by t.animateFloat(0.25f, 0.75f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse), label = "glow")
+    val ctx = LocalContext.current
+    val res = remember(id) { ctx.resources.getIdentifier("badge_$id", "drawable", ctx.packageName) }
+    if (res == 0) { BadgeArtVector(id, size, modifier, locked, special); return }
+    val gray = remember { androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0f) }) }
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        if (special) Canvas(Modifier.fillMaxSize().scale(1.25f)) {
+            drawCircle(Brush.radialGradient(listOf(d.c1.copy(alpha = glow * 0.8f), Color.Transparent), center, this.size.minDimension * 0.5f), this.size.minDimension * 0.5f, center)
+        }
+        androidx.compose.foundation.Image(
+            painterResource(res), null,
+            modifier = Modifier.fillMaxSize()
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen; alpha = if (locked) 0.38f else 1f }
+                .drawWithContent {
+                    drawContent()
+                    if (special) {
+                        val w = this.size.minDimension; val x = sweep * w
+                        drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.65f), Color.Transparent), Offset(x - w * 0.25f, 0f), Offset(x + w * 0.05f, w * 0.5f)), blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop)
+                    }
+                },
+            colorFilter = if (locked) gray else null)
+    }
+}
+
+@Composable
+private fun BadgeArtVector(id: String, size: Dp, modifier: Modifier, locked: Boolean, special: Boolean) {
+    val d = BADGES[id] ?: return
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "badgeV")
+    val sweep by t.animateFloat(-0.4f, 1.4f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(2200, easing = androidx.compose.animation.core.LinearEasing)), label = "sweepV")
+    val glow by t.animateFloat(0.25f, 0.75f, androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse), label = "glowV")
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = this.size.minDimension
@@ -164,6 +197,7 @@ fun BadgeArt(id: String, size: Dp, modifier: Modifier = Modifier, locked: Boolea
         Icon(d.glyph, null, tint = Color.White.copy(alpha = if (locked) 0.32f else 1f), modifier = Modifier.size(size * 0.44f))
     }
 }
+
 
 /** Dark pill with the person's badges, shown next to the username like Discord. */
 @Composable
