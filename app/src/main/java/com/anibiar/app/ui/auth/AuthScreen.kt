@@ -103,13 +103,7 @@ fun AuthScreen(onClose: () -> Unit, onGuest: (() -> Unit)? = null) {
     var email by rememberSaveable { mutableStateOf("") }
 
     Box(
-        Modifier.fillMaxSize().background(Ani.Onyx).background(
-            Brush.radialGradient(
-                listOf(Color(0x33B9A1DF), Color.Transparent),
-                center = androidx.compose.ui.geometry.Offset(540f, 500f),
-                radius = 1100f,
-            ),
-        ),
+        Modifier.fillMaxSize().background(Ani.Onyx),
     ) {
         AnimatedContent(
             targetState = sentTo,

@@ -139,7 +139,9 @@ fun Highlights(
                     EngageOverlay.highlight.value = HlRequest(h, owner?.shownName.orEmpty(), owner?.avatarUrl, owner?.avatarDeco, onOpen)
                 }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(Modifier.size(72.dp).border(2.dp, Ani.Lavender, CircleShape).padding(4.dp).clip(CircleShape).background(Ani.Item)) {
-                        PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 360)
+                        val tplRes = com.anibiar.app.ui.theme.coverRes(h.tpl)
+                        if (tplRes != null) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(tplRes), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                        else PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 360)
                     }
                     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (h.visibility != "everyone") { androidx.compose.material3.Icon(EngageIcons.Lock, null, tint = Ani.Muted, modifier = Modifier.size(11.dp)); Spacer(Modifier.width(3.dp)) }
@@ -172,7 +174,7 @@ private fun HighlightPrivacyDialog(items: List<com.anibiar.app.social.Highlight>
                         Text(label, style = inter(12.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
                             modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable {
                                 vis[h.id] = id
-                                scope.launch { runCatching { app.social.saveHighlight(h.id, h.title, id, h.items) } }
+                                scope.launch { runCatching { app.social.saveHighlight(h.id, h.title, id, h.items, h.tpl) } }
                             }.padding(horizontal = 14.dp, vertical = 7.dp))
                     }
                 }

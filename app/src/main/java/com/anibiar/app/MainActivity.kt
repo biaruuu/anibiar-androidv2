@@ -97,6 +97,8 @@ class MainActivity : ComponentActivity() {
                     hlReq?.let { r -> com.anibiar.app.ui.engage.HighlightViewer(r) { com.anibiar.app.ui.engage.EngageOverlay.highlight.value = null } }
                     val badgesReq by com.anibiar.app.ui.engage.EngageOverlay.badges.collectAsStateWithLifecycle()
                     badgesReq?.let { r -> com.anibiar.app.ui.engage.LevelScreen(r) { com.anibiar.app.ui.engage.EngageOverlay.badges.value = null } }
+                    val lvlUp by com.anibiar.app.ui.engage.EngageOverlay.levelUp.collectAsStateWithLifecycle()
+                    lvlUp?.let { r -> com.anibiar.app.ui.engage.LevelUpScreen(r) { com.anibiar.app.ui.engage.EngageOverlay.levelUp.value = null } }
                     if (splash) com.anibiar.app.ui.splash.SplashScreen(onFinished = { splash = false })
                 }
             }

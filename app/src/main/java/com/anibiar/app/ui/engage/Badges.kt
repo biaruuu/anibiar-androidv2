@@ -82,6 +82,7 @@ class BadgesRequest(val isMe: Boolean, val name: String)
 object EngageOverlay {
     val highlight = MutableStateFlow<HlRequest?>(null)
     val badges = MutableStateFlow<BadgesRequest?>(null)
+    val levelUp = MutableStateFlow<LevelUpRequest?>(null)
 }
 
 /** Level page: your level, XP progress, what unlocks next, and the weekly recap. */
@@ -158,7 +159,7 @@ fun HighlightViewer(req: HlRequest, onClose: () -> Unit) {
         )
     }) {
         PosterImage(cover, null, Modifier.fillMaxSize().blur(36.dp).alpha(0.6f), maxSide = 300)
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xCC000000), Color(0x33000000), Color(0x99000000), Color(0xF0000000)))))
+        Box(Modifier.fillMaxSize().background(Color(0xB3000000)))
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 h.items.forEachIndexed { n, _ ->

@@ -42,8 +42,10 @@ object ShareCard {
         val c = Canvas(bmp)
         val accent = Looks.theme(p.profileTheme)?.color?.toArgb() ?: 0xFF3D7BFF.toInt()
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), intArrayOf(accent, 0xFF151517.toInt(), 0xFF0B0B0D.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        paint.color = 0xFF111113.toInt()
         c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+        paint.color = accent
+        c.drawRect(0f, 0f, w.toFloat(), h * 0.12f, paint)
         paint.shader = null
 
         // Avatar (round)

@@ -35,7 +35,7 @@ object LevelWatcher {
     private suspend fun announce(ctx: Context, level: Int) {
         val unlock = Looks.unlockedAt(level)
         val text = if (unlock.isNotEmpty()) "Unlocked: ${unlock.joinToString(", ")}" else "Keep watching to reach the next one."
-        withContext(Dispatchers.Main) { Toast.makeText(ctx, "Level $level reached!", Toast.LENGTH_LONG).show() }
+        withContext(Dispatchers.Main) { com.anibiar.app.ui.engage.EngageOverlay.levelUp.value = com.anibiar.app.ui.engage.LevelUpRequest(level, text) }
         if (Build.VERSION.SDK_INT >= 33 && ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel("levels", "Level ups", NotificationManager.IMPORTANCE_DEFAULT))

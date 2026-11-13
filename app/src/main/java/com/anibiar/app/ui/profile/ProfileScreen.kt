@@ -166,7 +166,7 @@ fun ProfileScreen(
                     Banner(profile?.bannerUrl, Modifier.fillMaxSize())
                     ThemeTint(profile?.profileTheme, Modifier.fillMaxSize())
                     EffectLayer(profile?.profileEffect, Modifier.fillMaxSize())
-                    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, Color(0x99000000), Ani.Onyx))))
+                    Box(Modifier.fillMaxSize().background(Color(0x73000000)))
                     Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 20.dp, end = 18.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f).padding(end = 10.dp)) {
                             Text(profile?.shownName ?: "Loading…", style = inter(22f, FontWeight.ExtraBold, lineHeight = 26f).copy(shadow = androidx.compose.ui.graphics.Shadow(Color(0x99000000), androidx.compose.ui.geometry.Offset(0f, 2f), 6f)), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -289,8 +289,8 @@ fun ProfileScreen(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(18.dp)).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Ani.Border, RoundedCornerShape(18.dp)).padding(28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Icon(AniIcons.Bookmark, null, tint = Ani.Muted, modifier = Modifier.size(28.dp))
-                    Spacer(Modifier.height(10.dp))
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.anibiar.app.ui.theme.Art.Favorites), null, Modifier.size(width = 180.dp, height = 135.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(if (isMe) "No favorites yet" else "Nothing here yet", style = inter(15f, FontWeight.SemiBold), color = Color.White)
                     if (isMe) Text("Tap the bookmark on any anime to save it here.", style = inter(13f, lineHeight = 18f), color = Ani.Muted, modifier = Modifier.padding(top = 4.dp))
                 }
@@ -299,7 +299,7 @@ fun ProfileScreen(
                     row.forEach { f ->
                         Box(Modifier.weight(1f).aspectRatio(3f / 4f).background(Ani.Item).clickable { onOpenAnime(f.animeId) }) {
                             if (f.cover != null) AsyncImage(f.cover, f.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))) {
+                            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0x99000000))) {
                                 Text(f.title, style = inter(11.5f, FontWeight.SemiBold, lineHeight = 14f), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 7.dp, end = 7.dp, top = 18.dp, bottom = 7.dp))
                             }
                         }
@@ -414,7 +414,7 @@ private suspend fun toggle(social: com.anibiar.app.social.SocialRepository, uid:
 @Composable
 private fun Banner(url: String?, modifier: Modifier) {
     if (url == null) {
-        Box(modifier.background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF15151A), Color(0xFF1F2A2E)))))
+        androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.anibiar.app.R.drawable.art_banner_default), null, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop)
     } else {
         BannerMedia(url, modifier)
     }
@@ -475,7 +475,7 @@ private fun Stat(label: String, count: Int, onClick: () -> Unit) {
 @Composable
 private fun ProfileButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Brush.linearGradient(listOf(Color.White, Color.White)) else com.anibiar.app.ui.theme.GlassFill).border(1.dp, if (primary) Color.White else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier.height(40.dp).clip(RoundedCornerShape(50)).background(if (primary) Color.White else Color(0xFF1C1C1E)).border(1.dp, if (primary) Color.White else Color(0x40FFFFFF), RoundedCornerShape(50)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(label, style = inter(13.5f, FontWeight.Medium), color = if (primary) Color.Black else Color.White, maxLines = 1) }
 }
@@ -610,7 +610,7 @@ internal fun UserCard(
     ) {
         // Banner shows through softly behind the content, fading into the card.
         if (user.bannerUrl != null) BannerMedia(user.bannerUrl, Modifier.matchParentSize(), alpha = 0.5f)
-        Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+        Box(Modifier.matchParentSize().background(Color(0xD9151517)))
         ThemeTint(user.profileTheme, Modifier.matchParentSize())
         EffectLayer(user.profileEffect, Modifier.matchParentSize())
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {

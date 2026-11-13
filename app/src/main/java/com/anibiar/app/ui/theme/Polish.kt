@@ -113,14 +113,10 @@ fun rememberTick(): () -> Unit {
 /** A soft light sweep over a placeholder shape while content loads. */
 fun Modifier.shimmer(): Modifier = composed {
     val t = rememberInfiniteTransition(label = "shimmer")
-    val x by t.animateFloat(-1f, 2f, infiniteRepeatable(tween(1300, easing = LinearEasing), RepeatMode.Restart), label = "x")
+    val a by t.animateFloat(0.02f, 0.09f, infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "a")
     drawWithContent {
         drawContent()
-        val w = size.width.coerceAtLeast(1f)
-        val start = x * w
-        drawRect(
-            Brush.linearGradient(listOf(Color.Transparent, Color(0x1FFFFFFF), Color.Transparent), Offset(start, 0f), Offset(start + w * 0.6f, size.height * 0.3f)),
-        )
+        drawRect(Color.White.copy(alpha = a))
     }
 }
 
@@ -257,4 +253,4 @@ fun Modifier.staggerIn(index: Int, enabled: Boolean = true): Modifier = composed
 fun Modifier.liquidGlass(shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(22.dp)): Modifier = this
     .clip(shape)
     .background(Color(0xB3141416))
-    .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), shape)
+    .border(1.dp, Color(0x1FFFFFFF), shape)

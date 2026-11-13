@@ -193,7 +193,7 @@ internal fun EditProfileScreen(profile: UserProfile?, onBack: () -> Unit) {
                         trailing = {
                             Box(Modifier.width(72.dp).height(34.dp).clip(RoundedCornerShape(8.dp)).background(com.anibiar.app.ui.theme.GlassFill)) {
                                 if (profile?.bannerUrl != null) BannerMedia(profile.bannerUrl, Modifier.fillMaxSize())
-                                else Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF2A2140), Color(0xFF1F2A2E)))))
+                                else androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.anibiar.app.R.drawable.art_banner_default), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                             }
                         },
                     )
@@ -322,7 +322,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
             val shape = RoundedCornerShape(18.dp)
             Box(Modifier.fillMaxWidth().clip(shape).background(com.anibiar.app.ui.theme.GlassFill).border(1.dp, Color(0x26FFFFFF), shape)) {
                 if (profile?.bannerUrl != null) BannerMedia(profile.bannerUrl, Modifier.matchParentSize(), alpha = 0.5f)
-                Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color(0x66151517), Color(0xE6151517), Color(0xFF151517)))))
+                Box(Modifier.matchParentSize().background(Color(0xD9151517)))
                 ThemeTint(theme, Modifier.matchParentSize())
                 EffectLayer(fx, Modifier.matchParentSize())
                 Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -403,7 +403,10 @@ private fun HighlightsPage(onBack: () -> Unit) {
         Text("Group anime into collections that show on your profile as round covers. Each one has its own audience.", style = inter(13f), color = Ani.Muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
         list?.forEach { h ->
             Row(Modifier.padding(horizontal = 16.dp, vertical = 5.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Ani.Panel).clickable { editing = h }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(52.dp).border(2.dp, Ani.Lavender, CircleShape).padding(3.dp).clip(CircleShape).background(Ani.Item)) { com.anibiar.app.ui.home.PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 200) }
+                Box(Modifier.size(52.dp).border(2.dp, Ani.Lavender, CircleShape).padding(3.dp).clip(CircleShape).background(Ani.Item)) {
+                    val tr = com.anibiar.app.ui.theme.coverRes(h.tpl)
+                    if (tr != null) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(tr), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) else com.anibiar.app.ui.home.PosterImage(h.items.firstOrNull()?.cover, h.title, Modifier.fillMaxSize(), maxSide = 200)
+                }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(h.title, style = inter(15f, FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -426,6 +429,7 @@ private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack:
     val favs by remember(uid) { if (uid != null) social.favorites(uid) else kotlinx.coroutines.flow.flowOf(emptyList()) }.collectAsState(initial = emptyList())
     var title by remember { mutableStateOf(existing?.title.orEmpty()) }
     var vis by remember { mutableStateOf(existing?.visibility ?: "everyone") }
+    var tpl by remember { mutableStateOf(existing?.tpl) }
     val chosen = remember { androidx.compose.runtime.mutableStateListOf<com.anibiar.app.social.Fav>().apply { addAll(existing?.items.orEmpty()) } }
     var busy by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
@@ -454,7 +458,7 @@ private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack:
                 if (title.isBlank()) { toast("Give it a title"); return@clickable }
                 if (chosen.isEmpty()) { toast("Add at least one anime"); return@clickable }
                 busy = true
-                scope.launch { try { social.saveHighlight(existing?.id, title, vis, chosen.toList()); onDone() } catch (x: Exception) { toast(x.message ?: "Couldn't save"); busy = false } }
+                scope.launch { try { social.saveHighlight(existing?.id, title, vis, chosen.toList(), tpl); onDone() } catch (x: Exception) { toast(x.message ?: "Couldn't save"); busy = false } }
             }.padding(horizontal = 18.dp, vertical = 10.dp))
         }
         Text("Title", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 6.dp))
@@ -467,6 +471,17 @@ private fun HighlightEditor(existing: com.anibiar.app.social.Highlight?, onBack:
                 val on = vis == id
                 Text(label, style = inter(13.5f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
                     modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) Ani.Lavender else Ani.ButtonDark).clickable { vis = id }.padding(horizontal = 16.dp, vertical = 9.dp))
+            }
+        }
+        Text("Cover", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+        androidx.compose.foundation.lazy.LazyRow(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(listOf<String?>(null) + com.anibiar.app.ui.theme.COVER_TEMPLATES) { t ->
+                val on = tpl == t
+                Box(Modifier.size(56.dp).border(2.dp, if (on) Ani.Lavender else Color.Transparent, CircleShape).padding(3.dp).clip(CircleShape).background(Ani.Item).clickable { tpl = t }, contentAlignment = Alignment.Center) {
+                    val r = com.anibiar.app.ui.theme.coverRes(t)
+                    if (r != null) androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(r), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                    else Text("Poster", style = inter(10f, FontWeight.SemiBold), color = Ani.Soft)
+                }
             }
         }
         Text("Anime in this highlight (${chosen.size})", style = inter(13f, FontWeight.SemiBold), color = Ani.Soft, modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))

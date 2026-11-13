@@ -31,9 +31,9 @@ fun GlassButton(onClick: () -> Unit, size: Dp = 36.dp, selected: Boolean = false
     val hi = if (selected) 0.30f else 0.14f
     Box(
         Modifier.size(size).clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E))))
+            .background(Color(0x6B1C1C1E))
             .then(if (selected) Modifier.background(Color(0x40FFFFFF)) else Modifier)
-            .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), CircleShape)
+            .border(1.dp, Color(0x1FFFFFFF), CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center, content = content,
     )
@@ -45,7 +45,7 @@ object NavState {
 }
 
 /** The shared glass card fill used by the Inbox, Profile and Settings surfaces. */
-val GlassFill: Brush = Brush.linearGradient(listOf(Color(0xFF1C1C1E), Color(0xFF1C1C1E)))
+val GlassFill: Brush = androidx.compose.ui.graphics.SolidColor(Color(0xFF1C1C1E))
 
 @Composable
 fun GlassMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
@@ -53,7 +53,7 @@ fun GlassMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable and
         expanded = expanded, onDismissRequest = onDismiss,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp), containerColor = Color(0xF20C0C0F),
         tonalElevation = 0.dp, shadowElevation = 18.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF)))),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1FFFFFFF)),
         content = content,
     )
 }
@@ -70,7 +70,7 @@ fun GlassMenuItem(label: String, icon: androidx.compose.ui.graphics.vector.Image
         Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f * glow), Color.White.copy(alpha = 0.07f * glow))))
+            .background(Color.White.copy(alpha = 0.15f * glow))
             .border(1.dp, Color.White.copy(alpha = 0.30f * glow), shape)
             .clickable(interactionSource = src, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 11.dp)
@@ -100,8 +100,8 @@ fun GlassPill(modifier: Modifier = Modifier, content: @Composable androidx.compo
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(50)
     androidx.compose.foundation.layout.Row(
         modifier.height(36.dp).clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E))))
-            .border(1.dp, Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF))), shape)
+            .background(Color(0x6B1C1C1E))
+            .border(1.dp, Color(0x1FFFFFFF), shape)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically, content = content,
     )
@@ -113,8 +113,8 @@ fun PillIcon(onClick: () -> Unit, content: @Composable BoxScope.() -> Unit) {
     Box(Modifier.size(width = 40.dp, height = 36.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center, content = content)
 }
 
-val GlassBtnBrush: Brush = Brush.linearGradient(listOf(Color(0x6B1C1C1E), Color(0x6B1C1C1E)))
-val GlassRimBrush: Brush = Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF)))
+val GlassBtnBrush: Brush = androidx.compose.ui.graphics.SolidColor(Color(0x6B1C1C1E))
+val GlassRimBrush: Brush = androidx.compose.ui.graphics.SolidColor(Color(0x1FFFFFFF))
 
 /** iMessage glass: clip, translucent sheen fill and a bright rim. Use on any button, pill or chip. */
 fun Modifier.glass(shape: androidx.compose.ui.graphics.Shape): Modifier =

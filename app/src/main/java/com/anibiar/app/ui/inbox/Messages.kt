@@ -314,8 +314,8 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit, on
     }
 
     val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
-    val glass = Brush.linearGradient(listOf(Color(0xB0404048), Color(0xB0202024), Color(0xB0303036)))
-    val rim = Brush.linearGradient(listOf(Color(0x1FFFFFFF), Color(0x1FFFFFFF)))
+    val glass = androidx.compose.ui.graphics.SolidColor(Color(0xB0303036))
+    val rim = androidx.compose.ui.graphics.SolidColor(Color(0x1FFFFFFF))
     viewer?.let { url ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { viewer = null }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             Box(Modifier.fillMaxSize().background(Color(0xF2000000)).clickable { viewer = null }, contentAlignment = Alignment.Center) {
@@ -457,7 +457,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit, on
                                         .combinedClickable(onClick = { viewer = m.mediaUrl }, onLongClick = longPress),
                                 ) else Column(
                                     Modifier.widthIn(max = 276.dp).clip(shape)
-                                        .background(if (m.mine) Brush.linearGradient(listOf(Color(0xFF3D7BFF), Color(0xFF2B58F0))) else Brush.linearGradient(listOf(Color(0xFF2A2A2E), Color(0xFF2A2A2E))))
+                                        .background(if (m.mine) Color(0xFF2F68F5) else Color(0xFF2A2A2E))
                                         .combinedClickable(onClick = {}, onLongClick = longPress)
                                         .padding(start = if (m.mine) 12.dp else if (lastInGroup) 18.dp else 12.dp, end = if (m.mine) (if (lastInGroup) 18.dp else 12.dp) else 12.dp, top = 7.dp, bottom = 7.dp),
                                 ) {
@@ -562,7 +562,7 @@ fun ChatScreen(uid: String, onBack: () -> Unit, onOpenUser: (String) -> Unit, on
                 }
                 val ready = text.isNotBlank() && !sending
                 if (ready) Box(
-                    Modifier.size(30.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Color(0xFF3D7BFF), Color(0xFF2B58F0)))).clickable { send() },
+                    Modifier.size(30.dp).clip(CircleShape).background(Color(0xFF2F68F5)).clickable { send() },
                     contentAlignment = Alignment.Center,
                 ) { Icon(AniIcons.ArrowBack, "Send", tint = Color.White, modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f }) }
                 else Box(
