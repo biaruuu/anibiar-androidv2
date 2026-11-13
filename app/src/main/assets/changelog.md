@@ -589,3 +589,6 @@ Reverted the flat/Figma refresh (hero and scrolling are back to how they were). 
 
 ## 134 | CornCastle-style UI | 2026-11-13
 New look inspired by CornCastle: pure black background, white main buttons, a flat bottom bar with small icons and a new Schedule tab (next 7 days, pick a day), and a compact swipeable hero card with Watch Now and tick dots.
+
+## 135 | Hero buttons, layouts, search and schedule | 2026-11-14
+Hero cards now have Details and Add-to-favorites buttons. Home can show sections as swipeable rows or a grid (Settings > Home layout), and Search results as a list or grid. Search and Schedule were redesigned in the CornCastle style with Feather icons.

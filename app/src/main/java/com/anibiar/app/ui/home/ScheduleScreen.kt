@@ -1,6 +1,11 @@
 package com.anibiar.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,38 +73,69 @@ fun ScheduleScreen(onOpen: (Int) -> Unit) {
         val from = days[day]; val to = from + 86_400_000L
         all.orEmpty().filter { it.airingAt * 1000 in from until to }.sortedBy { it.airingAt }
     }
-    Column(Modifier.fillMaxSize().background(Ani.Onyx).statusBarsPadding()) {
-        Text("Schedule", style = inter(26f, FontWeight.ExtraBold), color = Color.White, modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 12.dp))
-        LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(days.size) { i ->
-                val on = i == day
-                Column(
-                    Modifier.clip(RoundedCornerShape(14.dp)).background(if (on) Color.White else Ani.Panel).clickable { day = i }.padding(horizontal = 16.dp, vertical = 9.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(if (i == 0) "Today" else dayFmt.format(Date(days[i])), style = inter(11.5f, FontWeight.SemiBold), color = if (on) Color.Black else Ani.Muted)
-                    Text(numFmt.format(Date(days[i])), style = inter(17f, FontWeight.Bold), color = if (on) Color.Black else Color.White)
+    val glass = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.White.copy(alpha = 0.02f)))
+    Box(Modifier.fillMaxSize().background(Ani.Onyx)) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 112.dp, bottom = 96.dp),
+        ) {
+            when {
+                all == null && !failed -> items(4) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.03f)).border(1.dp, glass, RoundedCornerShape(16.dp)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.width(48.dp).height(68.dp).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.05f)))
+                        Spacer(Modifier.width(12.dp))
+                        Column { Box(Modifier.width(140.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.08f))); Spacer(Modifier.height(8.dp)); Box(Modifier.width(90.dp).height(12.dp).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.04f))) }
+                    }
+                }
+                all == null -> item { ErrorState("Couldn't load the schedule.", { reload++ }, Modifier.fillMaxWidth().padding(top = 80.dp)) }
+                rows.isEmpty() -> item {
+                    Column(Modifier.fillMaxWidth().padding(top = 120.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("No schedule on this date", style = inter(14f, FontWeight.Medium), color = Color.Gray)
+                        Text(SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(days[day])), style = inter(12f), color = Color.DarkGray, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                else -> items(rows, key = { "${it.media.id}-${it.episode}" }) { e ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp).clip(RoundedCornerShape(16.dp)).clickable { onOpen(e.media.id) }
+                            .background(Color.White.copy(alpha = 0.03f)).border(1.dp, glass, RoundedCornerShape(16.dp)).padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        PosterImage(e.media.posterUrl, e.media.displayTitle, Modifier.width(48.dp).height(68.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.05f)), maxSide = 240)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(e.media.displayTitle, style = inter(15f, FontWeight.Bold, lineHeight = 19f), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Spacer(Modifier.width(8.dp))
+                                Text(timeFmt.format(Date(e.airingAt * 1000)), style = inter(10f, FontWeight.Bold), color = Color.White,
+                                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.08f)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(Modifier.clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.06f)).border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(5.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("EPISODE ${e.episode}", style = inter(10f, FontWeight.Bold), color = Color.White.copy(alpha = 0.9f))
+                                }
+                                Text(e.media.format?.replace('_', ' ') ?: "TV", style = inter(10f, FontWeight.SemiBold), color = Color.White.copy(alpha = 0.5f),
+                                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.04f)).border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        when {
-            all == null && !failed -> Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { repeat(6) { SkeletonBox(Modifier.fillMaxWidth().height(84.dp), 14) } }
-            all == null -> ErrorState("Couldn't load the schedule.", { reload++ }, Modifier.fillMaxWidth())
-            rows.isEmpty() -> Text("Nothing airs on this day.", style = inter(14f), color = Ani.Muted, modifier = Modifier.padding(20.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 90.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(rows, key = { "${it.media.id}-${it.episode}" }) { e ->
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Ani.Panel).clickable { onOpen(e.media.id) }.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        PosterImage(e.media.posterUrl, e.media.displayTitle, Modifier.width(52.dp).height(72.dp).clip(RoundedCornerShape(10.dp)).background(Ani.Item), maxSide = 240)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(e.media.displayTitle, style = inter(14.5f, FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text("Episode ${e.episode}", style = inter(12f), color = Ani.Muted, modifier = Modifier.padding(top = 3.dp))
+        // Header floats over the list: dark translucent bar with the title and a glass pill of five days.
+        Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.82f)).statusBarsPadding().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp)) {
+            Text("Airing Schedule", style = inter(22f, FontWeight.Bold), color = Color.White, modifier = Modifier.padding(start = 4.dp, bottom = 8.dp))
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.03f)).border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.03f))), RoundedCornerShape(16.dp)).padding(3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                days.take(5).forEachIndexed { i, d ->
+                    val on = i == day
+                    Box(Modifier.weight(1f).padding(2.dp).height(54.dp).clip(RoundedCornerShape(14.dp)).background(if (on) Color.White else Color.Transparent).clickable { day = i }, contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                            Text(dayFmt.format(Date(d)).uppercase(), style = inter(9f, FontWeight.Bold), color = if (on) Color.Black else Color.White.copy(alpha = 0.5f))
+                            Spacer(Modifier.height(2.dp))
+                            Text(numFmt.format(Date(d)), style = inter(14f, FontWeight.Bold), color = if (on) Color.Black else Color.White)
                         }
-                        Text(timeFmt.format(Date(e.airingAt * 1000)), style = inter(12.5f, FontWeight.SemiBold), color = Color.White, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Ani.Chip).padding(horizontal = 9.dp, vertical = 5.dp))
                     }
                 }
             }

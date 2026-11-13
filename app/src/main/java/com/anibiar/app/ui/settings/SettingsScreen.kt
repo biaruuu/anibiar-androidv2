@@ -408,6 +408,33 @@ private fun AppearanceRows(context: Context) {
         }
     }
     Divider()
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("Home layout", style = inter(15f), color = Color.White)
+        Text("Swipeable rows or a poster grid.", style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(top = 2.dp))
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(true to "Rows", false to "Grid").forEach { (rows, name) ->
+                val on = com.anibiar.app.ui.theme.Appearance.homeRows == rows
+                Box(
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setHomeRows(context, rows) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Text(name, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
+            }
+        }
+    }
+    Divider()
+    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        Text("Search results", style = inter(15f), color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(true to "List", false to "Grid").forEach { (list, name) ->
+                val on = com.anibiar.app.ui.theme.Appearance.listView == list
+                Box(
+                    Modifier.clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(context, list) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                ) { Text(name, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White) }
+            }
+        }
+    }
+    Divider()
     val amoled = com.anibiar.app.ui.theme.Appearance.amoled
     InfoRow("Pure black (AMOLED)", if (amoled) "On" else "Off", onClick = { tick(); com.anibiar.app.ui.theme.Appearance.setAmoled(context, !amoled) })
 }

@@ -337,6 +337,15 @@ private fun HomeContent(
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 32.dp),
                                 )
                             }
+                        } else if (com.anibiar.app.ui.theme.Appearance.homeRows) {
+                            item(key = "row-h-$page") {
+                                androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    items(pages.getOrNull(page).orEmpty(), key = { "${it.media.id}-${it.episode}" }) { ep ->
+                                        Box(Modifier.width(124.dp)) { EpisodeRow(listOf(ep), 1, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) }, pad = 0.dp) }
+                                    }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                            }
                         } else {
                             items(rows.size, key = { "row-$page-$it" }) { index ->
                                 EpisodeRow(rows[index], columns, saved, onToggleSaved, armedId, { armedId = it }, onClick = { onOpen(it.media.id) })
@@ -372,6 +381,22 @@ private fun HomeContent(
                                     )
                                 }
                             } else {
+                                if (com.anibiar.app.ui.theme.Appearance.homeRows) item(key = "trend-h-$trCur") {
+                                    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        items(trPages.getOrNull(trCur).orEmpty().size, key = { trPages.getOrNull(trCur).orEmpty()[it].id }) { i ->
+                                            val media = trPages.getOrNull(trCur).orEmpty()[i]
+                                            MediaGridCard(
+                                                media = media, leftText = "#${trCur * EPISODES_PER_PAGE + i + 1}", rightText = "",
+                                                rating = media.averageScore?.let { it / 10f },
+                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                                onClick = { onOpen(media.id) }, saved = media.id in saved, onToggleSaved = { onToggleSaved(media.id) },
+                                                armed = armedId == "N${media.id}", onArm = { armedId = "N${media.id}" },
+                                                modifier = Modifier.width(124.dp),
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                } else
                                 items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -428,6 +453,22 @@ private fun HomeContent(
                                     )
                                 }
                             } else {
+                                if (com.anibiar.app.ui.theme.Appearance.homeRows) item(key = "pop-h-$popCur") {
+                                    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                        items(popPages.getOrNull(popCur).orEmpty().size, key = { popPages.getOrNull(popCur).orEmpty()[it].id }) { i ->
+                                            val media = popPages.getOrNull(popCur).orEmpty()[i]
+                                            MediaGridCard(
+                                                media = media, leftText = "#${popCur * EPISODES_PER_PAGE + i + 1}", rightText = "",
+                                                rating = media.averageScore?.let { it / 10f },
+                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
+                                                onClick = { onOpen(media.id) }, saved = media.id in saved, onToggleSaved = { onToggleSaved(media.id) },
+                                                armed = armedId == "P${media.id}", onArm = { armedId = "P${media.id}" },
+                                                modifier = Modifier.width(124.dp),
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.height(16.dp))
+                                } else
                                 items(popRows.size, key = { "pop-$popCur-$it" }) { index ->
                                     Row(
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -972,9 +1013,10 @@ private fun EpisodeRow(
     armedId: String?,
     onArm: (String) -> Unit,
     onClick: (LatestEpisode) -> Unit,
+    pad: androidx.compose.ui.unit.Dp = 8.dp,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = pad),
         horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         rowItems.forEach { episode ->
@@ -1510,12 +1552,21 @@ private fun HeroCard(m: Media, onWatch: () -> Unit, onDetails: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                     Text(m.genres.orEmpty().take(2).joinToString(" • "), style = inter(11f), color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Row(
-                    Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White).clickable(onClick = onWatch).padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(AniIcons.Play, null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                    Text("Watch Now", style = inter(12f, FontWeight.Black), color = Color.Black)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        Modifier.height(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White).clickable(onClick = onWatch).padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(com.anibiar.app.ui.theme.FeatherIcons.Play, null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                        Text("Watch", style = inter(12f, FontWeight.Black), color = Color.Black)
+                    }
+                    Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).clickable(onClick = onDetails), contentAlignment = Alignment.Center) {
+                        Icon(com.anibiar.app.ui.theme.FeatherIcons.Info, "Details", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                    val (isFav, toggleFav) = rememberFav(m)
+                    Box(Modifier.size(34.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp)).clickable(onClick = toggleFav), contentAlignment = Alignment.Center) {
+                        Icon(if (isFav) com.anibiar.app.ui.theme.FeatherIcons.Check else com.anibiar.app.ui.theme.FeatherIcons.Plus, "Favorite", tint = if (isFav) FavYellow else Color.White, modifier = Modifier.size(17.dp).favPop(isFav))
+                    }
                 }
             }
             Spacer(Modifier.width(16.dp))

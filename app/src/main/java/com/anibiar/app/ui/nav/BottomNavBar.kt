@@ -55,12 +55,12 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 enum class NavTab(val label: String, val icon: ImageVector) {
-    Home("Home", AniIcons.Home),
-    Search("Search", AniIcons.Search),
-    Schedule("Schedule", AniIcons.Calendar),
-    Inbox("Inbox", AniIcons.Chat),
-    Profile("Profile", AniIcons.Person),
-    Settings("Settings", AniIcons.Settings),
+    Home("Home", com.anibiar.app.ui.theme.FeatherIcons.Home),
+    Search("Search", com.anibiar.app.ui.theme.FeatherIcons.Search),
+    Schedule("Schedule", com.anibiar.app.ui.theme.FeatherIcons.Calendar),
+    Inbox("Inbox", com.anibiar.app.ui.theme.FeatherIcons.Message),
+    Profile("Profile", com.anibiar.app.ui.theme.FeatherIcons.User),
+    Settings("Settings", com.anibiar.app.ui.theme.FeatherIcons.Settings),
 }
 
 /** Flat full-width tab bar: near-black strip with a hairline on top, small icons and tiny labels (CornCastle style). */

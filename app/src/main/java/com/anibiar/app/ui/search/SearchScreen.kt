@@ -70,6 +70,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.anibiar.app.AniBiarApp
 import com.anibiar.app.data.Media
+import androidx.compose.foundation.shape.CircleShape
+import com.anibiar.app.data.cleanDescription
 import com.anibiar.app.data.airedEpisodes
 import com.anibiar.app.ui.home.LatestHeader
 import com.anibiar.app.ui.home.MediaGridCard
@@ -158,33 +160,67 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
             ),
         ) {
             item(key = "bar") {
+                val tick = com.anibiar.app.ui.theme.rememberTick()
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    com.anibiar.app.ui.theme.GlassBack(onBack)
-                    Spacer(Modifier.width(12.dp))
-                    SearchField(
-                        value = state.query,
-                        onValue = viewModel::setQuery,
-                        onSubmit = { focus.clearFocus(); viewModel.submit() },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                        Text("Search", style = inter(24f, FontWeight.Bold), color = Color.White)
-                        Spacer(Modifier.height(2.dp))
-                        Text("Simple when you want it, extremely specific when you need it.", style = inter(13f, lineHeight = 18f), color = Ani.Muted)
+                    Text("Search", style = inter(22f, FontWeight.Bold), color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ModeDropdown(mode, onModeChange)
+                        val listOn = com.anibiar.app.ui.theme.Appearance.listView
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        Box(Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.05f)).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, !listOn) }.padding(8.dp), contentAlignment = Alignment.Center) {
+                            Icon(if (listOn) com.anibiar.app.ui.theme.FeatherIcons.Grid else com.anibiar.app.ui.theme.FeatherIcons.List, if (listOn) "Switch to grid" else "Switch to list", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                        }
+                        val on = showFilters
+                        Box(
+                            Modifier.clip(CircleShape).background(if (on) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
+                                .border(1.dp, if (on) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f), CircleShape)
+                                .clickable { tick(); showFilters = !showFilters }.padding(8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(com.anibiar.app.ui.theme.FeatherIcons.Sliders, "Filters", tint = if (on || filters.activeCount > 0) Color.White else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                        }
                     }
-                    ModeDropdown(mode, onModeChange)
                 }
-                Spacer(Modifier.height(14.dp))
+                SearchField(
+                    value = state.query,
+                    onValue = viewModel::setQuery,
+                    onSubmit = { focus.clearFocus(); viewModel.submit() },
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                )
+                val pills = buildList<Pair<String, () -> Unit>> {
+                    fun nice(v: String) = v.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+                    filters.genres.forEach { g -> add(g to { viewModel.setFilters(filters.copy(genres = filters.genres - g)) }) }
+                    filters.formats.forEach { f -> add(nice(f) to { viewModel.setFilters(filters.copy(formats = filters.formats - f)) }) }
+                    filters.status?.let { add("Status: ${nice(it)}" to { viewModel.setFilters(filters.copy(status = null)) }) }
+                    filters.year?.let { add("Year: $it" to { viewModel.setFilters(filters.copy(year = null)) }) }
+                    filters.season?.let { add("Season: ${nice(it)}" to { viewModel.setFilters(filters.copy(season = null)) }) }
+                    filters.country?.let { add("Country: $it" to { viewModel.setFilters(filters.copy(country = null)) }) }
+                    filters.language?.let { add(nice(it) to { viewModel.setFilters(filters.copy(language = null)) }) }
+                    filters.score?.let { add("Score: $it+" to { viewModel.setFilters(filters.copy(score = null)) }) }
+                }
+                if (pills.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                ) {
+                    items(pills.size) { i ->
+                        val (label, cancel) = pills[i]
+                        Row(
+                            Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.12f)).border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)).clickable { cancel() }.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(label, style = inter(12f, FontWeight.Bold), color = Color.White)
+                            Icon(com.anibiar.app.ui.theme.FeatherIcons.XCircle, "Remove $label", tint = Color.White, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
             }
 
             item(key = "tools") {
-                ToolBar(
+                if (showFilters) ToolBar(
                     activeCount = filters.activeCount,
                     expanded = showFilters,
                     onApply = { focus.clearFocus(); viewModel.submit() },
@@ -263,29 +299,9 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                     )
                 }
                 else -> {
-                    item(key = "view-toggle") {
-                        val ctx = androidx.compose.ui.platform.LocalContext.current
-                        val tick = com.anibiar.app.ui.theme.rememberTick()
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                            listOf(false to "Grid", true to "List").forEach { (isList, label) ->
-                                val on = com.anibiar.app.ui.theme.Appearance.listView == isList
-                                Text(label, style = inter(13f, FontWeight.SemiBold), color = if (on) Color.Black else Color.White,
-                                    modifier = Modifier.padding(start = 8.dp).clip(RoundedCornerShape(50)).background(if (on) Color.White else Ani.ButtonDark).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, isList) }.padding(horizontal = 14.dp, vertical = 7.dp))
-                            }
-                        }
-                    }
                     if (com.anibiar.app.ui.theme.Appearance.listView) {
                         items(state.results.size, key = { "l${state.resultsPage}-${state.results[it].id}" }) { i ->
-                            val media = state.results[i]
-                            Row(Modifier.fillMaxWidth().clickable { onOpen(media.id) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                com.anibiar.app.ui.home.PosterImage(url = media.posterUrl, contentDescription = media.displayTitle, maxSide = 300, modifier = Modifier.width(64.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(10.dp)).background(Ani.Item))
-                                Spacer(Modifier.width(14.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(media.displayTitle, style = inter(15f, FontWeight.SemiBold, lineHeight = 19f), color = Color.White, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                                    Text(listOfNotNull(media.format?.replace('_', ' '), media.seasonYear?.toString(), media.averageScore?.let { "★ %.1f".format(it / 10f) }, (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.let { "$it eps" }).joinToString(" · "), style = inter(12.5f), color = Ani.Muted, modifier = Modifier.padding(top = 3.dp))
-                                    Text(media.genres.orEmpty().take(3).joinToString(" · "), style = inter(12.5f), color = Ani.Soft, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
-                                }
-                            }
+                            SearchListRow(state.results[i]) { onOpen(state.results[i].id) }
                         }
                     } else {
                     val rows = state.results.chunked(columns)
@@ -343,29 +359,65 @@ private fun Hint(text: String) {
 
 @Composable
 private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(50)
+    val shape = RoundedCornerShape(19.dp)
     Row(
-        modifier.height(42.dp).glass(shape),
+        modifier.fillMaxWidth().height(38.dp).clip(shape).background(Color.White.copy(alpha = 0.05f))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.03f))), shape)
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.weight(1f).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterStart) {
-            if (value.isEmpty()) Text("Search anime…", style = inter(14f), color = Ani.Muted)
+        Icon(com.anibiar.app.ui.theme.FeatherIcons.Search, "Search", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Box(Modifier.weight(1f)) {
+            if (value.isEmpty()) Text("Titles, genres, specials...", style = inter(13f), color = Color.White.copy(alpha = 0.35f))
             BasicTextField(
-                value = value,
-                onValueChange = onValue,
-                singleLine = true,
-                textStyle = inter(14f).copy(color = Color.White),
-                cursorBrush = SolidColor(Ani.Lavender),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
+                value = value, onValueChange = onValue, singleLine = true,
+                textStyle = inter(13.5f).copy(color = Color.White), cursorBrush = SolidColor(Color.White),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        Box(Modifier.width(1.dp).fillMaxSize().background(Color(0x26FFFFFF)))
-        Box(
-            Modifier.width(44.dp).fillMaxSize().clickable(onClick = onSubmit),
-            contentAlignment = Alignment.Center,
-        ) { Icon(AniIcons.Search, contentDescription = "Search", tint = Ani.Muted, modifier = Modifier.size(20.dp)) }
+        if (value.isNotEmpty()) Icon(
+            com.anibiar.app.ui.theme.FeatherIcons.XCircle, "Clear", tint = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier.size(16.dp).clickable { onValue("") },
+        )
+    }
+}
+
+/** Result row: dark card with the banner faintly behind, a poster with its score, title, details and genre chips. */
+@Composable
+private fun SearchListRow(m: Media, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(Modifier.padding(horizontal = 16.dp, vertical = 5.dp).fillMaxWidth().clip(shape).background(Color(0xFF0C0C10)).border(0.5.dp, Color.White.copy(alpha = 0.08f), shape).clickable(onClick = onClick)) {
+        if (!m.bannerImage.isNullOrEmpty()) {
+            coil.compose.AsyncImage(model = m.bannerImage, contentDescription = null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, modifier = Modifier.matchParentSize().graphicsLayer { alpha = 0.18f })
+            Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.94f), Color.Black.copy(alpha = 0.55f)))))
+        }
+        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(72.dp).aspectRatio(0.7f).clip(RoundedCornerShape(8.dp)).background(Color(0xFF141416))) {
+                com.anibiar.app.ui.home.PosterImage(url = m.posterUrl, contentDescription = m.displayTitle, maxSide = 300, modifier = Modifier.fillMaxSize())
+                m.averageScore?.takeIf { it > 0 }?.let { sc ->
+                    val col = if (sc > 75) Color(0xFF4CAF50) else if (sc > 50) Color(0xFFFFC107) else Color(0xFFF44336)
+                    Row(Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.8f)).padding(horizontal = 4.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(com.anibiar.app.ui.theme.FeatherIcons.Star, null, tint = col, modifier = Modifier.size(8.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("$sc%", style = inter(8f, FontWeight.Bold), color = Color.White)
+                    }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(m.displayTitle, style = inter(13f, FontWeight.Bold), color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                val parts = listOfNotNull(m.format?.replace('_', ' '), m.seasonYear?.toString(), if (m.format != "MOVIE") m.episodes?.let { "$it Eps" } else null)
+                if (parts.isNotEmpty()) Text(parts.joinToString(" • "), style = inter(11f), color = Color.White.copy(alpha = 0.6f), maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+                if (!m.genres.isNullOrEmpty()) Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    m.genres.take(3).forEach { g ->
+                        Text(g, style = inter(9f), color = Color.White.copy(alpha = 0.7f), modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color.White.copy(alpha = 0.05f)).border(0.5.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
+                    }
+                }
+                m.cleanDescription.takeIf { it.isNotBlank() }?.let { Text(it, style = inter(11f, lineHeight = 14f), color = Color.White.copy(alpha = 0.45f), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp)) }
+            }
+        }
     }
 }
 
