@@ -56,6 +56,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -161,6 +163,10 @@ fun KiroPlayer(
     skipInfo: String = "",
     /** Called with the real video length in seconds once known (and if it changes). */
     onDuration: (Double) -> Unit = {},
+    /** Top-left X: leaves fullscreen / the player. */
+    onClose: () -> Unit = {},
+    /** Opens the episode list; null hides the Episodes button. */
+    onEpisodes: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -227,6 +233,18 @@ fun KiroPlayer(
     val capPrefs = remember { context.getSharedPreferences("caption_prefs", Context.MODE_PRIVATE) }
     var captionSize by remember { mutableIntStateOf(capPrefs.getInt("size", 0).coerceIn(0, CAPTION_SIZES.lastIndex)) }
     var captionStyle by remember { mutableIntStateOf(capPrefs.getInt("style", 3).coerceIn(0, CAPTION_STYLES.lastIndex)) }
+    var capFont by remember { mutableIntStateOf(capPrefs.getInt("font", 0).coerceIn(0, CaptionFonts.names.lastIndex)) }
+    var capBg by remember { mutableIntStateOf(capPrefs.getInt("bg", 0).coerceIn(0, 2)) }
+    var capEdge by remember { mutableIntStateOf(capPrefs.getInt("edge", 2).coerceIn(0, 2)) }
+    var capFontRev by remember { mutableIntStateOf(0) }
+    val fontPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openInputStream(uri)?.use { i -> CaptionFonts.customFile(context).outputStream().use { o -> i.copyTo(o) } }
+            android.graphics.Typeface.createFromFile(CaptionFonts.customFile(context))
+            capFont = CaptionFonts.CUSTOM; capFontRev++; capPrefs.edit().putInt("font", capFont).apply()
+        }.onFailure { CaptionFonts.customFile(context).delete(); android.widget.Toast.makeText(context, "That file isn't a usable font", android.widget.Toast.LENGTH_SHORT).show() }
+    }
+    var bright by remember { mutableFloatStateOf(-1f) }
     /** Caption timing fix in ms: positive = captions appear later, negative = earlier. Resets for each video. */
     var capOffset by remember { mutableIntStateOf(0) }
     // Once you change captions yourself, the host's caption settings stop overriding yours.
@@ -567,6 +585,7 @@ fun KiroPlayer(
                             val cur = w.attributes.screenBrightness.let { if (it < 0f) 0.5f else it }
                             val nv = (cur + d).coerceIn(0.02f, 1f)
                             w.attributes = w.attributes.also { a -> a.screenBrightness = nv }
+                            bright = nv
                             hud = "Brightness ${(nv * 100).toInt()}%"
                         }
                     } else {
@@ -608,38 +627,32 @@ fun KiroPlayer(
         val active = capLine
         if (active != null) {
             val (rawLine, italic) = active
-            // Netflix breaks long lines into two balanced ones (about 42 characters at most per line).
-            val netflix = captionStyle == 3
-            val base = ((h.value * (if (netflix) 0.052f else 0.058f)).coerceIn(14f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
-            // Netflix: one line if it fits, else the fewest balanced lines (the Rust core does the line breaking).
+            val base = ((h.value * 0.052f).coerceIn(14f, 30f) * CAPTION_SCALE[captionSize]).coerceAtMost(44f)
             val capChars = ((w.value * 0.8f) / (base * 0.54f)).toInt().coerceIn(14, 42)
             val line = remember(rawLine, capChars) { com.anibiar.app.nativecore.Native.balance(rawLine, capChars) }
-            val face = nflx(base, if (netflix) FontWeight.Medium else FontWeight.Bold, lineHeight = base * (if (netflix) 1.22f else 1.28f)).copy(
-                fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center,
-                color = if (captionStyle == 2) Color(0xFFFFE066) else Color.White, letterSpacing = (base * 0.008f).sp,
-                // Netflix look: plain white text with a soft dark drop shadow, no outline and no box.
-                shadow = if (netflix) androidx.compose.ui.graphics.Shadow(Color(0xF2000000), androidx.compose.ui.geometry.Offset(base * 0.05f, base * 0.08f), base * 0.22f) else null,
+            val family = remember(capFont, capFontRev) { CaptionFonts.family(context, capFont) }
+            val face = nflx(base, FontWeight.Medium, lineHeight = base * 1.22f).copy(
+                fontFamily = family, fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal, textAlign = TextAlign.Center,
+                color = Color.White, letterSpacing = (base * 0.008f).sp,
+                shadow = if (capEdge == 1) androidx.compose.ui.graphics.Shadow(Color(0xF2000000), androidx.compose.ui.geometry.Offset(base * 0.05f, base * 0.08f), base * 0.22f) else null,
             )
-            // Controls hidden: near the bottom edge. Controls showing: right above the seek slider, between the time and the fullscreen button.
+            // Controls hidden: near the bottom edge. Controls showing: right above the bottom controls.
             val lifted = aCtl > 0.5f
-            val bottomPad by animateDpAsState(if (lifted) (w * 0.032f).coerce(10.dp, 34.dp) + 22.dp else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
-            val sidePad by animateDpAsState(if (lifted) (w * 0.22f).coerce(88.dp, 224.dp) else w * 0.05f, label = "capSide")
+            val bottomPad by animateDpAsState(if (lifted) (w * 0.12f).coerce(70.dp, 120.dp) else (w * 0.02f).coerce(8.dp, 26.dp), label = "capBottom")
+            val sidePad by animateDpAsState(if (lifted) (w * 0.12f).coerce(48.dp, 140.dp) else w * 0.05f, label = "capSide")
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = sidePad).padding(bottom = bottomPad), contentAlignment = Alignment.Center) {
-                if (captionStyle == 0 || captionStyle == 2) {
-                    // Outline: bold Inter, white fill with a clean dark outline (no shadow), scaled to the player.
-                    val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
-                    Text(line, style = face.copy(color = Color(0xFF0A0A0C), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round, miter = 2f)))
+                val boxMod = when (capBg) {
+                    1 -> Modifier.clip(RoundedCornerShape((base * 0.3f).dp)).background(Color(0x88000000)).padding(horizontal = (base * 0.5f).dp, vertical = (base * 0.2f).dp)
+                    2 -> Modifier.clip(RoundedCornerShape((base * 0.3f).dp)).background(Color.Black).padding(horizontal = (base * 0.5f).dp, vertical = (base * 0.2f).dp)
+                    else -> Modifier
+                }
+                Box(boxMod, contentAlignment = Alignment.Center) {
+                    if (capEdge == 2) {
+                        val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { (base * 0.2f).sp.toPx() }
+                        Text(line, style = face.copy(color = Color(0xFF0A0A0C), drawStyle = Stroke(width = strokePx, join = StrokeJoin.Round, miter = 2f), shadow = null))
+                    }
                     Text(line, style = face)
-                } else if (netflix) {
-                    // Two passes of the shadowed text give the shadow the depth Netflix has on bright scenes.
-                    Text(line, style = face)
-                    Text(line, style = face)
-                } else {
-                    Text(
-                        line, style = face,
-                        modifier = Modifier.clip(RoundedCornerShape((base * 0.45f).dp)).background(Color(0xCC101012))
-                            .padding(horizontal = (base * 0.7f).dp, vertical = (base * 0.28f).dp),
-                    )
+                    if (capEdge == 1) Text(line, style = face)
                 }
             }
         }
@@ -685,7 +698,7 @@ fun KiroPlayer(
         }
 
         // Skip intro / outro + undo toast
-        Column(Modifier.align(Alignment.BottomEnd).padding(end = pad).padding(bottom = (w * 0.115f).coerce(64.dp, 120.dp)), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.align(Alignment.BottomEnd).padding(end = pad).padding(bottom = (w * 0.15f).coerce(84.dp, 150.dp)), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             skipToast?.let { (kind, from) ->
                 Row(Modifier.clip(RoundedCornerShape(50)).background(Color(0xB3000000)).border(1.dp, GlassEdge, RoundedCornerShape(50)).padding(start = 14.dp, end = 6.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(when (kind) { "intro" -> "Intro skipped"; "recap" -> "Recap skipped"; else -> "Outro skipped" }, style = nflx(12.5f, FontWeight.Medium), color = Color.White)
@@ -781,85 +794,78 @@ fun KiroPlayer(
         LaunchedEffect(inPip) { if (inPip) { showControls = false; menuOpen = false } }
 
         // ---------------- controls ----------------
-        Box(Modifier.fillMaxSize().alpha(aCtl)) {
+        Box(Modifier.fillMaxSize().alpha(aCtl).background(Color(0x66000000))) {
             val live = aCtl > 0.05f
-            // Top bar
-            Row(Modifier.fillMaxWidth().padding(pad), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
-                GlassPill {
-                    BarButton(btn, if (muted || volume == 0f) VidIcons.Mute else if (volume < 0.5f) VidIcons.VolumeLow else VidIcons.VolumeHigh, ico, live) {
-                        // First tap opens the volume slider; tapping again mutes / unmutes.
-                        if (!volOpen) volOpen = true else { muted = !muted; volOpen = true }
-                    }
-                    val volW by animateDpAsState(if (volOpen && live) (w * 0.26f).coerce(80.dp, 120.dp) else 0.dp, label = "volW")
-                    if (volW > 1.dp) Box(Modifier.width(volW).height(btn).padding(horizontal = 8.dp).clipToBounds()) {
-                        TrackBar(if (muted) 0f else volume, 0f, live, Modifier.align(Alignment.Center), thumb = true, onSeek = { volume = it; muted = false; volTick++ }, onScrub = { volume = it; muted = false; volTick++ })
-                    }
-                    BarButton(btn, VidIcons.Chromecast, ico, live) { openCastSettings(context) }
+            // Top left: close + title
+            Row(Modifier.align(Alignment.TopStart).fillMaxWidth(0.6f).padding(pad), verticalAlignment = Alignment.CenterVertically) {
+                BarButton(btn, FeatherIcons.X, ico, live) { onClose() }
+                Spacer(Modifier.width(6.dp))
+                Text(title, style = nflx((timeSp + 3f), FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            // Top right: cast, picture-in-picture, lock, settings
+            Row(Modifier.align(Alignment.TopEnd).padding(pad), verticalAlignment = Alignment.CenterVertically) {
+                BarButton(btn, VidIcons.Chromecast, ico, live) { openCastSettings(context) }
+                BarButton(btn, FeatherIcons.Pip, ico, live) {
+                    runCatching {
+                        if (android.os.Build.VERSION.SDK_INT >= 26) activity?.enterPictureInPictureMode(android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(16, 9)).build())
+                    }.onFailure { say("Picture-in-picture isn't available", true) }
                 }
-                GlassPill {
-                    val sw = (w * 0.075f).coerce(25.dp, 38.dp); val sh = (w * 0.04f).coerce(13.dp, 20.dp)
-                    GlassSwitch(autoplay, FeatherIcons.Play, sw, sh, live) { onAutoplay(!autoplay); say("Autoplay ${if (!autoplay) "on" else "off"}") }
-                    GlassSwitch(autoSkip, FeatherIcons.FastForward, sw, sh, live) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}" + (if (skipInfo.isNotEmpty()) " · $skipInfo" else "")) }
-                    GlassSwitch(autoNext, FeatherIcons.SkipForward, sw, sh, live) { onAutoNext(!autoNext); say("Auto next ${if (!autoNext) "on" else "off"}") }
-                    BarButton(btn, VidIcons.Camera, ico, live) { screenshot(context, textureView) { say(it.first, it.second) } }
-                    if (format == "file") BarButton(btn, VidIcons.Download, ico, live) {
-                        if (src != null && format == "file") {
-                            runCatching {
-                                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                dm.enqueue(DownloadManager.Request(Uri.parse(Streaming.abs(src))).setTitle(title).setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "${title.replace(Regex("[^A-Za-z0-9 ._-]"), "")}.mp4"))
-                            }.onSuccess { say("Download started") }.onFailure { say("Couldn't start the download", true) }
-                        } else say("This server only streams. Pick another one to download.", true)
-                    }
-                    if (sortedSubs.isNotEmpty()) BarButton(btn, if (captionTrack >= 0) VidIcons.ClosedCaptionsOn else VidIcons.ClosedCaptions, ico, live) {
-                        if (readOnly) { say("Only the host controls captions"); return@BarButton }; capLocal = false; captionTrack = if (captionTrack >= 0) -1 else 0
-                    }
-                    BarButton(btn, com.anibiar.app.ui.theme.AniIcons.Lock, ico, live) { locked = true; lockHint = true; showControls = false; menuOpen = false; hud = null }
-                    BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
+                BarButton(btn, com.anibiar.app.ui.theme.AniIcons.Lock, ico, live) { locked = true; lockHint = true; showControls = false; menuOpen = false; hud = null }
+                BarButton(btn, VidIcons.Settings, ico, live, rotate = menuOpen) { menuView = "main"; menuOpen = !menuOpen }
+            }
+
+            // Left: brightness slider with a sun
+            val ctlBright = if (bright >= 0f) bright else (activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f)
+            Column(Modifier.align(Alignment.CenterStart).padding(start = pad + 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                VSlider(ctlBright, (h * 0.36f).coerce(70.dp, 150.dp), live) { v ->
+                    val nv = v.coerceIn(0.02f, 1f); bright = nv
+                    activity?.window?.let { win -> win.attributes = win.attributes.also { a -> a.screenBrightness = nv } }
+                    showControls = true
+                }
+                Spacer(Modifier.height(8.dp))
+                Icon(FeatherIcons.Sun, "Brightness", tint = Color.White, modifier = Modifier.size(ico * 0.85f))
+            }
+
+            // Centre: back 10, play / pause, forward 10 (plain icons, no discs)
+            Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy((w * 0.09f).coerce(36.dp, 120.dp))) {
+                Box(Modifier.size(seekSize).clip(CircleShape).clickable(enabled = live && !readOnly) { seekBy(-10); showControls = true }, contentAlignment = Alignment.Center) {
+                    Icon(VidIcons.SeekBackward10, "Back 10 seconds", tint = Color.White, modifier = Modifier.fillMaxSize())
+                }
+                Box(Modifier.size(playSize * 1.25f).clip(CircleShape).clickable(enabled = live) { togglePlay(); showControls = true }, contentAlignment = Alignment.Center) {
+                    if (buffering && !playing && src != null && error == null) CircularProgressIndicator(Modifier.size(playSize * 0.8f), color = Color.White, strokeWidth = 3.dp)
+                    else Icon(if (playing) VidIcons.Pause else VidIcons.Play, if (playing) "Pause" else "Play", tint = Color.White, modifier = Modifier.fillMaxSize())
+                }
+                Box(Modifier.size(seekSize).clip(CircleShape).clickable(enabled = live && !readOnly) { seekBy(10); showControls = true }, contentAlignment = Alignment.Center) {
+                    Icon(VidIcons.SeekForward10, "Forward 10 seconds", tint = Color.White, modifier = Modifier.fillMaxSize())
                 }
             }
 
-            // Centre controls
-            Box(Modifier.fillMaxSize()) {
-                Box(Modifier.align(Alignment.Center).offset(x = -(w * 0.25f)).size(seekSize).clip(CircleShape).background(Glass).border(1.dp, GlassEdge, CircleShape)
-                    .clickable(enabled = live) { seekBy(-10); showControls = true }, contentAlignment = Alignment.Center) {
-                    Icon(VidIcons.SeekBackward10, "Back 10 seconds", tint = Color.White, modifier = Modifier.size(seekSize * 0.74f))
+            // Bottom: red seek bar with time, then the action row
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = (w * 0.035f).coerce(12.dp, 48.dp)).padding(bottom = (w * 0.012f).coerce(6.dp, 18.dp))) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TrackBar(
+                        (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live && !readOnly,
+                        Modifier.weight(1f), thumb = true, accent = Color(0xFFE50914),
+                        marks = if (durationMs > 0) listOfNotNull(intro, recap, outro).map { (it.start * 1000 / durationMs).toFloat() to (it.end * 1000 / durationMs).toFloat() } else emptyList(),
+                        onScrub = { scrubFrac = it; timeMs = (it * durationMs).toLong() },
+                        onSeek = { f -> scrubFrac = null; if (readOnly) return@TrackBar; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
+                        seekMode = true,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(fmt(((durationMs - timeMs).coerceAtLeast(0L)) / 1000.0), style = nflx(timeSp, FontWeight.Medium), color = Color.White, maxLines = 1)
                 }
-                Box(Modifier.align(Alignment.Center).size(playSize).clip(CircleShape).background(Glass).border(1.dp, GlassEdge, CircleShape)
-                    .clickable(enabled = live) { togglePlay(); showControls = true }, contentAlignment = Alignment.Center) {
-                    if (buffering && !playing && src != null && error == null) CircularProgressIndicator(Modifier.size(playSize * 0.5f), color = Color.White, strokeWidth = 2.5.dp)
-                    else Icon(if (playing) VidIcons.Pause else VidIcons.Play, if (playing) "Pause" else "Play", tint = Color.White, modifier = Modifier.size(playSize * 0.74f))
-                }
-                Box(Modifier.align(Alignment.Center).offset(x = (w * 0.25f)).size(seekSize).clip(CircleShape).background(Glass).border(1.dp, GlassEdge, CircleShape)
-                    .clickable(enabled = live) { seekBy(10); showControls = true }, contentAlignment = Alignment.Center) {
-                    Icon(VidIcons.SeekForward10, "Forward 10 seconds", tint = Color.White, modifier = Modifier.size(seekSize * 0.74f))
-                }
-            }
-
-            // Bottom: time + fullscreen, seek bar
-            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = (w * 0.035f).coerce(12.dp, 48.dp)).padding(bottom = (w * 0.032f).coerce(10.dp, 34.dp))) {
-                Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
-                    Row(Modifier.weight(1f).height(pill), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            buildTime(timeMs / 1000.0, durationMs / 1000.0, if (w >= 420.dp) title else null),
-                            style = nflx(timeSp, FontWeight.Medium).copy(shadow = Shadow(Color(0x99000000), Offset(0f, 1f), 3f)),
-                            color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
+                Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        ActionItem(FeatherIcons.Camera, "Clip", live) { screenshot(context, textureView) { say(it.first, it.second) } }
+                        if (!readOnly) ActionItem(VidIcons.PlaybackSpeedCircle, "Speed (${if (speed == 1f) "1" else speed.toString().removeSuffix(".0")}x)", live) { menuView = "speed"; menuOpen = true }
+                        if (onEpisodes != null) ActionItem(FeatherIcons.List, "Episodes", live) { onEpisodes() }
+                        ActionItem(VidIcons.ClosedCaptions, "Audio & Subtitles", live) { menuView = if (sortedSubs.isNotEmpty()) "captions" else "main"; menuOpen = true }
+                        if (nextLabel != null && !readOnly) ActionItem(FeatherIcons.SkipForward, "Next Episode", live) { onPlayNext() }
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Box(Modifier.height(pill).width((w * 0.056f).coerce(40.dp, 56.dp)).clip(RoundedCornerShape((w * 0.024f).coerce(14.dp, 22.dp))).background(Glass).border(1.dp, GlassEdge, RoundedCornerShape((w * 0.024f).coerce(14.dp, 22.dp)))
-                        .clickable(enabled = live) { onFullscreen(!fullscreen) }, contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(btn).clip(CircleShape).clickable(enabled = live) { onFullscreen(!fullscreen) }, contentAlignment = Alignment.Center) {
                         Icon(if (fullscreen) VidIcons.FullscreenExit else VidIcons.Fullscreen, "Fullscreen", tint = Color.White, modifier = Modifier.size(ico * 0.9f))
                     }
                 }
-                TrackBar(
-                    (scrubFrac ?: if (durationMs > 0) timeMs.toFloat() / durationMs else 0f), if (durationMs > 0) bufferedMs.toFloat() / durationMs else 0f, live && !readOnly,
-                    Modifier.fillMaxWidth(), thumb = scrubFrac != null,
-                    marks = if (durationMs > 0) listOfNotNull(intro, recap, outro).map { (it.start * 1000 / durationMs).toFloat() to (it.end * 1000 / durationMs).toFloat() } else emptyList(),
-                    onScrub = { scrubFrac = it; timeMs = (it * durationMs).toLong() },
-                    onSeek = { f -> scrubFrac = null; if (readOnly) return@TrackBar; val to = (f * durationMs).toLong(); player.seekTo(to); timeMs = to; ended = false },
-                    seekMode = true,
-                )
             }
         }
 
@@ -874,7 +880,7 @@ fun KiroPlayer(
                     .verticalScroll(rememberScrollState()).padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "style" -> "Style"; "size" -> "Size"; "sync" -> "Timing"; else -> "Speed" }) { menuView = if (menuView == "style" || menuView == "size" || menuView == "sync") "captions" else "main" }
+                if (menuView != "main") MenuBack(when (menuView) { "quality" -> "Quality"; "boost" -> "Volume boost"; "captions" -> "Captions"; "font" -> "Font"; "bg" -> "Background"; "edge" -> "Text style"; "size" -> "Size"; "sync" -> "Timing"; else -> "Speed" }) { menuView = if (menuView in listOf("font", "bg", "edge", "size", "sync")) "captions" else "main" }
                 when (menuView) {
                     "main" -> {
                         if (heights.isNotEmpty()) MenuRow(VidIcons.Settings, "Quality", if (quality > 0) "${quality}p" else "Auto") { menuView = "quality" }
@@ -883,6 +889,17 @@ fun KiroPlayer(
                             MenuRow(VidIcons.ClosedCaptions, "Captions", (if (captionState == "loading") "Loading…" else if (captionState == "error") "Failed" else sortedSubs.getOrNull(captionTrack)?.label ?: "Off")) { menuView = "captions" }
                         }
                         if (!readOnly) MenuRow(VidIcons.PlaybackSpeedCircle, "Speed", if (speed == 1f) "Normal" else "${speed}x") { menuView = "speed" }
+                        MenuRow(FeatherIcons.Play, "Autoplay", if (autoplay) "On" else "Off", chevron = false) { onAutoplay(!autoplay); say("Autoplay ${if (!autoplay) "on" else "off"}") }
+                        MenuRow(FeatherIcons.FastForward, "Auto skip", if (autoSkip) "On" else "Off", chevron = false) { onAutoSkip(!autoSkip); say("Auto skip ${if (!autoSkip) "on" else "off"}" + (if (skipInfo.isNotEmpty()) " · $skipInfo" else "")) }
+                        MenuRow(FeatherIcons.SkipForward, "Auto next", if (autoNext) "On" else "Off", chevron = false) { onAutoNext(!autoNext); say("Auto next ${if (!autoNext) "on" else "off"}") }
+                        if (format == "file") MenuRow(VidIcons.Download, "Download", "", chevron = false) {
+                            menuOpen = false
+                            runCatching {
+                                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                dm.enqueue(DownloadManager.Request(Uri.parse(Streaming.abs(src!!))).setTitle(title).setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "${title.replace(Regex("[^A-Za-z0-9 ._-]"), "")}.mp4"))
+                            }.onSuccess { say("Download started") }.onFailure { say("Couldn't start the download", true) }
+                        }
                     }
                     "quality" -> {
                         OptionRow("Auto", quality == -1) { userQuality = true; quality = -1; capPrefs.edit().putInt("quality", -1).apply(); menuView = "main" }
@@ -894,14 +911,19 @@ fun KiroPlayer(
                         if (captionState == "error") OptionRow("Couldn't load · tap to retry", false) { captionTry++ }
                         OptionRow("Off", captionTrack < 0) { capLocal = false; captionTrack = -1 }
                         sortedSubs.forEachIndexed { i, t -> OptionRow(t.label, captionTrack == i) { capLocal = false; captionTrack = i } }
-                        MenuRow(VidIcons.ClosedCaptionsOn, "Style", CAPTION_STYLES[captionStyle]) { menuView = "style" }
-                        MenuRow(VidIcons.ClosedCaptionsOn, "Size", CAPTION_SIZES[captionSize]) { menuView = "size" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Font", CaptionFonts.names[capFont]) { menuView = "font" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Size", CaptionFonts.SIZE_LABELS[captionSize] ?: "") { menuView = "size" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Background", CaptionFonts.BACKGROUNDS[capBg]) { menuView = "bg" }
+                        MenuRow(VidIcons.ClosedCaptionsOn, "Text style", CaptionFonts.EDGES[capEdge]) { menuView = "edge" }
                         MenuRow(VidIcons.ClosedCaptionsOn, "Timing", offsetLabel(capOffset)) { menuView = "sync" }
                     }
-                    "style" -> {
-                        CAPTION_STYLES.forEachIndexed { i, s -> OptionRow(s, captionStyle == i) { capLocal = false; captionStyle = i; capPrefs.edit().putInt("style", i).apply() } }
+                    "font" -> CaptionFonts.names.forEachIndexed { i, n ->
+                        if (i == CaptionFonts.CUSTOM) OptionRow(if (CaptionFonts.customFile(context).exists()) "Custom file · tap to replace" else "Custom file · pick a .ttf / .otf", capFont == i) { fontPicker.launch(arrayOf("*/*")) }
+                        else OptionRow(n, capFont == i) { capFont = i; capPrefs.edit().putInt("font", i).apply() }
                     }
-                    "size" -> CAPTION_SIZES.forEachIndexed { i, s -> OptionRow(s, captionSize == i) { capLocal = false; captionSize = i; capPrefs.edit().putInt("size", i).apply() } }
+                    "bg" -> CaptionFonts.BACKGROUNDS.forEachIndexed { i, n -> OptionRow(n, capBg == i) { capBg = i; capPrefs.edit().putInt("bg", i).apply() } }
+                    "edge" -> CaptionFonts.EDGES.forEachIndexed { i, n -> OptionRow(n, capEdge == i) { capEdge = i; capPrefs.edit().putInt("edge", i).apply() } }
+                    "size" -> CaptionFonts.SIZE_ORDER.forEach { i -> OptionRow(CaptionFonts.SIZE_LABELS[i] ?: "", captionSize == i) { capLocal = false; captionSize = i; capPrefs.edit().putInt("size", i).apply() } }
                     "sync" -> {
                         OptionRow("Captions earlier  (-0.5 s)", false) { capOffset = (capOffset - 500).coerceAtLeast(-30_000) }
                         OptionRow("Captions later  (+0.5 s)", false) { capOffset = (capOffset + 500).coerceAtMost(30_000) }
@@ -958,6 +980,7 @@ private fun TrackBar(
     onScrub: (Float) -> Unit = {}, onSeek: (Float) -> Unit, seekMode: Boolean = false,
     /** Stretches of the timeline to highlight (intro / outro), as fractions 0..1. */
     marks: List<Pair<Float, Float>> = emptyList(),
+    accent: Color = Color.White,
 ) {
     val f = frac.coerceIn(0f, 1f)
     val fNow by rememberUpdatedState(f)
@@ -981,8 +1004,8 @@ private fun TrackBar(
         if (marks.isNotEmpty()) androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape)) {
             marks.forEach { (a, b) -> drawRect(Color(0xE6FFC94D), androidx.compose.ui.geometry.Offset(size.width * a.coerceIn(0f, 1f), 0f), androidx.compose.ui.geometry.Size(size.width * (b - a).coerceIn(0f, 1f), size.height)) }
         }
-        Box(Modifier.fillMaxWidth(f).height(4.dp).clip(CircleShape).background(Color.White))
-        if (thumb) BoxWithConstraints(Modifier.fillMaxWidth()) { Box(Modifier.offset(x = (maxWidth * f) - 6.dp).size(12.dp).clip(CircleShape).background(Color.White)) }
+        Box(Modifier.fillMaxWidth(f).height(4.dp).clip(CircleShape).background(accent))
+        if (thumb) BoxWithConstraints(Modifier.fillMaxWidth()) { Box(Modifier.offset(x = (maxWidth * f) - 7.dp).size(14.dp).clip(CircleShape).background(accent)) }
     }
 }
 
@@ -1077,5 +1100,26 @@ private fun ReactionLayer(t: com.anibiar.app.social.WatchTogether, showPicker: B
                 Text(e, fontSize = 20.sp, modifier = Modifier.clickable { t.react(e) }.padding(horizontal = 8.dp, vertical = 4.dp))
             }
         }
+    }
+}
+
+@Composable private fun ActionItem(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(50)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = nflx(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1)
+    }
+}
+
+/** Vertical slider (brightness): white fill from the bottom over a faint track. */
+@Composable private fun VSlider(frac: Float, height: Dp, enabled: Boolean, onChange: (Float) -> Unit) {
+    Box(
+        Modifier.width(30.dp).height(height)
+            .pointerInput(enabled) { if (enabled) detectTapGestures { o -> onChange(1f - (o.y / size.height).coerceIn(0f, 1f)) } }
+            .pointerInput(enabled) { if (enabled) detectVerticalDragGestures { c, _ -> onChange(1f - (c.position.y / size.height).coerceIn(0f, 1f)) } },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(Modifier.align(Alignment.Center).width(5.dp).fillMaxHeight().clip(CircleShape).background(Color(0x59FFFFFF)))
+        Box(Modifier.align(Alignment.BottomCenter).width(5.dp).fillMaxHeight(frac.coerceIn(0.02f, 1f)).clip(CircleShape).background(Color.White))
     }
 }

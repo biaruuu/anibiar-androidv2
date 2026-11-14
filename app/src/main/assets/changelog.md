@@ -592,3 +592,6 @@ New look inspired by CornCastle: pure black background, white main buttons, a fl
 
 ## 135 | Hero buttons, layouts, search and schedule | 2026-11-14
 Hero cards now have Details and Add-to-favorites buttons. Home can show sections as swipeable rows or a grid (Settings > Home layout), and Search results as a list or grid. Search and Schedule were redesigned in the CornCastle style with Feather icons.
+
+## 136 | Netflix-style player and caption fonts | 2026-11-15
+Player controls redone: close and title on top, cast / picture-in-picture / lock / settings, brightness slider on the left, 10s back, big play and 10s forward in the middle, red seek bar with time left, and a bottom row with Clip, Speed, Episodes, Audio and Subtitles, Next Episode. Captions now have Font (Netflix Sans, Inter, Trebuchet, Roboto, Open Sans, Poppins, Montserrat, Cinzel, Roboto Mono, Comic Neue or your own font file), Size, Background and Text style.
