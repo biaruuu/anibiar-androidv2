@@ -65,7 +65,7 @@ object Appearance {
     /** How poster rows look: 0 poster only, 1 poster and title, 2 large cards with a score badge. */
     var cardStyle by mutableStateOf(1); private set
     /** Search results as a poster grid (false) or a detailed list (true). */
-    var listView by mutableStateOf(true); private set
+    var listView by mutableStateOf(false); private set
     /** Home sections as swipeable rows (true) or the poster grid (false). */
     var homeRows by mutableStateOf(true); private set
     val cardStyles = listOf("Poster only", "With titles", "Large")
@@ -78,7 +78,7 @@ object Appearance {
         amoled = p.getBoolean("amoled", false)
         textScale = p.getFloat("text", 1f)
         cardStyle = p.getInt("cards", 1).coerceIn(0, 2)
-        listView = p.getBoolean("list", true)
+        listView = p.getBoolean("list", false)
         homeRows = p.getBoolean("homeRows", true)
     }
     fun setHomeRows(context: Context, v: Boolean) {

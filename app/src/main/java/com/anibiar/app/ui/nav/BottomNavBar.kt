@@ -68,9 +68,9 @@ enum class NavTab(val label: String, val icon: ImageVector) {
 fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifier = Modifier, inboxBadge: Int = 0) {
     val tabs = NavTab.entries
     val tick = com.anibiar.app.ui.theme.rememberTick()
-    Column(modifier.fillMaxWidth().background(Color(0xFF08080C)).navigationBarsPadding()) {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.08f)))
-        Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier.fillMaxWidth().background(com.anibiar.app.ui.theme.Ani.Onyx).navigationBarsPadding()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF2E2E2E)))
+        Row(Modifier.fillMaxWidth().height(62.dp), verticalAlignment = Alignment.CenterVertically) {
             tabs.forEach { tab ->
                 NavItem(tab, tab == selected, Modifier.weight(1f).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { if (tab != selected) tick(); onSelect(tab) }, if (tab == NavTab.Inbox) inboxBadge else 0)
             }
@@ -80,19 +80,19 @@ fun BottomNavBar(selected: NavTab, onSelect: (NavTab) -> Unit, modifier: Modifie
 
 @Composable
 private fun NavItem(tab: NavTab, lit: Boolean, modifier: Modifier, badge: Int) {
-    val tint by animateColorAsState(if (lit) Color.White else Color.White.copy(alpha = 0.45f), tween(140), label = "navTint")
+    val tint by animateColorAsState(if (lit) com.anibiar.app.ui.theme.Appearance.accent else Color.White, tween(140), label = "navTint")
     Column(
         modifier.fillMaxHeight(),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
     ) {
         Box {
-            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(19.dp))
+            Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(26.dp))
             if (badge > 0) Box(
                 Modifier.align(Alignment.TopEnd).offset(x = 7.dp, y = (-3).dp).clip(RoundedCornerShape(50)).background(Color(0xFFFF4D6A)).padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(if (badge > 99) "99+" else "$badge", style = inter(9f, FontWeight.Bold), color = Color.White, maxLines = 1) }
         }
-        Spacer(Modifier.height(2.dp))
-        Text(tab.label, style = inter(9f, if (lit) FontWeight.Bold else FontWeight.Medium), color = tint, maxLines = 1)
+        Spacer(Modifier.height(3.dp))
+        Text(tab.label, style = inter(12f, FontWeight.Normal), color = tint, maxLines = 1)
     }
 }

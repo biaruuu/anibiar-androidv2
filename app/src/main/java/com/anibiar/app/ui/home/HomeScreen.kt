@@ -118,7 +118,7 @@ private const val EPISODES_PER_PAGE = 12
 private const val MAX_EPISODE_PAGES = 5
 
 @Composable
-fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onContinue: (Int) -> Unit = onOpen, viewModel: HomeViewModel = viewModel()) {
+fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) -> Unit = onOpen, onContinue: (Int) -> Unit = onOpen, onInbox: () -> Unit = {}, viewModel: HomeViewModel = viewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val app = LocalContext.current.applicationContext as com.anibiar.app.AniBiarApp
     val saved by app.watchlist.ids.collectAsStateWithLifecycle()
@@ -140,6 +140,7 @@ fun HomeScreen(onOpen: (Int) -> Unit, onSearch: () -> Unit = {}, onWatch: (Int) 
         onSearch = onSearch,
         onWatch = onWatch,
         onContinue = onContinue,
+        onInbox = onInbox,
         onRetry = viewModel::refresh,
         onRemoveHistory = viewModel::removeFromHistory,
     )
@@ -154,6 +155,7 @@ private fun HomeContent(
     onSearch: () -> Unit,
     onWatch: (Int) -> Unit,
     onContinue: (Int) -> Unit,
+    onInbox: () -> Unit,
     onRetry: () -> Unit,
     onRemoveHistory: (HistoryItem) -> Unit,
 ) {
@@ -208,7 +210,7 @@ private fun HomeContent(
     BoxWithConstraints(Modifier.fillMaxSize().background(Ani.Onyx).nestedScroll(scrollConnection)) {
         // Everything below adapts to the real screen size.
         // Miruro's hero is ~1.48x as tall as it is wide; that proportion gives the same crop of the art.
-        val heroHeight = (maxWidth * 1.48f).coerceAtMost(maxHeight * 0.88f).coerceAtLeast(300.dp)
+        val heroHeight = (maxWidth * 1.7f).coerceAtMost(maxHeight * 0.72f).coerceAtLeast(380.dp)
         val columns = when {
             maxWidth >= 900.dp -> 6
             maxWidth >= 600.dp -> 4
@@ -283,11 +285,9 @@ private fun HomeContent(
     
                         if (state.hero.isNotEmpty()) {
                             item(key = "hero") {
-                                CompactHero(
-                                    items = state.hero,
-                                    onWatch = onWatch,
-                                    onDetails = onOpen,
-                                    modifier = Modifier.statusBarsPadding().padding(top = 12.dp, bottom = 8.dp),
+                                LaftelHero(
+                                    items = state.hero, art = state.art, height = heroHeight,
+                                    onWatch = onWatch, onDetails = onOpen, onBell = onInbox, isFav = { m -> rememberFav(m) },
                                 )
                             }
                         }
@@ -305,9 +305,10 @@ private fun HomeContent(
 
                         if (state.history.isNotEmpty()) {
                             item(key = "continue") {
-                                ContinueWatching(
+                                LaftelContinue(
                                     entries = state.history,
                                     onClick = { onContinue(it.mediaId) },
+                                    onInfo = { onOpen(it.mediaId) },
                                     onRemove = onRemoveHistory,
                                 )
                             }
@@ -317,7 +318,7 @@ private fun HomeContent(
     
                         item(key = "latest-header") {
                             Spacer(Modifier.height(28.dp))
-                            LatestHeader(
+                            if (com.anibiar.app.ui.theme.Appearance.homeRows) LaftelTitle("Latest Episodes") else LatestHeader(
                                 dubMode = dubMode,
                                 onModeChange = { dubMode = it },
                                 page = page,
@@ -360,7 +361,7 @@ private fun HomeContent(
                             val trRows = trPages.getOrNull(trCur).orEmpty().chunked(columns)
                             item(key = "trending-header") {
                                 Spacer(Modifier.height(12.dp))
-                                LatestHeader(
+                                if (com.anibiar.app.ui.theme.Appearance.homeRows) LaftelTitle("Trending Now") else LatestHeader(
                                     title = "Trending Now",
                                     dubMode = trendingDub,
                                     onModeChange = { trendingDub = it },
@@ -382,19 +383,7 @@ private fun HomeContent(
                                 }
                             } else {
                                 if (com.anibiar.app.ui.theme.Appearance.homeRows) item(key = "trend-h-$trCur") {
-                                    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        items(trPages.getOrNull(trCur).orEmpty().size, key = { trPages.getOrNull(trCur).orEmpty()[it].id }) { i ->
-                                            val media = trPages.getOrNull(trCur).orEmpty()[i]
-                                            MediaGridCard(
-                                                media = media, leftText = "#${trCur * EPISODES_PER_PAGE + i + 1}", rightText = "",
-                                                rating = media.averageScore?.let { it / 10f },
-                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                                onClick = { onOpen(media.id) }, saved = media.id in saved, onToggleSaved = { onToggleSaved(media.id) },
-                                                armed = armedId == "N${media.id}", onArm = { armedId = "N${media.id}" },
-                                                modifier = Modifier.width(124.dp),
-                                            )
-                                        }
-                                    }
+                                    LaftelRankRow(state.trending.take(15), onOpen)
                                     Spacer(Modifier.height(16.dp))
                                 } else
                                 items(trRows.size, key = { "trend-$trCur-$it" }) { index ->
@@ -432,7 +421,7 @@ private fun HomeContent(
                             val popRows = popPages.getOrNull(popCur).orEmpty().chunked(columns)
                             item(key = "popular-header") {
                                 Spacer(Modifier.height(12.dp))
-                                LatestHeader(
+                                if (com.anibiar.app.ui.theme.Appearance.homeRows) LaftelTitle("Most Popular") else LatestHeader(
                                     title = "Most Popular",
                                     dubMode = popularDub,
                                     onModeChange = { popularDub = it },
@@ -454,19 +443,7 @@ private fun HomeContent(
                                 }
                             } else {
                                 if (com.anibiar.app.ui.theme.Appearance.homeRows) item(key = "pop-h-$popCur") {
-                                    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                        items(popPages.getOrNull(popCur).orEmpty().size, key = { popPages.getOrNull(popCur).orEmpty()[it].id }) { i ->
-                                            val media = popPages.getOrNull(popCur).orEmpty()[i]
-                                            MediaGridCard(
-                                                media = media, leftText = "#${popCur * EPISODES_PER_PAGE + i + 1}", rightText = "",
-                                                rating = media.averageScore?.let { it / 10f },
-                                                ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                                onClick = { onOpen(media.id) }, saved = media.id in saved, onToggleSaved = { onToggleSaved(media.id) },
-                                                armed = armedId == "P${media.id}", onArm = { armedId = "P${media.id}" },
-                                                modifier = Modifier.width(124.dp),
-                                            )
-                                        }
-                                    }
+                                    LaftelPosterRow(state.popular.take(20), onOpen)
                                     Spacer(Modifier.height(16.dp))
                                 } else
                                 items(popRows.size, key = { "pop-$popCur-$it" }) { index ->

@@ -598,3 +598,6 @@ Player controls redone: close and title on top, cast / picture-in-picture / lock
 
 ## 137 | Fluent icons, AniBiar API servers, player fixes | 2026-11-15
 All icons are now Fluent. The app now uses the AniBiar API (kiroapp-api.onrender.com) for the Anikoto, Megaplay, Desidub and Heaven servers (the first request can take a minute while the server wakes up). The player controls scale to the screen: the small player shows icons only, fullscreen shows labels.
+
+## 138 | New Home and Search look | 2026-11-15
+Home: full-screen hero with the title logo, one-line tagline and a wide Play button, bigger Continue Watching cards, numbered Trending row and clean poster rows. Search: new search bar, genre tabs, results count with sort, and a plain poster grid. Softer dark colours and a roomier bottom bar.

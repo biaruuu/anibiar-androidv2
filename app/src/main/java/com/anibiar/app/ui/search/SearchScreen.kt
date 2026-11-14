@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -155,44 +156,46 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
             state = listState,
             modifier = Modifier.fillMaxSize().clearOnEmptyTap { armedId = null },
             contentPadding = PaddingValues(
-                top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 12.dp,
+                top = 0.dp,
                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp,
             ),
         ) {
             item(key = "bar") {
                 val tick = com.anibiar.app.ui.theme.rememberTick()
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("Search", style = inter(22f, FontWeight.Bold), color = Color.White)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().background(Ani.Panel).statusBarsPadding()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        SearchField(
+                            value = state.query,
+                            onValue = viewModel::setQuery,
+                            onSubmit = { focus.clearFocus(); viewModel.submit() },
+                            modifier = Modifier.weight(1f),
+                        )
                         ModeDropdown(mode, onModeChange)
-                        val listOn = com.anibiar.app.ui.theme.Appearance.listView
-                        val ctx = androidx.compose.ui.platform.LocalContext.current
-                        Box(Modifier.clip(CircleShape).background(Color.White.copy(alpha = 0.05f)).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, !listOn) }.padding(8.dp), contentAlignment = Alignment.Center) {
-                            Icon(if (listOn) com.anibiar.app.ui.theme.FeatherIcons.Grid else com.anibiar.app.ui.theme.FeatherIcons.List, if (listOn) "Switch to grid" else "Switch to list", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
-                        }
-                        val on = showFilters
-                        Box(
-                            Modifier.clip(CircleShape).background(if (on) Color.White.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
-                                .border(1.dp, if (on) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f), CircleShape)
-                                .clickable { tick(); showFilters = !showFilters }.padding(8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(com.anibiar.app.ui.theme.FeatherIcons.Sliders, "Filters", tint = if (on || filters.activeCount > 0) Color.White else Color.White.copy(alpha = 0.7f), modifier = Modifier.size(16.dp))
+                    }
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
+                    androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                        val tabs = listOf<String?>(null) + GENRES.map { it.first }
+                        items(tabs.size) { i ->
+                            val g = tabs[i]
+                            val sel = if (g == null) filters.genres.isEmpty() else filters.genres == setOf(g)
+                            Column(
+                                Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { tick(); viewModel.setFilters(filters.copy(genres = if (g == null) emptySet() else setOf(g))) }.padding(top = 14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(g ?: "All", style = inter(17f, if (sel) FontWeight.Bold else FontWeight.SemiBold), color = if (sel) Color.White else Ani.Muted, maxLines = 1)
+                                Spacer(Modifier.height(10.dp))
+                                Box(Modifier.height(3.dp).fillMaxWidth().background(if (sel) Color.White else Color.Transparent))
+                            }
                         }
                     }
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Ani.Border))
                 }
-                SearchField(
-                    value = state.query,
-                    onValue = viewModel::setQuery,
-                    onSubmit = { focus.clearFocus(); viewModel.submit() },
-                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
-                )
                 val pills = buildList<Pair<String, () -> Unit>> {
                     fun nice(v: String) = v.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
-                    filters.genres.forEach { g -> add(g to { viewModel.setFilters(filters.copy(genres = filters.genres - g)) }) }
+                    if (filters.genres.size > 1) filters.genres.forEach { g -> add(g to { viewModel.setFilters(filters.copy(genres = filters.genres - g)) }) }
                     filters.formats.forEach { f -> add(nice(f) to { viewModel.setFilters(filters.copy(formats = filters.formats - f)) }) }
                     filters.status?.let { add("Status: ${nice(it)}" to { viewModel.setFilters(filters.copy(status = null)) }) }
                     filters.year?.let { add("Year: $it" to { viewModel.setFilters(filters.copy(year = null)) }) }
@@ -203,7 +206,7 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                 }
                 if (pills.isNotEmpty()) androidx.compose.foundation.lazy.LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 0.dp),
                 ) {
                     items(pills.size) { i ->
                         val (label, cancel) = pills[i]
@@ -259,16 +262,35 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
             }
 
             item(key = "pagehead") {
-                LatestHeader(
-                    title = "Results",
-                    dubMode = filters.language == "DUB",
-                    onModeChange = { dub -> viewModel.setFilters(filters.copy(language = if (dub) "DUB" else null)) },
-                    page = state.page - 1,
-                    pageCount = state.lastPage.coerceAtLeast(state.page),
-                    onPrev = { viewModel.goTo(state.page - 1) },
-                    onNext = { viewModel.goTo(state.page + 1) },
-                )
-                Spacer(Modifier.height(14.dp))
+                val tick = com.anibiar.app.ui.theme.rememberTick()
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 20.dp, bottom = 18.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (!state.hasNext && state.page == 1) "${state.results.size} Results" else "Page ${state.page} / ${state.lastPage.coerceAtLeast(state.page)}",
+                        style = inter(16f), color = Ani.Muted,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        var sortOpen by remember { mutableStateOf(false) }
+                        val curSort = filters.sort ?: "POPULARITY_DESC"
+                        Box {
+                            Row(Modifier.clickable { sortOpen = true }, verticalAlignment = Alignment.CenterVertically) {
+                                Text((SORTS.firstOrNull { it.first == curSort }?.second ?: "Most Popular").replace("Most ", ""), style = inter(16f), color = Ani.Muted)
+                                Spacer(Modifier.width(4.dp))
+                                Icon(com.anibiar.app.ui.theme.FeatherIcons.ChevronDown, null, tint = Ani.Muted, modifier = Modifier.size(22.dp))
+                            }
+                            DropdownMenu(sortOpen, { sortOpen = false }, modifier = Modifier.background(Ani.Item)) {
+                                SORTS.forEach { (v, label) ->
+                                    DropdownMenuItem(text = { Text(label, style = inter(15f), color = if (v == curSort) Ani.Lavender else Color.White) }, onClick = { sortOpen = false; viewModel.setFilters(filters.copy(sort = v)) })
+                                }
+                            }
+                        }
+                        val listOn = com.anibiar.app.ui.theme.Appearance.listView
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        Icon(if (listOn) com.anibiar.app.ui.theme.FeatherIcons.Grid else com.anibiar.app.ui.theme.FeatherIcons.List, if (listOn) "Switch to grid" else "Switch to list", tint = Ani.Muted,
+                            modifier = Modifier.size(24.dp).clickable { tick(); com.anibiar.app.ui.theme.Appearance.setListView(ctx, !listOn) })
+                        Icon(com.anibiar.app.ui.theme.FeatherIcons.Sliders, "Filters", tint = if (showFilters || filters.activeCount > 0) Ani.Lavender else Ani.Muted,
+                            modifier = Modifier.size(24.dp).clickable { tick(); showFilters = !showFilters })
+                    }
+                }
             }
 
             if (state.results.isNotEmpty() && (state.suggest != null || state.offline)) {
@@ -305,31 +327,12 @@ private fun AnimeSearchScreen(onOpen: (Int) -> Unit, onBack: () -> Unit, mode: S
                         }
                     } else {
                     val rows = state.results.chunked(columns)
-                    val ranked = state.query.isBlank() && (filters.sort ?: "POPULARITY_DESC") in RANK_SORTS
                     items(rows.size, key = { "r${state.resultsPage}-$it-${rows[it].first().id}" }) { index ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            rows[index].forEachIndexed { col, media ->
-                                val rank = (state.resultsPage - 1) * 30 + index * columns + col + 1
-                                MediaGridCard(
-                                    media = media,
-                                    leftText = if (ranked) "#$rank" else "",
-                                    rightText = "",
-                                    rating = media.averageScore?.let { it / 10f },
-                                    ccText = (media.airedEpisodes ?: media.episodes)?.takeIf { it > 0 }?.toString(),
-                                    onClick = { onOpen(media.id) },
-                                    saved = media.id in saved,
-                                    onToggleSaved = { app.watchlist.toggle(media.id) },
-                                    armed = armedId == "S${media.id}",
-                                    onArm = { armedId = "S${media.id}" },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rows[index].forEach { media -> com.anibiar.app.ui.home.LaftelPoster(media, { onOpen(media.id) }, Modifier.weight(1f)) }
                             repeat((columns - rows[index].size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(22.dp))
                     }
                     }
                     item(key = "bottompager") {
@@ -359,27 +362,25 @@ private fun Hint(text: String) {
 
 @Composable
 private fun SearchField(value: String, onValue: (String) -> Unit, onSubmit: () -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(19.dp)
+    val shape = RoundedCornerShape(8.dp)
     Row(
-        modifier.fillMaxWidth().height(38.dp).clip(shape).background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.03f))), shape)
-            .padding(horizontal = 12.dp),
+        modifier.fillMaxWidth().height(52.dp).clip(shape).background(Ani.Chip).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(com.anibiar.app.ui.theme.FeatherIcons.Search, "Search", tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(6.dp))
+        Icon(com.anibiar.app.ui.theme.FeatherIcons.Search, "Search", tint = Color.White, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(12.dp))
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text("Titles, genres, specials...", style = inter(13f), color = Color.White.copy(alpha = 0.35f))
+            if (value.isEmpty()) Text("Search by title, tag", style = inter(17f), color = Ani.Muted)
             BasicTextField(
                 value = value, onValueChange = onValue, singleLine = true,
-                textStyle = inter(13.5f).copy(color = Color.White), cursorBrush = SolidColor(Color.White),
+                textStyle = inter(17f).copy(color = Color.White), cursorBrush = SolidColor(Color.White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         if (value.isNotEmpty()) Icon(
-            com.anibiar.app.ui.theme.FeatherIcons.XCircle, "Clear", tint = Color.White.copy(alpha = 0.6f),
-            modifier = Modifier.size(16.dp).clickable { onValue("") },
+            com.anibiar.app.ui.theme.FeatherIcons.XCircle, "Clear", tint = Ani.Muted,
+            modifier = Modifier.size(22.dp).clickable { onValue("") },
         )
     }
 }

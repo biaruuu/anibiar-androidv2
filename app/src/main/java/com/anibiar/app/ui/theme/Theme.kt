@@ -17,14 +17,14 @@ import com.anibiar.app.R
 
 /** Onyx palette sampled from the Miruro reference screenshots. */
 object Ani {
-    val Onyx get() = Color(0xFF000000)
-    val Panel get() = Color(0xFF141414)
-    val Item = Color(0xFF1C1C1C)
-    val Border = Color(0xFF2F2F2F)
-    val Chip = Color(0xFF2F2F2F)
+    val Onyx get() = Color(0xFF141414)
+    val Panel get() = Color(0xFF1C1C1C)
+    val Item = Color(0xFF242424)
+    val Border = Color(0xFF2E2E2E)
+    val Chip = Color(0xFF2E2E2E)
     val ChipOnItem = Color(0xFF3A3A3C)
-    val ButtonDark = Color(0xFF2F2F2F)
-    val Muted = Color(0xFFB3B3B3)
+    val ButtonDark = Color(0xFF2E2E2E)
+    val Muted = Color(0xFF9B9B9B)
     val Soft = Color(0xFFD1D1D6)
     val Lavender get() = Appearance.accent
     val Lime = Color(0xFFAAFF01)

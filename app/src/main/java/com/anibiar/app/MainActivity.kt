@@ -252,7 +252,7 @@ private fun AppNavigation() {
 
     // Keep Home composed underneath so its scroll position survives opening a page.
     Box(Modifier.fillMaxSize().background(com.anibiar.app.ui.theme.Ani.Onyx)) {
-        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; scheduleOpen = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id })
+        HomeScreen(onOpen = { id -> stack.add(id) }, onSearch = { profileOpen = false; settingsOpen = false; inboxTab = false; scheduleOpen = false; searchOpen = true }, onWatch = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onContinue = { id -> watchEp = (context0.applicationContext as AniBiarApp).history.resumeEpisode(id); watchId = id }, onInbox = { profileOpen = false; settingsOpen = false; scheduleOpen = false; searchOpen = false; inboxTab = true })
 
         androidx.compose.animation.AnimatedVisibility(
             visible = searchOpen,
