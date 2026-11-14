@@ -253,7 +253,7 @@ object Streaming {
     }
 
     /** After the first provider answers, the others get this long to show up (slow ones like Nami take several seconds). */
-    private const val PROVIDER_GRACE_MS = 8_000L
+    private const val PROVIDER_GRACE_MS = 12_000L
 
     private fun isIdeal(s: StreamSource, audio: String) = s.height >= 1080 && (audio != "sub" || (s.kind == "soft" && s.subtitles.any(::isEnglish)))
 
@@ -297,7 +297,7 @@ object Streaming {
                 ch.send(Res(res?.getOrNull(), probeAll(res?.getOrNull()?.streams.orEmpty()), res?.exceptionOrNull(), null))
             }
             for (a in local.filter { !StreamHealth.benched(it.lowercase()) }.ifEmpty { local }) jobs += launch {
-                val res = kotlinx.coroutines.withTimeoutOrNull(14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) } }
+                val res = kotlinx.coroutines.withTimeoutOrNull(if (a.lowercase() in Anivault.aliases) 50_000 else 14_000) { runCatching { LocalSources.watch(id, audio, ep, a.lowercase()) } }
                 if (res?.getOrNull().isNullOrEmpty()) StreamHealth.fail(a.lowercase()) else StreamHealth.ok(a.lowercase())
                 ch.send(Res(null, probeAll(res?.getOrNull().orEmpty()), res?.exceptionOrNull(), a.lowercase()))
             }

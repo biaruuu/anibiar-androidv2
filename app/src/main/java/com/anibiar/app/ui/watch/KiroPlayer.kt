@@ -110,6 +110,7 @@ import com.anibiar.app.ui.theme.TrebuchetFamily
 import com.anibiar.app.ui.theme.Ani
 import com.anibiar.app.ui.theme.VidIcons
 import com.anibiar.app.ui.theme.FeatherIcons
+import com.anibiar.app.ui.theme.FluentIcons
 import com.anibiar.app.ui.theme.inter
 import com.anibiar.app.ui.theme.nflx
 import kotlinx.coroutines.Dispatchers
@@ -796,11 +797,13 @@ fun KiroPlayer(
         // ---------------- controls ----------------
         Box(Modifier.fillMaxSize().alpha(aCtl).background(Color(0x66000000))) {
             val live = aCtl > 0.05f
+            // Small inline player (portrait): icons only, no brightness slider.
+            val compact = h < 300.dp
             // Top left: close + title
             Row(Modifier.align(Alignment.TopStart).fillMaxWidth(0.6f).padding(pad), verticalAlignment = Alignment.CenterVertically) {
                 BarButton(btn, FeatherIcons.X, ico, live) { onClose() }
                 Spacer(Modifier.width(6.dp))
-                Text(title, style = nflx((timeSp + 3f), FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = nflx(if (compact) timeSp + 1f else timeSp + 4f, FontWeight.Medium), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             // Top right: cast, picture-in-picture, lock, settings
             Row(Modifier.align(Alignment.TopEnd).padding(pad), verticalAlignment = Alignment.CenterVertically) {
@@ -816,7 +819,7 @@ fun KiroPlayer(
 
             // Left: brightness slider with a sun
             val ctlBright = if (bright >= 0f) bright else (activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0f } ?: 0.5f)
-            Column(Modifier.align(Alignment.CenterStart).padding(start = pad + 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (!compact) Column(Modifier.align(Alignment.CenterStart).padding(start = pad + 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 VSlider(ctlBright, (h * 0.36f).coerce(70.dp, 150.dp), live) { v ->
                     val nv = v.coerceIn(0.02f, 1f); bright = nv
                     activity?.window?.let { win -> win.attributes = win.attributes.also { a -> a.screenBrightness = nv } }
@@ -831,7 +834,7 @@ fun KiroPlayer(
                 Box(Modifier.size(seekSize).clip(CircleShape).clickable(enabled = live && !readOnly) { seekBy(-10); showControls = true }, contentAlignment = Alignment.Center) {
                     Icon(VidIcons.SeekBackward10, "Back 10 seconds", tint = Color.White, modifier = Modifier.fillMaxSize())
                 }
-                Box(Modifier.size(playSize * 1.25f).clip(CircleShape).clickable(enabled = live) { togglePlay(); showControls = true }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(if (compact) playSize else playSize * 1.25f).clip(CircleShape).clickable(enabled = live) { togglePlay(); showControls = true }, contentAlignment = Alignment.Center) {
                     if (buffering && !playing && src != null && error == null) CircularProgressIndicator(Modifier.size(playSize * 0.8f), color = Color.White, strokeWidth = 3.dp)
                     else Icon(if (playing) VidIcons.Pause else VidIcons.Play, if (playing) "Pause" else "Play", tint = Color.White, modifier = Modifier.fillMaxSize())
                 }
@@ -856,11 +859,11 @@ fun KiroPlayer(
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        ActionItem(FeatherIcons.Camera, "Clip", live) { screenshot(context, textureView) { say(it.first, it.second) } }
-                        if (!readOnly) ActionItem(VidIcons.PlaybackSpeedCircle, "Speed (${if (speed == 1f) "1" else speed.toString().removeSuffix(".0")}x)", live) { menuView = "speed"; menuOpen = true }
-                        if (onEpisodes != null) ActionItem(FeatherIcons.List, "Episodes", live) { onEpisodes() }
-                        ActionItem(VidIcons.ClosedCaptions, "Audio & Subtitles", live) { menuView = if (sortedSubs.isNotEmpty()) "captions" else "main"; menuOpen = true }
-                        if (nextLabel != null && !readOnly) ActionItem(FeatherIcons.SkipForward, "Next Episode", live) { onPlayNext() }
+                        ActionItem(FeatherIcons.Camera, "Clip", live, compact) { screenshot(context, textureView) { say(it.first, it.second) } }
+                        if (!readOnly) ActionItem(VidIcons.PlaybackSpeedCircle, "Speed (${if (speed == 1f) "1" else speed.toString().removeSuffix(".0")}x)", live, compact) { menuView = "speed"; menuOpen = true }
+                        if (onEpisodes != null) ActionItem(FluentIcons.Episodes, "Episodes", live, compact) { onEpisodes() }
+                        ActionItem(VidIcons.ClosedCaptions, "Audio & Subtitles", live, compact) { menuView = if (sortedSubs.isNotEmpty()) "captions" else "main"; menuOpen = true }
+                        if (nextLabel != null && !readOnly) ActionItem(FeatherIcons.SkipForward, "Next Episode", live, compact) { onPlayNext() }
                     }
                     Box(Modifier.size(btn).clip(CircleShape).clickable(enabled = live) { onFullscreen(!fullscreen) }, contentAlignment = Alignment.Center) {
                         Icon(if (fullscreen) VidIcons.FullscreenExit else VidIcons.Fullscreen, "Fullscreen", tint = Color.White, modifier = Modifier.size(ico * 0.9f))
@@ -1103,11 +1106,10 @@ private fun ReactionLayer(t: com.anibiar.app.social.WatchTogether, showPicker: B
     }
 }
 
-@Composable private fun ActionItem(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
-    Row(Modifier.clip(RoundedCornerShape(50)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = nflx(12.5f, FontWeight.Medium), color = Color.White, maxLines = 1)
+@Composable private fun ActionItem(icon: ImageVector, label: String, enabled: Boolean, compact: Boolean = false, onClick: () -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(50)).clickable(enabled = enabled, onClick = onClick).padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 6.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, label, tint = Color.White, modifier = Modifier.size(if (compact) 20.dp else 22.dp))
+        if (!compact) { Spacer(Modifier.width(7.dp)); Text(label, style = nflx(13f, FontWeight.Medium), color = Color.White, maxLines = 1) }
     }
 }
 

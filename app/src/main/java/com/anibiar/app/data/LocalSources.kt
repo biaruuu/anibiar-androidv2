@@ -41,7 +41,7 @@ object LocalSources {
     const val HOSHI = "hoshi"    // JSON API, HLS
     const val YUKI = "yuki"      // sub + dub, vidmoly / nova players
     const val NAMI = "nami"      // anikoto: sub + dub, MegaPlay
-    val aliases = listOf(AdminContent.ALIAS, KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI)
+    val aliases = listOf(AdminContent.ALIAS) + Anivault.aliases + listOf(KAZE, TSUKI, DUNYA, GG, HOSHI, YUKI, NAMI)
 
     private const val KAZE_API = "https://animetsu.live/v2/api/anime"
     private const val KAZE_PROXY = "https://swiftstream.top/proxy"
@@ -831,7 +831,8 @@ object LocalSources {
             AdminContent.episodes(id)?.let { onEach(AdminContent.ALIAS, it) }
             return@coroutineScope
         }
-        val jobs: List<Pair<String, suspend () -> Local>> = listOf(
+        Anivault.warmUp()
+        val jobs: List<Pair<String, suspend () -> Local>> = Anivault.aliases.map { a -> a to suspend { Anivault.episodes(id, a) } } + listOf(
             AdminContent.ALIAS to { AdminContent.episodes(id) ?: Local(emptyList(), emptyList()) }, KAZE to { kazeEpisodes(id) }, HOSHI to { kaaEpisodes(id) }, TSUKI to { zoneEpisodes(id) },
             YUKI to { nsEpisodes(id) }, NAMI to { akEpisodes(id) }, DUNYA to { dunyaEpisodes(id) }, GG to { ggEpisodes(id) },
         )
@@ -849,6 +850,7 @@ object LocalSources {
 
     private suspend fun watchInner(id: Int, audio: String, ep: Int, alias: String): List<StreamSource> = when (alias) {
         AdminContent.ALIAS -> AdminContent.watch(id, audio, ep)
+        in Anivault.aliases -> Anivault.watch(id, audio, ep, alias)
         KAZE -> kazeWatch(id, audio, ep)
         TSUKI -> if (audio == "sub") zoneWatch(id, ep) else emptyList()
         HOSHI -> if (audio == "sub") kaaWatch(id, ep) else emptyList()
