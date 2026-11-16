@@ -343,7 +343,7 @@ private fun LookPage(profile: UserProfile?, onBack: () -> Unit, onSave: (String?
             Text("Namecard effect", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 LookTile("None", fx == null, { fx = null }) { androidx.compose.material3.Icon(com.anibiar.app.ui.theme.AniIcons.Close, null, tint = Ani.Muted, modifier = Modifier.size(24.dp)) }
-                Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }, lockLevel = Looks.fxReq(e.id).takeIf { it > level }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize()) } } }
+                Looks.effects.forEach { e -> LookTile(e.name, fx == e.id, { fx = e.id }, lockLevel = Looks.fxReq(e.id).takeIf { it > level }) { Box(Modifier.size(58.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF151517))) { EffectLayer(e.id, Modifier.matchParentSize(), tile = true) } } }
             }
             Text("Profile theme", style = inter(13.5f, FontWeight.SemiBold), color = Ani.Muted, modifier = Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
             androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {

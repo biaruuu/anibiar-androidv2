@@ -604,3 +604,6 @@ Home: full-screen hero with the title logo, one-line tagline and a wide Play but
 
 ## 139 | New avatar decoration and namecard effect | 2026-11-17
 Added the animated Dark Spirit avatar decoration and the Teal Flame namecard effect. Both unlock at level 30 under Edit profile.
+
+## 140 | Kitsune Flame decoration and Moonlit Shrine namecard | 2026-11-17
+New animated avatar decoration (Kitsune Flame) and a still namecard picture (Moonlit Shrine). Both unlock at level 30.
