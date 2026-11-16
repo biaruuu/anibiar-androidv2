@@ -601,3 +601,6 @@ All icons are now Fluent. The app now uses the AniBiar API (kiroapp-api.onrender
 
 ## 138 | New Home and Search look | 2026-11-15
 Home: full-screen hero with the title logo, one-line tagline and a wide Play button, bigger Continue Watching cards, numbered Trending row and clean poster rows. Search: new search bar, genre tabs, results count with sort, and a plain poster grid. Softer dark colours and a roomier bottom bar.
+
+## 139 | New avatar decoration and namecard effect | 2026-11-17
+Added the animated Dark Spirit avatar decoration and the Teal Flame namecard effect. Both unlock at level 30 under Edit profile.

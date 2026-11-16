@@ -43,18 +43,18 @@ class Theme(val id: String, val name: String, val color: Color)
 object Looks {
     val decos = listOf(
         Deco("cat", "Kitty"), Deco("bolt", "Thunder"), Deco("burst", "Burst"),
-        Deco("butterfly", "Butterflies"), Deco("notes", "Study buddy"), Deco("rage", "Furious"),
+        Deco("butterfly", "Butterflies"), Deco("notes", "Study buddy"), Deco("rage", "Furious"), Deco("shade", "Dark Spirit"),
     )
     val effects = listOf(
-        Fx("storm", "Storm"), Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"), Fx("rain", "Rain"), Fx("fireflies", "Fireflies"), Fx("hearts", "Hearts"),
+        Fx("storm", "Storm"), Fx("flame", "Teal Flame"), Fx("sparkle", "Sparkles"), Fx("sakura", "Sakura"), Fx("embers", "Embers"), Fx("snow", "Snowfall"), Fx("aura", "Aura"), Fx("rain", "Rain"), Fx("fireflies", "Fireflies"), Fx("hearts", "Hearts"),
     )
     val themes = listOf(
         Theme("ocean", "Ocean", Color(0xFF2B7FFF)), Theme("rose", "Rose", Color(0xFFFF4D8D)), Theme("forest", "Forest", Color(0xFF2FBF71)),
         Theme("sunset", "Sunset", Color(0xFFFF8A3D)), Theme("gold", "Gold", Color(0xFFFFC83D)), Theme("crimson", "Crimson", Color(0xFFE5383B)),
     )
     /** Levels needed to use each decoration and effect. Level comes from watch time, shows and streaks, so these are earned by watching. */
-    private val decoLevel = mapOf("cat" to 1, "bolt" to 5, "burst" to 10, "butterfly" to 15, "notes" to 20, "rage" to 25)
-    private val fxLevel = mapOf("sparkle" to 1, "sakura" to 3, "snow" to 6, "rain" to 9, "hearts" to 12, "fireflies" to 15, "embers" to 19, "aura" to 23, "storm" to 28)
+    private val decoLevel = mapOf("cat" to 1, "bolt" to 5, "burst" to 10, "butterfly" to 15, "notes" to 20, "rage" to 25, "shade" to 30)
+    private val fxLevel = mapOf("sparkle" to 1, "sakura" to 3, "snow" to 6, "rain" to 9, "hearts" to 12, "fireflies" to 15, "embers" to 19, "aura" to 23, "storm" to 28, "flame" to 30)
     /** Names of the decorations and effects that become available exactly at this level. */
     fun unlockedAt(level: Int): List<String> = decos.filter { decoReq(it.id) == level }.map { it.name } + effects.filter { fxReq(it.id) == level }.map { it.name }
     fun decoReq(id: String) = decoLevel[id] ?: 1
@@ -87,10 +87,11 @@ fun DecoOverlay(id: String?, size: Dp, modifier: Modifier = Modifier) {
 @Composable
 fun EffectLayer(id: String?, modifier: Modifier = Modifier) {
     if (id == null || Looks.effects.none { it.id == id }) return
-    if (id == "storm") {
+    if (id == "storm" || id == "flame") {
         AsyncImage(
-            ImageRequest.Builder(LocalContext.current).data("file:///android_asset/deco/storm.webp").build(), null,
-            modifier = modifier, contentScale = ContentScale.Crop, alignment = androidx.compose.ui.BiasAlignment(0f, -0.85f),
+            ImageRequest.Builder(LocalContext.current).data("file:///android_asset/deco/$id.webp").build(), null,
+            modifier = modifier, contentScale = ContentScale.Crop,
+            alignment = if (id == "storm") androidx.compose.ui.BiasAlignment(0f, -0.85f) else androidx.compose.ui.Alignment.CenterEnd,
         )
         return
     }
